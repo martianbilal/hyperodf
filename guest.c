@@ -10,11 +10,15 @@ __attribute__((noreturn))
 __attribute__((section(".start")))
 _start(void) {
 	const char *p;
-
+	//make multiple memory accesses
+	//check if page tables are being used 
 	for (p = "Hello, world!\n"; *p; ++p)
 		outb(0xE9, *p);
-
+	for (p = "More Words here \n"; *p; ++p)
+		outb(0xE9, *p);
+		
 	*(long *) 0x400 = 42;
+	*(long *) 0x800 = 233;
 
 	for (;;)
 		asm("hlt" : /* empty */ : "a" (42) : "memory");
