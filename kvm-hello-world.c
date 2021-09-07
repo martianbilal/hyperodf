@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <linux/kvm.h>
+#include <time.h>
+
 
 /* CR0 bits */
 #define CR0_PE 1u
@@ -233,8 +235,7 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
 	struct kvm_regs regs;
 	uint64_t memval = 0;
-
-	for (int i = 0; i<=40000; i++) {
+	for (int i = 0;i<4; i++) {
 		if (ioctl(vcpu->fd, KVM_RUN, 0) < 0) {
 			perror("KVM_RUN");
 			exit(1);
@@ -242,7 +243,7 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 
 		switch (vcpu->kvm_run->exit_reason) {
 		case KVM_EXIT_HLT:
-			goto check;
+			goto check_p;
 
 		case KVM_EXIT_IO:
 			if (vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
@@ -263,23 +264,23 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 		}
 	}
 
- check:
+ check_p:
 	if (ioctl(vcpu->fd, KVM_GET_REGS, &regs) < 0) {
 		perror("KVM_GET_REGS");
 		exit(1);
 	}
-
-	if (regs.rax != 42) {
-		printf("Wrong result: {E,R,}AX is %lld\n", regs.rax);
-		return 0;
-	}
+	// if (regs.rax != 42) {
+	// 	printf("Wrong result: {E,R,}AX is %lld\n", regs.rax);
+	// 	return 0;
+	// }
 
 	memcpy(&memval, &vm->mem[0x400], sz);
-	if (memval != 42) {
-		printf("Wrong result: memory at 0x400 is %lld\n",
-		       (unsigned long long)memval);
-		return 0;
-	}
+
+	// if (memval != 42) {
+	// 	printf("Wrong result: memory at 0x400 is %lld\n",
+	// 	       (unsigned long long)memval);
+	// 	return 0;
+	// }
 
 	return 1;
 }
@@ -288,35 +289,36 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
 	struct kvm_regs regs;
 	uint64_t memval = 0;
-
-	for (;;) {
-		if (ioctl(vcpu->fd, KVM_RUN, 0) < 0) {
-			perror("KVM_RUN");
-			exit(1);
-		}
-
-		switch (vcpu->kvm_run->exit_reason) {
-		case KVM_EXIT_HLT:
-			goto check;
-
-		case KVM_EXIT_IO:
-			if (vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
-			    && vcpu->kvm_run->io.port == 0xE9) {
-				char *p = (char *)vcpu->kvm_run;
-				fwrite(p + vcpu->kvm_run->io.data_offset,
-				       vcpu->kvm_run->io.size, 1, stdout);
-				fflush(stdout);
-				continue;
+restart:
+		for (int i=0; i<12; i++) {
+			if (ioctl(vcpu->fd, KVM_RUN, 0) < 0) {
+				perror("KVM_RUN");
+				exit(1);
 			}
 
-			/* fall through */
-		default:
-			fprintf(stderr,	"Got exit_reason %d,"
-				" expected KVM_EXIT_HLT (%d)\n",
-				vcpu->kvm_run->exit_reason, KVM_EXIT_HLT);
-			exit(1);
+			switch (vcpu->kvm_run->exit_reason) {
+			case KVM_EXIT_HLT:
+				goto check;
+
+			case KVM_EXIT_IO:
+				if (vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
+					&& vcpu->kvm_run->io.port == 0xE9) {
+					char *p = (char *)vcpu->kvm_run;
+					fwrite(p + vcpu->kvm_run->io.data_offset,
+							vcpu->kvm_run->io.size, 1, stdout);
+					fflush(stdout);
+					continue;
+				}
+
+				/* fall through */
+			default:
+				goto restart;
+				fprintf(stderr,	"Got exit_reason %d,"
+					" expected KVM_EXIT_HLT (%d)\n",
+					vcpu->kvm_run->exit_reason, KVM_EXIT_HLT);
+				exit(1);
+			}
 		}
-	}
 
  check:
 	if (ioctl(vcpu->fd, KVM_GET_REGS, &regs) < 0) {
@@ -324,18 +326,30 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 		exit(1);
 	}
 
+	memcpy(&memval, &vm->mem[0x400], sz);
 	if (regs.rax != 42) {
 		printf("Wrong result: {E,R,}AX is %lld\n", regs.rax);
-		return 0;
+		printf("Wrong result: memory at 0x400 is %lld\n",
+		       (unsigned long long)memval);
+		goto restart;
+		if(regs.rax == 43){
+			goto restart;
+			return 0;
+		}
+		// goto restart;
+
+		return 1;
 	}
 
-	memcpy(&memval, &vm->mem[0x400], sz);
 	if (memval != 42) {
 		printf("Wrong result: memory at 0x400 is %lld\n",
 		       (unsigned long long)memval);
-		return 0;
+		if(memval == 20){
+			return 0;
+		}
+		// goto restart;
+		return 1;
 	}
-
 	return 1;
 }
 
@@ -533,26 +547,53 @@ static void setup_long_mode(struct vm *vm, struct kvm_sregs *sregs)
 	setup_64bit_code_segment(sregs);
 	
 }
-
-int run_long_mode(struct vm *vm, struct vcpu *vcpu)
+int run_long_mode(struct vcpu *parent_vcpu, struct vm *vm, struct vcpu *vcpu)
 {
+	struct kvm_sregs parent_sregs;
 	struct kvm_sregs sregs;
+	struct kvm_regs parent_regs;
 	struct kvm_regs regs;
 	
 	printf("Testing 64-bit mode\n");
 
-        if (ioctl(vcpu->fd, KVM_GET_SREGS, &sregs) < 0) {
+    
+
+	if(parent_vcpu){
+		if (ioctl(parent_vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
+			perror("KVM_GET_SREGS");
+			exit(1);
+		}
+		if (ioctl(vcpu->fd, KVM_SET_SREGS, &parent_sregs) < 0) {
+			perror("KVM_SET_SREGS");
+			exit(1);
+		}
+		if (ioctl(parent_vcpu->fd, KVM_GET_REGS, &parent_regs) < 0) {
+			perror("KVM_GET_REGS");
+			exit(1);
+		}
+		if (ioctl(vcpu->fd, KVM_SET_REGS, &parent_regs) < 0) {
+			perror("KVM_SET_REGS");
+			exit(1);
+		}
+		memcpy(vm->mem, guest64, guest64_end-guest64);
+		child_run_vm(vm, vcpu, 8);
+		return 0;
+	} 
+	if (ioctl(vcpu->fd, KVM_GET_SREGS, &sregs) < 0) {
 		perror("KVM_GET_SREGS");
 		exit(1);
 	}
-
 	setup_long_mode(vm, &sregs);
 
-        if (ioctl(vcpu->fd, KVM_SET_SREGS, &sregs) < 0) {
+    if (ioctl(vcpu->fd, KVM_SET_SREGS, &sregs) < 0) {
 		perror("KVM_SET_SREGS");
 		exit(1);
 	}
 
+
+	// if in the child vcpu don't set up the regs or the sregs 
+	// use the ones that have been left behind by the original one 
+	
 	memset(&regs, 0, sizeof(regs));
 	/* Clear all FLAGS bits, except bit 1 which is always set. */
 	regs.rflags = 2;
@@ -565,9 +606,9 @@ int run_long_mode(struct vm *vm, struct vcpu *vcpu)
 		exit(1);
 	}
 	memcpy(vm->mem, guest64, guest64_end-guest64);
-	return child_run_vm(vm, vcpu, 8);
+	run_vm(vm, vcpu, 8);
+	return 0;
 }
-
 
 int main(int argc, char **argv)
 {
@@ -575,6 +616,8 @@ int main(int argc, char **argv)
 	struct vm parent_vm;
 	struct vcpu vcpu;
 	struct vcpu parent_vcpu;
+	clock_t start_clk;
+
 	enum {
 		REAL_MODE,
 		PROTECTED_MODE,
@@ -608,10 +651,15 @@ int main(int argc, char **argv)
 		}
 	}
 
+
+	start_clk = clock();
 	vm_init(&parent_vm, 0x200000);
+	printf("\nTime for vm init (parent) %lg \n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
+	start_clk = clock();
 	vcpu_init(&parent_vm, &parent_vcpu);
-	child_vm_init(&parent_vm, &vm, 0x200000);
-	child_vcpu_init(&parent_vcpu, &vm, &vcpu);
+	printf("\nTime for vcpu init (parent) %lg \n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
+	
+	// child_vcpu_init(&parent_vcpu, &vm, &vcpu);
 
 	switch (mode) {
 	case REAL_MODE:
@@ -624,8 +672,19 @@ int main(int argc, char **argv)
 		return !run_paged_32bit_mode(&vm, &vcpu);
 
 	case LONG_MODE:
-		run_long_mode(&parent_vm, &parent_vcpu);
-		return !run_long_mode(&vm, &vcpu);
+		start_clk = clock();
+		child_vm_init(&parent_vm, &vm, 0x200000);
+		printf("\nTime for VM init(child): %lg\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
+		start_clk = clock();
+		vcpu_init(&vm, &vcpu);
+		printf("\nTime for VCPU init(child): %lg\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
+		start_clk = clock();
+		run_long_mode(NULL, &parent_vm, &parent_vcpu);
+		// run_long_mode(NULL, &parent_vm, &parent_vcpu);
+		run_long_mode(&parent_vcpu, &vm, &vcpu);
+		printf("\nDid calls in %lg seconds\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
+ 		
+		return 0;
 	}
 
 	return 1;

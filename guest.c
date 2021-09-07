@@ -5,21 +5,40 @@ static void outb(uint16_t port, uint8_t value) {
 	asm("outb %0,%1" : /* empty */ : "a" (value), "Nd" (port) : "memory");
 }
 
+// static void outb1(uint16_t port, uint8_t value) {
+// 	*(long *) 0x400 = 44;
+// 	asm("outb %0,%1" : /* empty */ : "a" (value), "Nd" (port) : "memory");
+// 	*(long *) 0x400 = 45;
+// }
+
+
 void
 __attribute__((noreturn))
 __attribute__((section(".start")))
 _start(void) {
-	const char *p;
 	//make multiple memory accesses
 	//check if page tables are being used 
-	for (p = "Hello, world!\n"; *p; ++p)
-		outb(0xE9, *p);
-	for (p = "More Words here \n"; *p; ++p)
-		outb(0xE9, *p);
-		
-	*(long *) 0x400 = 42;
-	*(long *) 0x800 = 233;
+	outb(0xE9, 'P');
+	outb(0xE9, 'a');
+	*(long *) 0x400 = 43;
+	outb(0xE9, 'r');
+	outb(0xE9, 'e');
+	outb(0xE9, 'n');
+	outb(0xE9, 't');
+	outb(0xE9, '\n');
 
-	for (;;)
-		asm("hlt" : /* empty */ : "a" (42) : "memory");
+
+		
+	
+	for(int i = 0; i < 1; i++){
+		*(long *) 0x400 = i;
+	}
+	*(long *) 0x400 = 43;
+	
+	outb(0xE9, 't');
+	
+	*(long *) 0x400 = 42;
+	for (;;){
+		asm("hlt"::"a"(42):"memory");
+	}
 }
