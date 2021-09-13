@@ -343,7 +343,7 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
-			if(fork() == 0){
+			if(syscall(439) == 0){
 				printf("== Child VM Started====\n");
 				//do work for the child 
 				//setup the vm --> with the same memory as that of the parent store in the 
