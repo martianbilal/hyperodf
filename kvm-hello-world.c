@@ -316,7 +316,7 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 		perror("KVM_SET_REGS");
 		exit(1);
 	}
-	memcpy(vm.mem, guest64, guest64_end-guest64);
+	// memcpy(vm.mem, guest64, guest64_end-guest64); //Todo : remove it 
 	child_run_vm(&vm, &vcpu, 8);
 
 }
@@ -350,6 +350,7 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 				//in vm->mem =====> Do all of the child vm init
 				//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
 				fork_child(vm, parent_sregs, parent_regs);
+				printf("== Child VM Ended====\n");
 				return 0;
 			} else {
 				wait(NULL);
