@@ -66,6 +66,7 @@
 #define PDE64_PS (1U << 7)
 #define PDE64_G (1U << 8)
 
+char MODE;
 
 struct vm {
 	int sys_fd;
@@ -343,17 +344,32 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
-			if(syscall(439) == 0){
-				printf("== Child VM Started====\n");
-				//do work for the child 
-				//setup the vm --> with the same memory as that of the parent store in the 
-				//in vm->mem =====> Do all of the child vm init
-				//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
-				fork_child(vm, parent_sregs, parent_regs);
-				printf("== Child VM Ended====\n");
-				return 0;
-			} else {
-				wait(NULL);
+			if(MODE == 1){
+				if(syscall(439) == 0){
+					printf("== Child VM Started====\n");
+					//do work for the child 
+					//setup the vm --> with the same memory as that of the parent store in the 
+					//in vm->mem =====> Do all of the child vm init
+					//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
+					fork_child(vm, parent_sregs, parent_regs);
+					printf("== Child VM Ended====\n");
+					return 0;
+				} else {
+					wait(NULL);
+				}
+			} else if (MODE == 0) {
+				if(fork() == 0){
+					printf("== Child VM Started====\n");
+					//do work for the child 
+					//setup the vm --> with the same memory as that of the parent store in the 
+					//in vm->mem =====> Do all of the child vm init
+					//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
+					fork_child(vm, parent_sregs, parent_regs);
+					printf("== Child VM Ended====\n");
+					return 0;
+				} else {
+					wait(NULL);
+				}	
 			}
 		}
 
@@ -596,38 +612,14 @@ static void setup_long_mode(struct vm *vm, struct kvm_sregs *sregs)
 }
 
 
-int run_long_mode(struct vcpu *parent_vcpu, struct vm *vm, struct vcpu *vcpu)
+int run_long_mode(struct vm *vm, struct vcpu *vcpu)
 {
-	struct kvm_sregs parent_sregs;
 	struct kvm_sregs sregs;
-	struct kvm_regs parent_regs;
 	struct kvm_regs regs;
 	
 	printf("Testing 64-bit mode\n");
 
-    
-
-	if(parent_vcpu){
-		if (ioctl(parent_vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
-			perror("KVM_GET_SREGS");
-			exit(1);
-		}
-		if (ioctl(vcpu->fd, KVM_SET_SREGS, &parent_sregs) < 0) {
-			perror("KVM_SET_SREGS");
-			exit(1);
-		}
-		if (ioctl(parent_vcpu->fd, KVM_GET_REGS, &parent_regs) < 0) {
-			perror("KVM_GET_SREGS - prlm");
-			exit(1);
-		}
-		if (ioctl(vcpu->fd, KVM_SET_REGS, &parent_regs) < 0) {
-			perror("KVM_SET_REGS");
-			exit(1);
-		}
-		memcpy(vm->mem, guest64, guest64_end-guest64);
-		child_run_vm(vm, vcpu, 8);
-		return 0;
-	} 
+     
 	if (ioctl(vcpu->fd, KVM_GET_SREGS, &sregs) < 0) {
 		perror("KVM_GET_SREGS - rlm");
 		exit(1);
@@ -682,7 +674,7 @@ int main(int argc, char **argv)
 	} mode = REAL_MODE;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "rspl")) != -1) {
+	while ((opt = getopt(argc, argv, "rspl10")) != -1) {
 		switch (opt) {
 		case 'r':
 			mode = REAL_MODE;
@@ -700,8 +692,16 @@ int main(int argc, char **argv)
 			mode = LONG_MODE;
 			break;
 
+		case '1':
+			MODE = 1;
+			break;
+
+		case '0':
+			MODE = 0;
+			break;
+
 		default:
-			fprintf(stderr, "Usage: %s [ -r | -s | -p | -l ]\n",
+			fprintf(stderr, "Usage: %s [ -r | -s | -p | -l ] [-1 | -0]\n",
 				argv[0]);
 			return 1;
 		}
@@ -735,7 +735,8 @@ int main(int argc, char **argv)
 		// vcpu_init(&vm, &vcpu);
 		// printf("\nTime for VCPU init(child): %lg\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
 		// start_clk = clock();
-		run_long_mode(NULL, &parent_vm, &parent_vcpu);
+		// MODE = 1;
+		run_long_mode(&parent_vm, &parent_vcpu);
 		// run_long_mode(NULL, &parent_vm, &parent_vcpu);
 		// run_long_mode(&parent_vcpu, &vm, &vcpu);
 		// printf("\nDid calls in %lg seconds\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
