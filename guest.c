@@ -20,8 +20,9 @@ _start(void) {
 	//check if page tables are being used 
 	outb(0xE9, 'P');
 	outb(0xE9, 'a');
-	*(long *) 0x400 = 43;
+	// *(long *) 0x400 = 43;
 	outb(0xE9, 'r');
+	asm("hlt"::"a"(42):"memory");
 	outb(0xE9, 'e');
 	outb(0xE9, 'n');
 	outb(0xE9, 't');
@@ -30,15 +31,15 @@ _start(void) {
 
 		
 	
-	for(int i = 0; i < 1; i++){
-		*(long *) 0x400 = i;
-	}
-	*(long *) 0x400 = 43;
+	// for(int i = 0; i < 1; i++){
+	// 	*(long *) 0x400 = i;
+	// }
+	// *(long *) 0x400 = 43;
 	
 	outb(0xE9, 't');
 	
-	*(long *) 0x400 = 42;
+	// *(long *) 0x400 = 42;
 	for (;;){
-		asm("hlt"::"a"(42):"memory");
+		asm("hlt"::"a"(43):"memory");
 	}
 }
