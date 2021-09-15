@@ -108,11 +108,6 @@ void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 	}
 
 	vm->mem = parent_vm->mem;
-	
-	if (vm->mem == MAP_FAILED) {
-		perror("mmap mem");
-		exit(1);
-	}
 
 	madvise(vm->mem, mem_size, MADV_MERGEABLE);
 
@@ -128,6 +123,7 @@ void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 }
 void vm_init(struct vm *vm, size_t mem_size)
 {
+	// int r = 0;
 	int api_ver;
 	struct kvm_userspace_memory_region memreg;
 
@@ -136,6 +132,11 @@ void vm_init(struct vm *vm, size_t mem_size)
 		perror("open /dev/kvm");
 		exit(1);
 	}
+	// r = ioctl(vm->fd, KVM_CHECK_EXTENSION, KVM_CAP_VCPU_EVENTS);
+	// if (r == 0)
+	// 	printf("yahhh");
+	// else 
+	// 	printf("nahhh --- %d", r);
 
 	api_ver = ioctl(vm->sys_fd, KVM_GET_API_VERSION, 0);
 	if (api_ver < 0) {
@@ -324,18 +325,23 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 
 int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
-	struct kvm_regs regs;
 	struct kvm_sregs parent_sregs;
 	struct kvm_regs parent_regs;
 
 	uint64_t memval = 0;
+
+restart:
 	for (int i = 0;; i++) {
 		if (ioctl(vcpu->fd, KVM_RUN, 0) < 0) {
 			perror("KVM_RUN - fc");
 			exit(1);
 		}
 		
-		if ( i == 3 ){
+		
+
+		
+		switch (vcpu->kvm_run->exit_reason) {
+		case KVM_EXIT_HLT:
 			if (ioctl(vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
@@ -344,39 +350,42 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
-			if(MODE == 1){
-				if(syscall(439) == 0){
-					printf("== Child VM Started====\n");
-					//do work for the child 
-					//setup the vm --> with the same memory as that of the parent store in the 
-					//in vm->mem =====> Do all of the child vm init
-					//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
-					fork_child(vm, parent_sregs, parent_regs);
-					printf("== Child VM Ended====\n");
-					return 0;
+			printf("---------->>>> parent CR3 : %llu", parent_sregs.cr3);
+			if (parent_regs.rax == 42)
+			{				
+				if(MODE == 1){
+					if(syscall(439) == 0){
+						printf("== Child VM Started====\n");
+						//do work for the child 
+						//setup the vm --> with the same memory as that of the parent store in the 
+						//in vm->mem =====> Do all of the child vm init
+						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
+						fork_child(vm, parent_sregs, parent_regs);
+						printf("== Child VM Ended====\n");
+						return 0;
+					} else {
+						wait(NULL);
+					}
+				} else if (MODE == 0) {
+					if(fork() == 0){
+						printf("== Child VM Started====\n");
+						//do work for the child 
+						//setup the vm --> with the same memory as that of the parent store in the 
+						//in vm->mem =====> Do all of the child vm init
+						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
+						fork_child(vm, parent_sregs, parent_regs);
+						printf("== Child VM Ended====\n");
+						return 0;
+					} else {
+						wait(NULL);
+					}	
 				} else {
-					wait(NULL);
-				}
-			} else if (MODE == 0) {
-				if(fork() == 0){
-					printf("== Child VM Started====\n");
-					//do work for the child 
-					//setup the vm --> with the same memory as that of the parent store in the 
-					//in vm->mem =====> Do all of the child vm init
-					//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
-					fork_child(vm, parent_sregs, parent_regs);
-					printf("== Child VM Ended====\n");
-					return 0;
-				} else {
-					wait(NULL);
-				}	
-			}
-		}
 
-		
-		switch (vcpu->kvm_run->exit_reason) {
-		case KVM_EXIT_HLT:
-			goto check_p;
+				}
+				goto restart;
+			}
+			else
+				goto check_p;
 
 		case KVM_EXIT_IO:
 			if (vcpu->kvm_run->io.direction == KVM_EXIT_IO_OUT
@@ -397,8 +406,8 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 		}
 	}
 
- check_p:
-	if (ioctl(vcpu->fd, KVM_GET_REGS, &regs) < 0) {
+check_p:
+	if (ioctl(vcpu->fd, KVM_GET_REGS, &parent_regs) < 0) {
 		perror("KVM_GET_REGS");
 		exit(1);
 	}
@@ -674,7 +683,7 @@ int main(int argc, char **argv)
 	} mode = REAL_MODE;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "rspl10")) != -1) {
+	while ((opt = getopt(argc, argv, "rspl102")) != -1) {
 		switch (opt) {
 		case 'r':
 			mode = REAL_MODE;
@@ -699,9 +708,13 @@ int main(int argc, char **argv)
 		case '0':
 			MODE = 0;
 			break;
+		
+		case '2':
+			MODE = 2;
+			break; 
 
 		default:
-			fprintf(stderr, "Usage: %s [ -r | -s | -p | -l ] [-1 | -0]\n",
+			fprintf(stderr, "Usage: %s [ -r | -s | -p | -l ] [-1 | -0 | -2]\n",
 				argv[0]);
 			return 1;
 		}
