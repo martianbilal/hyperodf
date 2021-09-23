@@ -90,7 +90,7 @@ void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 		exit(1);
 	}
 
-	if (api_ver != KVM_API_VERSION) {
+	if (api_ver != 13) {
 		fprintf(stderr, "Got KVM api version %d, expected %d\n",
 			api_ver, KVM_API_VERSION);
 		exit(1);
@@ -102,7 +102,7 @@ void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 		exit(1);
 	}
 
-    if (ioctl(vm->fd, KVM_SET_TSS_ADDR, 0xfffbd000) < 0) {
+    if (ioctl(vm->fd, KVM_SET_TSS_ADDR, 0xff000000) < 0) {
 		perror("KVM_SET_TSS_ADDR");
 		exit(1);
 	}
@@ -143,8 +143,9 @@ void vm_init(struct vm *vm, size_t mem_size)
 		perror("KVM_GET_API_VERSION");
 		exit(1);
 	}
+	printf("api_version : : %u", api_ver);
 
-	if (api_ver != KVM_API_VERSION) {
+	if (api_ver != 13) {
 		fprintf(stderr, "Got KVM api version %d, expected %d\n",
 			api_ver, KVM_API_VERSION);
 		exit(1);
@@ -162,13 +163,13 @@ void vm_init(struct vm *vm, size_t mem_size)
 	}
 
 	vm->mem = mmap(NULL, mem_size, PROT_READ | PROT_WRITE,
-		   MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+		   MAP_SHARED | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 	if (vm->mem == MAP_FAILED) {
 		perror("mmap mem");
 		exit(1);
 	}
 
-	madvise(vm->mem, mem_size, MADV_MERGEABLE);
+	// madvise(vm->mem, mem_size, MADV_MERGEABLE);
 
 	memreg.slot = 0;
 	memreg.flags = 0;
@@ -213,12 +214,34 @@ void child_vcpu_init(struct vcpu *parent_vcpu, struct vm *vm, struct vcpu *vcpu)
 void vcpu_init(struct vm *vm, struct vcpu *vcpu)
 {
 	int vcpu_mmap_size;
+	int res = 1;
+	// struct kvm_enable_cap {
+	// 	/* in */
+	// 	__u32 cap;
 
+
+	// 	__u32 flags;
+
+
+	// 	__u64 args[4];
+
+
+	// 	__u8  pad[64];
+	// } fork_cap;
+
+	struct kvm_enable_cap fork_cap = {
+        .cap = 180,
+        .flags = 0,
+    };
+
+	printf(" %u \n", fork_cap.cap);
 	vcpu->fd = ioctl(vm->fd, KVM_CREATE_VCPU, 0);
         if (vcpu->fd < 0) {
 		perror("KVM_CREATE_VCPU");
                 exit(1);
 	}
+	// res = ioctl(vm->fd, 0xaec5);
+	printf(" ----------> res %u\n\n", res );
 
 	vcpu_mmap_size = ioctl(vm->sys_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
         if (vcpu_mmap_size <= 0) {
@@ -295,7 +318,7 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	// 	// goto restart;
 	// 	return 1;
 	// }
-	return 1;
+	return 0;
 }
 
 extern const unsigned char guest16[], guest16_end[];
@@ -320,6 +343,7 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 	}
 	// memcpy(vm.mem, guest64, guest64_end-guest64); //Todo : remove it 
 	child_run_vm(&vm, &vcpu, 8);
+	return; 
 
 }
 
@@ -379,10 +403,9 @@ restart:
 					} else {
 						wait(NULL);
 					}	
-				} else {
-
 				}
-				goto restart;
+				else
+					goto restart;
 			}
 			else
 				goto check_p;
@@ -424,7 +447,7 @@ check_p:
 	// 	return 0;
 	// }
 
-	return 1;
+	return 0;
 }
 
 
