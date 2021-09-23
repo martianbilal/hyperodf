@@ -102,14 +102,14 @@ void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 		exit(1);
 	}
 
-    if (ioctl(vm->fd, KVM_SET_TSS_ADDR, 0xff000000) < 0) {
+    if (ioctl(vm->fd, KVM_SET_TSS_ADDR, 0xfffbd000) < 0) {
 		perror("KVM_SET_TSS_ADDR");
 		exit(1);
 	}
 
 	vm->mem = parent_vm->mem;
 
-	madvise(vm->mem, mem_size, MADV_MERGEABLE);
+	// madvise(vm->mem, mem_size, MADV_MERGEABLE);
 
 	memreg.slot = 0;
 	memreg.flags = 0;
@@ -157,7 +157,7 @@ void vm_init(struct vm *vm, size_t mem_size)
 		exit(1);
 	}
 
-        if (ioctl(vm->fd, KVM_SET_TSS_ADDR, 0xfffbd000) < 0) {
+    if (ioctl(vm->fd, KVM_SET_TSS_ADDR, 0xfffbd000) < 0) {
                 perror("KVM_SET_TSS_ADDR");
 		exit(1);
 	}
@@ -169,7 +169,7 @@ void vm_init(struct vm *vm, size_t mem_size)
 		exit(1);
 	}
 
-	// madvise(vm->mem, mem_size, MADV_MERGEABLE);
+	madvise(vm->mem, mem_size, MADV_MERGEABLE);
 
 	memreg.slot = 0;
 	memreg.flags = 0;
@@ -260,9 +260,13 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
 	struct kvm_regs regs;
 	uint64_t memval = 0;
+	int r = 0;
+	printf("vm----\n");
 	for (int i=0;; i++) {
-		if (ioctl(vcpu->fd, KVM_RUN, 0) < 0) {
-			perror("KVM_RUN");
+		r = ioctl(vcpu->fd, KVM_RUN, 0);
+		printf("\n value of r === %d\n", r);
+		if (r < 0) {
+			perror("KVM_RUN - ioctl: ");
 			exit(1);
 		}
 
@@ -344,13 +348,63 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 	// memcpy(vm.mem, guest64, guest64_end-guest64); //Todo : remove it 
 	child_run_vm(&vm, &vcpu, 8);
 	return; 
+}
 
+struct fork_info { 
+	struct kvm_userspace_memory_region memreg;
+	int vm_fd;
+	int vcpu_fd;
+};
+
+void fork_child_with_ioctl(struct fork_info *info, int sys_fd,struct kvm_regs parent_regs, struct kvm_sregs parent_sregs){
+	struct vm vm;
+	struct vcpu vcpu;
+	int vcpu_mmap_size;
+	
+	vm.sys_fd = sys_fd;
+	printf("%u", sys_fd);
+	
+	//putting values in vcpu struct 
+	vcpu.fd = info->vcpu_fd;
+
+	//putting values in vm struct 
+	vm.fd = info->vm_fd;
+	vm.mem = (char *)info->memreg.userspace_addr;
+
+	//setting up the kvm run for the vcpu
+	vcpu_mmap_size = ioctl(vm.sys_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
+        if (vcpu_mmap_size <= 0) {
+		perror("KVM_GET_VCPU_MMAP_SIZE");
+                exit(1);
+	}
+	printf("fork");
+
+	vcpu.kvm_run = mmap(NULL, vcpu_mmap_size, PROT_READ | PROT_WRITE,
+			     MAP_SHARED, vcpu.fd, 0);
+	if (vcpu.kvm_run == MAP_FAILED) {
+		perror("mmap kvm_run");
+		exit(1);
+	}			
+
+	if (ioctl(vcpu.fd, KVM_SET_SREGS, &parent_sregs) < 0) {
+		perror("KVM_SET_SREGS");
+		exit(1);
+	}
+	if (ioctl(vcpu.fd, KVM_SET_REGS, &parent_regs) < 0) {
+		perror("KVM_SET_REGS");
+		exit(1);
+	}	
+	
+
+	child_run_vm(&vm, &vcpu, 8);
+	return;
 }
 
 int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
 	struct kvm_sregs parent_sregs;
 	struct kvm_regs parent_regs;
+	struct fork_info info;
 
 	uint64_t memval = 0;
 
@@ -396,8 +450,23 @@ restart:
 						//do work for the child 
 						//setup the vm --> with the same memory as that of the parent store in the 
 						//in vm->mem =====> Do all of the child vm init
-						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
-						fork_child(vm, parent_sregs, parent_regs);
+						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu   
+						info.memreg.slot = 0;
+						info.memreg.flags = 0;
+						info.memreg.guest_phys_addr = 0;
+						info.memreg.memory_size = 0x200000;
+						info.memreg.userspace_addr = (unsigned long)vm->mem;
+						printf("Userspace value of vm-> mem %lu", (unsigned long)vm->mem);
+						// fork_child(vm, parent_sregs, parent_regs);
+						printf("vm fd ::::: > %lu\n", (unsigned long)vm->fd);
+						printf("vm fd ::::: > %lu\n", (unsigned long)vm->sys_fd);
+						ioctl(vm->sys_fd, 0xc028aec5, &info);
+						printf(" The fd of the vcpu : %u\n", info.vcpu_fd);
+						printf(" The fd of the vm : %u\n", info.vm_fd);
+						printf(" The mem the vm : %lu\n", (unsigned long)info.memreg.userspace_addr);
+						fork_child_with_ioctl(&info, vm->sys_fd, parent_regs, parent_sregs);
+					
+						
 						printf("== Child VM Ended====\n");
 						return 0;
 					} else {
