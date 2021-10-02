@@ -90,7 +90,7 @@ void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 		exit(1);
 	}
 
-	if (api_ver != 13) {
+	if (api_ver == 13) {
 		fprintf(stderr, "Got KVM api version %d, expected %d\n",
 			api_ver, KVM_API_VERSION);
 		exit(1);
@@ -145,7 +145,7 @@ void vm_init(struct vm *vm, size_t mem_size)
 	}
 	printf("api_version : : %u", api_ver);
 
-	if (api_ver != 13) {
+	if (api_ver == 13) {
 		fprintf(stderr, "Got KVM api version %d, expected %d\n",
 			api_ver, KVM_API_VERSION);
 		exit(1);
