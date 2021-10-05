@@ -264,7 +264,6 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	printf("vm----\n");
 	for (int i=0;; i++) {
 		r = ioctl(vcpu->fd, KVM_RUN, 0);
-		printf("\n value of r === %d\n", r);
 		if (r < 0) {
 			perror("KVM_RUN - ioctl: ");
 			exit(1);
@@ -351,7 +350,7 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 }
 
 struct fork_info { 
-	struct kvm_userspace_memory_region memreg;
+	unsigned long kvm_userspace_mem;
 	int vm_fd;
 	int vcpu_fd;
 };
@@ -359,6 +358,7 @@ struct fork_info {
 void fork_child_with_ioctl(struct fork_info *info, int sys_fd,struct kvm_regs parent_regs, struct kvm_sregs parent_sregs){
 	struct vm vm;
 	struct vcpu vcpu;
+	struct kvm_userspace_memory_region *memreg; 
 	int vcpu_mmap_size;
 	
 	vm.sys_fd = sys_fd;
@@ -369,7 +369,8 @@ void fork_child_with_ioctl(struct fork_info *info, int sys_fd,struct kvm_regs pa
 
 	//putting values in vm struct 
 	vm.fd = info->vm_fd;
-	vm.mem = (char *)info->memreg.userspace_addr;
+	memreg = (struct kvm_userspace_memory_region *)info->kvm_userspace_mem;
+	vm.mem = (char *)memreg->userspace_addr;
 
 	//setting up the kvm run for the vcpu
 	vcpu_mmap_size = ioctl(vm.sys_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
@@ -405,6 +406,7 @@ int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	struct kvm_sregs parent_sregs;
 	struct kvm_regs parent_regs;
 	struct fork_info info;
+	struct kvm_userspace_memory_region memreg;
 
 	uint64_t memval = 0;
 
@@ -451,19 +453,19 @@ restart:
 						//setup the vm --> with the same memory as that of the parent store in the 
 						//in vm->mem =====> Do all of the child vm init
 						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu   
-						info.memreg.slot = 0;
-						info.memreg.flags = 0;
-						info.memreg.guest_phys_addr = 0;
-						info.memreg.memory_size = 0x200000;
-						info.memreg.userspace_addr = (unsigned long)vm->mem;
+						memreg.slot = 0;
+						memreg.flags = 0;
+						memreg.guest_phys_addr = 0;
+						memreg.memory_size = 0x200000;
+						memreg.userspace_addr = (unsigned long)vm->mem;
+						info.kvm_userspace_mem = (unsigned long)&memreg;
 						printf("Userspace value of vm-> mem %lu", (unsigned long)vm->mem);
 						// fork_child(vm, parent_sregs, parent_regs);
 						printf("vm fd ::::: > %lu\n", (unsigned long)vm->fd);
 						printf("vm fd ::::: > %lu\n", (unsigned long)vm->sys_fd);
-						ioctl(vm->sys_fd, 0xc028aec5, &info);
+						ioctl(vm->sys_fd, 0xc010aec5, &info);
 						printf(" The fd of the vcpu : %u\n", info.vcpu_fd);
 						printf(" The fd of the vm : %u\n", info.vm_fd);
-						printf(" The mem the vm : %lu\n", (unsigned long)info.memreg.userspace_addr);
 						fork_child_with_ioctl(&info, vm->sys_fd, parent_regs, parent_sregs);
 					
 						
