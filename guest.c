@@ -34,7 +34,7 @@ _start(void) {
 	// for(int i = 0; i < 1; i++){
 	// 	*(long *) 0x400 = i;
 	// }
-	// *(long *) 0x400 = 43;
+	*(long *) 0x1000 = 43;
 	
 	outb(0xE9, 't');
 	

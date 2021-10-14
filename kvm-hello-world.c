@@ -205,7 +205,7 @@ void child_vcpu_init(struct vcpu *parent_vcpu, struct vm *vm, struct vcpu *vcpu)
 
 	vcpu->kvm_run = parent_vcpu->kvm_run;
 	if (vcpu->kvm_run == MAP_FAILED) {
-		perror("mmap kvm_run");
+	perror("mmap kvm_run");
 		exit(1);
 	}
 }
@@ -700,9 +700,13 @@ static void setup_long_mode(struct vm *vm, struct kvm_sregs *sregs)
 	uint64_t pd_addr = 0x4000;
 	uint64_t *pd = (void *)(vm->mem + pd_addr);
 
+	uint64_t pt_addr= 0x5000;
+	uint64_t *pt = (void *)(vm->mem + pt_addr);
+
 	pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
 	pdpt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pd_addr;
-	pd[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS;
+	pd[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pt_addr;
+	pt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER ;
 
 	sregs->cr3 = pml4_addr;
 	sregs->cr4 = CR4_PAE;
