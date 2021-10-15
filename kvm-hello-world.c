@@ -163,7 +163,7 @@ void vm_init(struct vm *vm, size_t mem_size)
 	}
 
 	vm->mem = mmap(NULL, mem_size, PROT_READ | PROT_WRITE,
-		   MAP_SHARED | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+		   MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 	if (vm->mem == MAP_FAILED) {
 		perror("mmap mem");
 		exit(1);
@@ -459,6 +459,7 @@ restart:
 						memreg.memory_size = 0x200000;
 						memreg.userspace_addr = (unsigned long)vm->mem;
 						info.kvm_userspace_mem = (unsigned long)&memreg;
+						info.vcpu_fd = vcpu->fd;
 						printf("Userspace value of vm-> mem %lu", (unsigned long)vm->mem);
 						// fork_child(vm, parent_sregs, parent_regs);
 						printf("vm fd ::::: > %lu\n", (unsigned long)vm->fd);
@@ -691,7 +692,7 @@ static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 
 static void setup_long_mode(struct vm *vm, struct kvm_sregs *sregs)
 {
-	uint64_t pml4_addr = 0x20000;
+	uint64_t pml4_addr = 0x2000;
 	uint64_t *pml4 = (void *)(vm->mem + pml4_addr);
 
 	uint64_t pdpt_addr = 0x3000;
