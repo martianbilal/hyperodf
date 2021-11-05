@@ -250,7 +250,7 @@ void vcpu_init(struct vm *vm, struct vcpu *vcpu)
 	}
 
 	vcpu->kvm_run = mmap(NULL, vcpu_mmap_size, PROT_READ | PROT_WRITE,
-			     MAP_SHARED, vcpu->fd, 0);
+			     MAP_PRIVATE, vcpu->fd, 0);
 	if (vcpu->kvm_run == MAP_FAILED) {
 		perror("mmap kvm_run");
 		exit(1);
@@ -355,7 +355,7 @@ struct fork_info {
 	int vcpu_fd;
 };
 
-void fork_child_with_ioctl(struct fork_info *info, int sys_fd,struct kvm_regs parent_regs, struct kvm_sregs parent_sregs){
+void fork_child_with_ioctl(struct fork_info *info, int sys_fd){
 	struct vm vm;
 	struct vcpu vcpu;
 	struct kvm_userspace_memory_region *memreg; 
@@ -381,20 +381,12 @@ void fork_child_with_ioctl(struct fork_info *info, int sys_fd,struct kvm_regs pa
 	printf("fork");
 
 	vcpu.kvm_run = mmap(NULL, vcpu_mmap_size, PROT_READ | PROT_WRITE,
-			     MAP_SHARED, vcpu.fd, 0);
+			     MAP_PRIVATE, vcpu.fd, 0);
 	if (vcpu.kvm_run == MAP_FAILED) {
 		perror("mmap kvm_run");
 		exit(1);
 	}			
 
-	if (ioctl(vcpu.fd, KVM_SET_SREGS, &parent_sregs) < 0) {
-		perror("KVM_SET_SREGS");
-		exit(1);
-	}
-	if (ioctl(vcpu.fd, KVM_SET_REGS, &parent_regs) < 0) {
-		perror("KVM_SET_REGS");
-		exit(1);
-	}	
 	
 
 	child_run_vm(&vm, &vcpu, 8);
@@ -430,7 +422,6 @@ restart:
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
-			printf("---------->>>> parent CR3 : %llu", parent_sregs.cr3);
 			if (parent_regs.rax == 42)
 			{				
 				if(MODE == 1){
@@ -460,6 +451,7 @@ restart:
 						memreg.userspace_addr = (unsigned long)vm->mem;
 						info.kvm_userspace_mem = (unsigned long)&memreg;
 						info.vcpu_fd = vcpu->fd;
+						info.vm_fd = vm->fd;
 						printf("Userspace value of vm-> mem %lu", (unsigned long)vm->mem);
 						// fork_child(vm, parent_sregs, parent_regs);
 						printf("vm fd ::::: > %lu\n", (unsigned long)vm->fd);
@@ -467,7 +459,7 @@ restart:
 						ioctl(vm->sys_fd, 0xc010aec5, &info);
 						printf(" The fd of the vcpu : %u\n", info.vcpu_fd);
 						printf(" The fd of the vm : %u\n", info.vm_fd);
-						fork_child_with_ioctl(&info, vm->sys_fd, parent_regs, parent_sregs);
+						fork_child_with_ioctl(&info, vm->sys_fd);
 					
 						
 						printf("== Child VM Ended====\n");
