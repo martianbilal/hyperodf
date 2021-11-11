@@ -20,7 +20,7 @@ _start(void) {
 	//check if page tables are being used 
 	outb(0xE9, 'P');
 	outb(0xE9, 'a');
-	// *(long *) 0x400 = 43;
+	*(long *) 0x400 = 43;
 	outb(0xE9, 'r');
 	asm("hlt"::"a"(42):"memory");
 	outb(0xE9, 'e');
@@ -38,7 +38,7 @@ _start(void) {
 	
 	outb(0xE9, 't');
 	
-	// *(long *) 0x400 = 42;
+	*(long *) 0x400 = 42;
 	for (;;){
 		asm("hlt"::"a"(43):"memory");
 	}

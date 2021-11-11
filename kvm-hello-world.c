@@ -300,6 +300,7 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	}
 
 	memcpy(&memval, &vm->mem[0x400], sz);
+	printf("The value of memory at 0x400 :: > %lld", (unsigned long long)memval);
 	// if (regs.rax != 42) {
 	// 	printf("Wrong result: {E,R,}AX is %lld\n", regs.rax);
 	// 	printf("Wrong result: memory at 0x400 is %lld\n",
