@@ -7,7 +7,9 @@ typedef struct VM {
   void *mem;
   uint64_t mem_size;
   /* Only supports one vCPU */
+  int vmfd;
   int vcpufd;
+  int sysfd;
   struct kvm_run *run;
 } VM;
 

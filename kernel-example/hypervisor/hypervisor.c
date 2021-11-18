@@ -11,6 +11,7 @@
 #include "definition.h"
 #include "hypercall.h"
 
+#define KVM_FORK (0xc010aec5)
 #define PS_LIMIT (0x200000)
 #define KERNEL_STACK_SIZE (0x4000)
 /*
@@ -133,7 +134,7 @@ VM* kvm_init(uint8_t code[], size_t len) {
   void *mem = mmap(0,
     MEM_SIZE,
     PROT_READ | PROT_WRITE,
-    MAP_SHARED | MAP_ANONYMOUS,
+    MAP_PRIVATE | MAP_ANONYMOUS,
     -1, 0);
   if(mem == NULL) pexit("mmap(MEM_SIZE)");
   size_t entry = 0;
@@ -162,6 +163,8 @@ VM* kvm_init(uint8_t code[], size_t len) {
     .mem = mem,
     .mem_size = MEM_SIZE,
     .vcpufd = vcpufd,
+    .vmfd = vmfd,
+    .sys_fd = kvmfd,
     .run = run
   };
 
@@ -179,13 +182,51 @@ int check_iopl(VM *vm) {
   return sregs.cs.dpl <= ((regs.rflags >> 12) & 3);
 }
 
+struct fork_info {
+  unsigned long kvm_userspace_mem;
+  int vm_fd;
+  int vcpu_fd;
+};
+
+void fork_child_with_ioctl(struct fork_info, int kvmfd){
+
+}
+  
 void execute(VM* vm) {
+  struct fork_info info;
+  bool fork = false; 
+  struct kvm_regs regs;
+  struct kvm_userspace_memory_region memreg;
   while(1) {
     ioctl(vm->vcpufd, KVM_RUN, NULL);
     dump_regs(vm->vcpufd);
     switch (vm->run->exit_reason) {
     case KVM_EXIT_HLT:
+      ioctl(vm->vcpufd, KVM_GET_REGS, &regs);
+      if(regs == 42){
+        if(fork){
+          if(fork() == 0){
+            printf("======CHILD VM STARTED=======\n");
+            memreg.slot = 0;
+            memreg.flags = 0;
+            memreg.guest_phys_addr = 0;
+            memreg.memory_size = MEM_SIZE;
+            memreg.userspace_addr = (size_t) vm->mem;
+            info.kvm_userspace_mem = (unsigned long)&memreg;
+            info.vcpu_fd = vm->vcpufd;
+            info.vm_fd = vm->vmfd;
+            ioctl(vm->sysfd, KVM_FORK, &info);
+            fork_child_with_ioctl(&info, vm->sysfd);
+            printf("======CHILD VM Ended=======\n");
+          } else {
+            wait(NULL);
+          }
+          break;
+        }
+        return;
+      }
       fprintf(stderr, "KVM_EXIT_HLT\n");
+      
       return;
     case KVM_EXIT_IO:
       if(!check_iopl(vm)) error("KVM_EXIT_SHUTDOWN\n");
