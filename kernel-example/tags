@@ -1,0 +1,358 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+BADFD	hypervisor/hypercall.c	104;"	d	file:
+CFLAGS	hypervisor/Makefile	/^CFLAGS := -Wall$/;"	m
+CFLAGS	kernel/Makefile	/^CFLAGS := -Wall -Werror -fPIE -pie -masm=intel -nostdlib -Os -I.$/;"	m
+CFLAGS	kernel/template.mk	/^CFLAGS := -nostdlib -Os -Wall -Werror -fPIE -pie -masm=intel -I..$/;"	m
+CHECK_OOB	hypervisor/hypercall.c	71;"	d	file:
+CR0_AM	hypervisor/definition.h	33;"	d
+CR0_CD	hypervisor/definition.h	35;"	d
+CR0_EM	hypervisor/definition.h	28;"	d
+CR0_ET	hypervisor/definition.h	30;"	d
+CR0_MP	hypervisor/definition.h	27;"	d
+CR0_NE	hypervisor/definition.h	31;"	d
+CR0_NW	hypervisor/definition.h	34;"	d
+CR0_PE	hypervisor/definition.h	26;"	d
+CR0_PG	hypervisor/definition.h	36;"	d
+CR0_TS	hypervisor/definition.h	29;"	d
+CR0_WP	hypervisor/definition.h	32;"	d
+CR4_DE	hypervisor/definition.h	42;"	d
+CR4_FSGSBASE	hypervisor/definition.h	53;"	d
+CR4_MCE	hypervisor/definition.h	45;"	d
+CR4_OSFXSR	hypervisor/definition.h	48;"	d
+CR4_OSXMMEXCPT	hypervisor/definition.h	49;"	d
+CR4_OSXSAVE	hypervisor/definition.h	55;"	d
+CR4_PAE	hypervisor/definition.h	44;"	d
+CR4_PCE	hypervisor/definition.h	47;"	d
+CR4_PCIDE	hypervisor/definition.h	54;"	d
+CR4_PGE	hypervisor/definition.h	46;"	d
+CR4_PKE	hypervisor/definition.h	58;"	d
+CR4_PSE	hypervisor/definition.h	43;"	d
+CR4_PVI	hypervisor/definition.h	40;"	d
+CR4_SMAP	hypervisor/definition.h	57;"	d
+CR4_SMEP	hypervisor/definition.h	56;"	d
+CR4_SMXE	hypervisor/definition.h	52;"	d
+CR4_TSD	hypervisor/definition.h	41;"	d
+CR4_UMIP	hypervisor/definition.h	50;"	d
+CR4_VME	hypervisor/definition.h	39;"	d
+CR4_VMXE	hypervisor/definition.h	51;"	d
+CSRCS	kernel/template.mk	/^CSRCS	:= $(wildcard *.c)$/;"	m
+DEBUG_H	hypervisor/debug.h	2;"	d
+DEFINITION_H	hypervisor/definition.h	2;"	d
+DEPS	hypervisor/Makefile	/^DEPS := definition.h debug.h$/;"	m
+DEPS	kernel/Makefile	/^DEPS := $(wildcard .\/**\/*.d)$/;"	m
+DEPS	kernel/template.mk	/^DEPS	:= $(CSRCS:.c=.d)$/;"	m
+DIRS	Makefile	/^DIRS := hypervisor kernel$/;"	m
+EACCES	kernel/utils/errno.h	9;"	d
+EBADF	kernel/utils/errno.h	7;"	d
+EFAULT	kernel/utils/errno.h	10;"	d
+EFER_FFXSR	hypervisor/definition.h	66;"	d
+EFER_LMA	hypervisor/definition.h	62;"	d
+EFER_LME	hypervisor/definition.h	61;"	d
+EFER_LMSLE	hypervisor/definition.h	65;"	d
+EFER_NXE	hypervisor/definition.h	63;"	d
+EFER_SCE	hypervisor/definition.h	60;"	d
+EFER_SVME	hypervisor/definition.h	64;"	d
+EFER_TCE	hypervisor/definition.h	67;"	d
+EINVAL	kernel/utils/errno.h	11;"	d
+EI_NIDENT	kernel/elf/elf.h	6;"	d
+ELF_H	kernel/elf/elf.h	2;"	d
+ENFILE	kernel/utils/errno.h	12;"	d
+ENOEXEC	kernel/utils/errno.h	6;"	d
+ENOHP	kernel/utils/errno.h	14;"	d
+ENOMEM	kernel/utils/errno.h	8;"	d
+ENOSYS	kernel/utils/errno.h	13;"	d
+ENTRY	kernel/syscalls/syscall_handler.c	14;"	d	file:
+ENTRY	kernel/syscalls/syscall_handler.c	6;"	d	file:
+EPERM	kernel/utils/errno.h	5;"	d
+ERRNO_H	kernel/utils/errno.h	2;"	d
+ET_DYN	kernel/elf/elf.h	26;"	d
+ET_EXEC	kernel/elf/elf.h	25;"	d
+Elf64_Addr	kernel/elf/elf.h	/^typedef __u64	Elf64_Addr;$/;"	t
+Elf64_Ehdr	kernel/elf/elf.h	/^} Elf64_Ehdr;$/;"	t	typeref:struct:elf64_hdr
+Elf64_Half	kernel/elf/elf.h	/^typedef __u16	Elf64_Half;$/;"	t
+Elf64_Off	kernel/elf/elf.h	/^typedef __u64	Elf64_Off;$/;"	t
+Elf64_Phdr	kernel/elf/elf.h	/^} Elf64_Phdr;$/;"	t	typeref:struct:elf64_phdr
+Elf64_SHalf	kernel/elf/elf.h	/^typedef __s16	Elf64_SHalf;$/;"	t
+Elf64_Sword	kernel/elf/elf.h	/^typedef __s32	Elf64_Sword;$/;"	t
+Elf64_Sxword	kernel/elf/elf.h	/^typedef __s64	Elf64_Sxword;$/;"	t
+Elf64_Word	kernel/elf/elf.h	/^typedef __u32	Elf64_Word;$/;"	t
+Elf64_Xword	kernel/elf/elf.h	/^typedef __u64	Elf64_Xword;$/;"	t
+FETCH_U32	hypervisor/hypercall.c	62;"	d	file:
+HP_CLOSE_H	kernel/hypercalls/hp_close.h	2;"	d
+HP_LSEEK_H	kernel/hypercalls/hp_lseek.h	2;"	d
+HP_NR_MARK	hypervisor/hypercall_table.h	4;"	d
+HP_NR_MARK	kernel/hypercalls/hypercall_table.h	4;"	d
+HP_OPEN_H	kernel/hypercalls/hp_open.h	2;"	d
+HP_READ_H	kernel/hypercalls/hp_read.h	2;"	d
+HP_WRITE_H	kernel/hypercalls/hp_write.h	2;"	d
+HYPERCALL_H	hypervisor/hypercall.h	2;"	d
+HYPERCALL_H	kernel/hypercalls/hypercall.h	2;"	d
+HYPERCALL_TABLE_H	hypervisor/hypercall_table.h	2;"	d
+HYPERCALL_TABLE_H	kernel/hypercalls/hypercall_table.h	2;"	d
+KERNEL_BASE_OFFSET	kernel/mm/translate.h	25;"	d
+KERNEL_PAGING_SIZE	kernel/mm/translate.h	23;"	d
+KERNEL_STACK_SIZE	hypervisor/hypervisor.c	15;"	d	file:
+KMALLOC_H	kernel/mm/kmalloc.h	2;"	d
+LDFLAGS	kernel/Makefile	/^LDFLAGS := -ffreestanding -fno-builtin -Tlinker.script$/;"	m
+MALLOC_NO_ALIGN	kernel/mm/kmalloc.h	8;"	d
+MALLOC_PAGE_ALIGN	kernel/mm/kmalloc.h	9;"	d
+MAP_FIXED	kernel/syscalls/sys_mmap.h	6;"	d
+MAX_FD	hypervisor/hypercall.c	44;"	d	file:
+MAX_KERNEL_SIZE	hypervisor/hypervisor.c	20;"	d	file:
+MAX_SYS_NR	kernel/syscalls/syscall_handler.h	18;"	d
+MAY_INIT_FD_MAP	hypervisor/hypercall.c	/^static inline void MAY_INIT_FD_MAP() {$/;"	f	file:
+MEM_AT	hypervisor/hypercall.c	73;"	d	file:
+MEM_SIZE	hypervisor/hypervisor.c	21;"	d	file:
+MIN_MMAP_ADDR	kernel/mm/translate.h	24;"	d
+MIN_USER_MEM	kernel/mm/translate.h	27;"	d
+MISC_H	kernel/utils/misc.h	2;"	d
+MMAP_H	kernel/mm/mmap.h	2;"	d
+MSR_CSTAR	kernel/kernel_main.c	9;"	d	file:
+MSR_LSTAR	kernel/kernel_main.c	8;"	d	file:
+MSR_STAR	kernel/kernel_main.c	7;"	d	file:
+MSR_SYSCALL_MASK	kernel/kernel_main.c	10;"	d	file:
+NR_HP_close	hypervisor/hypercall_table.h	9;"	d
+NR_HP_close	kernel/hypercalls/hypercall_table.h	9;"	d
+NR_HP_exit	hypervisor/hypercall_table.h	11;"	d
+NR_HP_exit	kernel/hypercalls/hypercall_table.h	11;"	d
+NR_HP_lseek	hypervisor/hypercall_table.h	10;"	d
+NR_HP_lseek	kernel/hypercalls/hypercall_table.h	10;"	d
+NR_HP_open	hypervisor/hypercall_table.h	6;"	d
+NR_HP_open	kernel/hypercalls/hypercall_table.h	6;"	d
+NR_HP_panic	hypervisor/hypercall_table.h	13;"	d
+NR_HP_panic	kernel/hypercalls/hypercall_table.h	13;"	d
+NR_HP_read	hypervisor/hypercall_table.h	7;"	d
+NR_HP_read	kernel/hypercalls/hypercall_table.h	7;"	d
+NR_HP_write	hypervisor/hypercall_table.h	8;"	d
+NR_HP_write	kernel/hypercalls/hypercall_table.h	8;"	d
+OBJS	kernel/Makefile	/^OBJS :=$/;"	m
+OBJS	kernel/template.mk	/^OBJS	:= $(SSRCS:.s=.o) $(CSRCS:.c=.o)$/;"	m
+PAGE_TABLE_SIZE	hypervisor/hypervisor.c	19;"	d	file:
+PAGING	kernel/mm/translate.c	39;"	d	file:
+PAGING	kernel/mm/translate.c	51;"	d	file:
+PAGING	kernel/mm/translate.c	59;"	d	file:
+PAGING	kernel/mm/translate.c	66;"	d	file:
+PAGING	kernel/mm/translate.c	80;"	d	file:
+PAGING	kernel/mm/translate.c	93;"	d	file:
+PANIC_H	kernel/utils/panic.h	2;"	d
+PDE64_ACCESSED	hypervisor/definition.h	73;"	d
+PDE64_ACCESSED	kernel/mm/translate.h	18;"	d
+PDE64_DIRTY	hypervisor/definition.h	74;"	d
+PDE64_DIRTY	kernel/mm/translate.h	19;"	d
+PDE64_G	hypervisor/definition.h	76;"	d
+PDE64_G	kernel/mm/translate.h	21;"	d
+PDE64_PRESENT	hypervisor/definition.h	70;"	d
+PDE64_PRESENT	kernel/mm/translate.h	15;"	d
+PDE64_PS	hypervisor/definition.h	75;"	d
+PDE64_PS	kernel/mm/translate.h	20;"	d
+PDE64_RW	hypervisor/definition.h	71;"	d
+PDE64_RW	kernel/mm/translate.h	16;"	d
+PDE64_USER	hypervisor/definition.h	72;"	d
+PDE64_USER	kernel/mm/translate.h	17;"	d
+PDOFF	kernel/mm/translate.c	29;"	d	file:
+PDPOFF	kernel/mm/translate.c	28;"	d	file:
+PF_R	kernel/elf/elf.h	49;"	d
+PF_W	kernel/elf/elf.h	50;"	d
+PF_X	kernel/elf/elf.h	51;"	d
+PML4OFF	kernel/mm/translate.c	27;"	d	file:
+PROCESS	hypervisor/hypercall.c	64;"	d	file:
+PROCESS_ON_FD	hypervisor/hypercall.c	105;"	d	file:
+PROT_R	kernel/mm/translate.h	8;"	d
+PROT_RW	kernel/mm/translate.h	11;"	d
+PROT_RWX	kernel/mm/translate.h	12;"	d
+PROT_W	kernel/mm/translate.h	9;"	d
+PROT_X	kernel/mm/translate.h	10;"	d
+PS_LIMIT	hypervisor/hypervisor.c	14;"	d	file:
+PTOFF	kernel/mm/translate.c	30;"	d	file:
+PT_LOAD	kernel/elf/elf.h	46;"	d
+ROUNDDOWN	kernel/syscalls/sys_execve.c	74;"	d	file:
+SEEK_CUR	kernel/hypercalls/hp_lseek.h	7;"	d
+SEEK_END	kernel/hypercalls/hp_lseek.h	8;"	d
+SEEK_SET	kernel/hypercalls/hp_lseek.h	6;"	d
+SRCS	hypervisor/Makefile	/^SRCS := hypervisor.c hypercall.c$/;"	m
+SRCS	kernel/Makefile	/^SRCS := entry.s kernel_main.c$/;"	m
+SSRCS	kernel/template.mk	/^SSRCS	:= $(wildcard *.s)$/;"	m
+STACK_ALLOC	hypervisor/hypervisor.c	217;"	d	file:
+STACK_ALLOC	hypervisor/hypervisor.c	231;"	d	file:
+STACK_ALLOC	kernel/syscalls/sys_execve.c	73;"	d	file:
+STRING_H	kernel/utils/string.h	2;"	d
+SUBOBJS	kernel/Makefile	/^SUBOBJS := syscalls\/syscalls.a hypercalls\/hypercalls.a mm\/mm.a elf\/elf.a utils\/utils.a$/;"	m
+SYSCALL_HANDLER_H	kernel/syscalls/syscall_handler.h	2;"	d
+SYS_CLOSE_H	kernel/syscalls/sys_close.h	2;"	d
+SYS_EXECVE_H	kernel/syscalls/sys_execve.h	2;"	d
+SYS_EXIT_H	kernel/syscalls/sys_exit.h	2;"	d
+SYS_MMAP_H	kernel/syscalls/sys_mmap.h	2;"	d
+SYS_OPEN_H	kernel/syscalls/sys_open.h	2;"	d
+SYS_READ_H	kernel/syscalls/sys_read.h	2;"	d
+SYS_WRITE_H	kernel/syscalls/sys_write.h	2;"	d
+SYS_close	kernel/syscalls/syscall_handler.h	15;"	d
+SYS_exit	kernel/syscalls/syscall_handler.h	16;"	d
+SYS_open	kernel/syscalls/syscall_handler.h	14;"	d
+SYS_read	kernel/syscalls/syscall_handler.h	12;"	d
+SYS_write	kernel/syscalls/syscall_handler.h	13;"	d
+TARGET	hypervisor/Makefile	/^TARGET := hypervisor.elf$/;"	m
+TARGET	kernel/Makefile	/^TARGET := kernel.bin$/;"	m
+TARGET	kernel/elf/Makefile	/^TARGET := elf.a$/;"	m
+TARGET	kernel/hypercalls/Makefile	/^TARGET := hypercalls.a$/;"	m
+TARGET	kernel/mm/Makefile	/^TARGET := mm.a$/;"	m
+TARGET	kernel/syscalls/Makefile	/^TARGET := syscalls.a$/;"	m
+TARGET	kernel/utils/Makefile	/^TARGET := utils.a$/;"	m
+THEN_RETURN	hypervisor/hypercall.c	65;"	d	file:
+TRANSLATE_H	kernel/mm/translate.h	2;"	d
+UACCESS_H	kernel/mm/uaccess.h	2;"	d
+UNUSED_VAR	hypervisor/hypercall.c	60;"	d	file:
+USER_MEM_RANGE_OK	kernel/mm/translate.h	29;"	d
+VERIFY_READ	kernel/mm/uaccess.h	6;"	d
+VERIFY_WRITE	kernel/mm/uaccess.h	7;"	d
+VM	hypervisor/definition.h	/^typedef struct VM {$/;"	s
+VM	hypervisor/definition.h	/^} VM;$/;"	t	typeref:struct:VM
+_OFFSET	kernel/mm/translate.c	25;"	d	file:
+__s16	kernel/elf/elf.h	/^typedef int16_t __s16;$/;"	t
+__s32	kernel/elf/elf.h	/^typedef int32_t __s32;$/;"	t
+__s64	kernel/elf/elf.h	/^typedef int64_t __s64;$/;"	t
+__u16	kernel/elf/elf.h	/^typedef uint16_t __u16;$/;"	t
+__u32	kernel/elf/elf.h	/^typedef uint32_t __u32;$/;"	t
+__u64	kernel/elf/elf.h	/^typedef uint64_t __u64;$/;"	t
+_start	kernel/entry.s	/^_start:$/;"	l
+access_ok	kernel/mm/uaccess.c	/^int access_ok(int type, const void* addr_, uint64_t size) {$/;"	f
+access_string_ok	kernel/mm/uaccess.c	/^int access_string_ok(const void *addr_) {$/;"	f
+add_trans_user	kernel/mm/translate.c	/^void add_trans_user(void* vaddr_, void* paddr_, int prot) {$/;"	f
+aligndown	kernel/utils/misc.h	4;"	d
+alignok	kernel/utils/misc.h	6;"	d
+alignup	kernel/mm/kmalloc.c	110;"	d	file:
+alignup	kernel/utils/misc.h	5;"	d
+arena	kernel/mm/kmalloc.c	/^static struct kmalloc_arena arena;$/;"	v	typeref:struct:kmalloc_arena	file:
+check_and_get_count	kernel/syscalls/sys_execve.c	/^static int check_and_get_count(char *const ary[]) {$/;"	f	file:
+check_iopl	hypervisor/hypervisor.c	/^int check_iopl(VM *vm) {$/;"	f
+chunk	kernel/mm/kmalloc.c	/^  struct chunk {$/;"	s	struct:kmalloc_arena	file:
+chunk2mem	kernel/mm/kmalloc.c	20;"	d	file:
+copy_argv	hypervisor/hypervisor.c	/^void copy_argv(VM* vm, int argc, char *argv[]) {$/;"	f
+copy_str_from_user	kernel/mm/uaccess.c	/^void *copy_str_from_user(const char *s) {$/;"	f
+create_elf_info	kernel/syscalls/sys_execve.c	/^static int create_elf_info(process *p, char *const argv[], char *const envp[]) {$/;"	f	file:
+debug	hypervisor/debug.h	11;"	d
+do_close	hypervisor/hypercall.c	/^static inline int do_close(struct fd_handle *h) {$/;"	f	file:
+dump_regs	hypervisor/debug.h	/^void dump_regs(int vcpufd) {$/;"	f
+dump_regs	hypervisor/debug.h	51;"	d
+dump_seg	hypervisor/debug.h	12;"	d
+e_ehsize	kernel/elf/elf.h	/^  Elf64_Half e_ehsize;$/;"	m	struct:elf64_hdr
+e_entry	kernel/elf/elf.h	/^  Elf64_Addr e_entry;$/;"	m	struct:elf64_hdr
+e_flags	kernel/elf/elf.h	/^  Elf64_Word e_flags;$/;"	m	struct:elf64_hdr
+e_ident	kernel/elf/elf.h	/^  unsigned char	e_ident[EI_NIDENT];$/;"	m	struct:elf64_hdr
+e_machine	kernel/elf/elf.h	/^  Elf64_Half e_machine;$/;"	m	struct:elf64_hdr
+e_phentsize	kernel/elf/elf.h	/^  Elf64_Half e_phentsize;$/;"	m	struct:elf64_hdr
+e_phnum	kernel/elf/elf.h	/^  Elf64_Half e_phnum;$/;"	m	struct:elf64_hdr
+e_phoff	kernel/elf/elf.h	/^  Elf64_Off e_phoff;$/;"	m	struct:elf64_hdr
+e_shentsize	kernel/elf/elf.h	/^  Elf64_Half e_shentsize;$/;"	m	struct:elf64_hdr
+e_shnum	kernel/elf/elf.h	/^  Elf64_Half e_shnum;$/;"	m	struct:elf64_hdr
+e_shoff	kernel/elf/elf.h	/^  Elf64_Off e_shoff;$/;"	m	struct:elf64_hdr
+e_shstrndx	kernel/elf/elf.h	/^  Elf64_Half e_shstrndx;$/;"	m	struct:elf64_hdr
+e_type	kernel/elf/elf.h	/^  Elf64_Half e_type;$/;"	m	struct:elf64_hdr
+e_version	kernel/elf/elf.h	/^  Elf64_Word e_version;$/;"	m	struct:elf64_hdr
+elf64_hdr	kernel/elf/elf.h	/^typedef struct elf64_hdr {$/;"	s
+elf64_phdr	kernel/elf/elf.h	/^typedef struct elf64_phdr {$/;"	s
+entry	kernel/syscalls/sys_execve.h	/^  uint64_t entry;$/;"	m	struct:process
+error	hypervisor/definition.h	15;"	d
+execute	hypervisor/hypervisor.c	/^void execute(VM* vm) {$/;"	f
+fd_handle	hypervisor/hypercall.c	/^typedef struct fd_handle {$/;"	s	file:
+fd_handle	hypervisor/hypercall.c	/^} fd_handle;$/;"	t	typeref:struct:fd_handle	file:
+fd_map	hypervisor/hypercall.c	/^static fd_handle fd_map[MAX_FD + 1];$/;"	v	file:
+fetch_sorted_bin	kernel/mm/kmalloc.c	/^static void *fetch_sorted_bin(uint64_t nb) {$/;"	f	file:
+generate	user/gen.py	/^def generate(filename, data):$/;"	f
+get_pml4_addr	kernel/mm/translate.c	/^static inline uint64_t* get_pml4_addr() {$/;"	f	file:
+handle	hypervisor/hypercall.c	23;"	d	file:
+handle	hypervisor/hypercall.c	33;"	d	file:
+handle_rw	hypervisor/hypercall.c	/^static int handle_rw(VM* vm, typeof(read) fptr) {$/;"	f	file:
+hlt	kernel/entry.s	/^hlt:$/;"	l
+hp_close	kernel/hypercalls/hp_close.c	/^int hp_close(int fildes) {$/;"	f
+hp_handle_close	hypervisor/hypercall.c	/^static int hp_handle_close(VM *vm) {$/;"	f	file:
+hp_handle_exit	hypervisor/hypercall.c	/^static int hp_handle_exit(VM *vm) {$/;"	f	file:
+hp_handle_lseek	hypervisor/hypercall.c	/^static int hp_handle_lseek(VM *vm) {$/;"	f	file:
+hp_handle_open	hypervisor/hypercall.c	/^static int hp_handle_open(VM *vm) {$/;"	f	file:
+hp_handle_panic	hypervisor/hypercall.c	/^static int hp_handle_panic(VM *vm) {$/;"	f	file:
+hp_handle_read	hypervisor/hypercall.c	/^static int hp_handle_read(VM* vm) {$/;"	f	file:
+hp_handle_write	hypervisor/hypercall.c	/^static int hp_handle_write(VM* vm) {$/;"	f	file:
+hp_handler	hypervisor/hypercall.c	/^int hp_handler(uint16_t nr, VM* vm) {$/;"	f
+hp_lseek	kernel/hypercalls/hp_lseek.c	/^int hp_lseek(int fildes, uint32_t offset, int whence) {$/;"	f
+hp_open	kernel/hypercalls/hp_open.c	/^int hp_open(uint64_t paddr) {$/;"	f
+hp_read	kernel/hypercalls/hp_read.c	/^int hp_read(int fildes, uint64_t phy_addr, uint64_t nbyte) {$/;"	f
+hp_write	kernel/hypercalls/hp_write.c	/^int hp_write(int fildes, uint64_t phy_addr, uint64_t nbyte) {$/;"	f
+hypercall	kernel/hypercalls/hypercall.c	/^int hypercall(uint16_t port, uint32_t data) {$/;"	f
+init_allocator	kernel/mm/kmalloc.c	/^void init_allocator(void *addr, uint64_t len) {$/;"	f
+init_pagetable	kernel/mm/translate.c	/^void init_pagetable() {$/;"	f
+insert_sorted	kernel/mm/kmalloc.c	/^static inline void insert_sorted(struct chunk *c) {$/;"	f	file:
+int_kmalloc	kernel/mm/kmalloc.c	/^static void *int_kmalloc(uint64_t nb, int align) {$/;"	f	file:
+invalid_chunk_size	kernel/mm/kmalloc.c	/^static inline int invalid_chunk_size(uint64_t s) {$/;"	f	file:
+kernel_main	kernel/kernel_main.c	/^int kernel_main(void* addr, uint64_t len, uint64_t argc, char *argv[]) {$/;"	f
+kernel_stack	kernel/syscalls/syscall_entry.s	/^kernel_stack: .quad 0$/;"	l
+kfree	kernel/mm/kmalloc.c	/^void kfree(void *mem) {$/;"	f
+kmalloc	kernel/mm/kmalloc.c	/^void *kmalloc(uint64_t len, int align) {$/;"	f
+kmalloc_arena	kernel/mm/kmalloc.c	/^struct kmalloc_arena {$/;"	s	file:
+kvm_init	hypervisor/hypervisor.c	/^VM* kvm_init(uint8_t code[], size_t len) {$/;"	f
+load_addr	kernel/syscalls/sys_execve.h	/^  uint64_t load_addr;$/;"	m	struct:process
+load_binary	kernel/syscalls/sys_execve.c	/^static int load_binary(int fd, process* p) {$/;"	f	file:
+main	hypervisor/hypervisor.c	/^int main(int argc, char *argv[]) {$/;"	f
+malloc_top	kernel/mm/kmalloc.c	/^static void *malloc_top(uint64_t nb) {$/;"	f	file:
+mem	hypervisor/definition.h	/^  void *mem;$/;"	m	struct:VM
+mem2chunk	kernel/mm/kmalloc.c	21;"	d	file:
+mem_size	hypervisor/definition.h	/^  uint64_t mem_size;$/;"	m	struct:VM
+memcmp	kernel/utils/string.c	/^int memcmp(const void *s1, const void *s2, uint64_t n) {$/;"	f
+memcpy	kernel/utils/string.c	/^void *memcpy(void *dst, const void *src, uint64_t n) {$/;"	f
+memset	kernel/utils/string.c	/^void *memset(void *b, int c, uint64_t len) {$/;"	f
+min_addr	kernel/mm/kmalloc.c	/^  void *min_addr;$/;"	m	struct:kmalloc_arena	file:
+mmap	kernel/mm/mmap.c	/^void *mmap(void *addr, uint64_t len, int prot) {$/;"	f
+modify_permission	kernel/mm/translate.c	/^int modify_permission(void *vaddr, int prot) {$/;"	f
+mprotect	kernel/mm/mmap.c	/^int mprotect(void *addr, uint64_t len, int prot) {$/;"	f
+next	kernel/mm/kmalloc.c	/^    struct chunk *next;$/;"	m	struct:kmalloc_arena::chunk	typeref:struct:kmalloc_arena::chunk::chunk	file:
+offsetof	kernel/mm/kmalloc.c	18;"	d	file:
+opening	hypervisor/hypercall.c	/^  int opening;$/;"	m	struct:fd_handle	file:
+p_align	kernel/elf/elf.h	/^  Elf64_Xword p_align;$/;"	m	struct:elf64_phdr
+p_filesz	kernel/elf/elf.h	/^  Elf64_Xword p_filesz;$/;"	m	struct:elf64_phdr
+p_flags	kernel/elf/elf.h	/^  Elf64_Word p_flags;$/;"	m	struct:elf64_phdr
+p_memsz	kernel/elf/elf.h	/^  Elf64_Xword p_memsz;$/;"	m	struct:elf64_phdr
+p_offset	kernel/elf/elf.h	/^  Elf64_Off p_offset;$/;"	m	struct:elf64_phdr
+p_paddr	kernel/elf/elf.h	/^  Elf64_Addr p_paddr;$/;"	m	struct:elf64_phdr
+p_type	kernel/elf/elf.h	/^  Elf64_Word p_type;$/;"	m	struct:elf64_phdr
+p_vaddr	kernel/elf/elf.h	/^  Elf64_Addr p_vaddr;$/;"	m	struct:elf64_phdr
+pad	kernel/mm/kmalloc.c	/^    uint64_t pad;$/;"	m	struct:kmalloc_arena::chunk	file:
+panic	kernel/utils/panic.s	/^panic:$/;"	l
+pexit	hypervisor/definition.h	20;"	d
+pf_to_prot	kernel/mm/translate.c	/^int pf_to_prot(Elf64_Word pf) {$/;"	f
+physical	kernel/mm/translate.c	/^uint64_t physical(void *vaddr_) {$/;"	f
+process	kernel/syscalls/sys_execve.h	/^typedef struct process {$/;"	s
+process	kernel/syscalls/sys_execve.h	/^} process;$/;"	t	typeref:struct:process
+read_file	hypervisor/hypervisor.c	/^void read_file(const char *filename, uint8_t** content_ptr, size_t* size_ptr) {$/;"	f
+real_fd	hypervisor/hypercall.c	/^  int real_fd;$/;"	m	struct:fd_handle	file:
+register_syscall	kernel/kernel_main.c	/^int register_syscall() {$/;"	f
+rsp	kernel/syscalls/sys_execve.h	/^  uint64_t rsp;$/;"	m	struct:process
+run	hypervisor/definition.h	/^  struct kvm_run *run;$/;"	m	struct:VM	typeref:struct:VM::kvm_run
+setup_long_mode	hypervisor/hypervisor.c	/^void setup_long_mode(VM *vm) {$/;"	f
+setup_paging	hypervisor/hypervisor.c	/^void setup_paging(VM *vm) {$/;"	f
+setup_regs	hypervisor/hypervisor.c	/^void setup_regs(VM *vm, size_t entry) {$/;"	f
+setup_seg_regs	hypervisor/hypervisor.c	/^void setup_seg_regs(VM *vm) {$/;"	f
+size	kernel/mm/kmalloc.c	/^    uint64_t size;$/;"	m	struct:kmalloc_arena::chunk	file:
+sorted_bin	kernel/mm/kmalloc.c	/^  } sorted_bin;$/;"	m	struct:kmalloc_arena	typeref:struct:kmalloc_arena::chunk	file:
+stack_base	kernel/syscalls/sys_execve.h	/^  uint64_t stack_base;$/;"	m	struct:process
+stack_size	kernel/syscalls/sys_execve.h	/^  uint64_t stack_size;$/;"	m	struct:process
+strlen	kernel/utils/string.c	/^uint64_t strlen(const char *s) {$/;"	f
+strnlen	kernel/utils/string.c	/^uint64_t strnlen(const char *s, uint64_t maxlen) {$/;"	f
+switch_user	kernel/kernel_main.c	/^void switch_user(uint64_t argc, char *argv[]) {$/;"	f
+sys_close	kernel/syscalls/sys_close.h	7;"	d
+sys_execve	kernel/syscalls/sys_execve.c	/^int sys_execve(const char *path, char *const argv[], char *const envp[]) {$/;"	f
+sys_exit	kernel/syscalls/sys_exit.c	/^void sys_exit(int status) {$/;"	f
+sys_mmap	kernel/syscalls/sys_mmap.c	/^void *sys_mmap($/;"	f
+sys_open	kernel/syscalls/sys_open.c	/^int sys_open(const char *path) {$/;"	f
+sys_read	kernel/syscalls/sys_read.c	/^int64_t sys_read(int fildes, void *buf, uint64_t nbyte) {$/;"	f
+sys_write	kernel/syscalls/sys_write.c	/^int64_t sys_write(int fildes, void *buf, uint64_t nbyte) {$/;"	f
+syscall_entry	kernel/syscalls/syscall_entry.s	/^syscall_entry:$/;"	l
+syscall_handler	kernel/syscalls/syscall_handler.c	/^uint64_t syscall_handler($/;"	f
+syscall_table	kernel/syscalls/syscall_handler.c	/^static const void* syscall_table[MAX_SYS_NR + 1] = {$/;"	v	file:
+top	kernel/mm/kmalloc.c	/^  void *top;$/;"	m	struct:kmalloc_arena	file:
+top_size	kernel/mm/kmalloc.c	/^  uint64_t top_size;$/;"	m	struct:kmalloc_arena	file:
+translate	kernel/mm/translate.c	/^uint64_t translate(void *vaddr, int usermode, int writable) {$/;"	f
+user_stack	kernel/syscalls/syscall_entry.s	/^user_stack: .quad 0$/;"	l
+vcpufd	hypervisor/definition.h	/^  int vcpufd;$/;"	m	struct:VM
