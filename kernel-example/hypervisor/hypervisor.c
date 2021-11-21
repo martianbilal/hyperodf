@@ -6,6 +6,9 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "debug.h"
 #include "definition.h"
@@ -164,7 +167,7 @@ VM* kvm_init(uint8_t code[], size_t len) {
     .mem_size = MEM_SIZE,
     .vcpufd = vcpufd,
     .vmfd = vmfd,
-    .sys_fd = kvmfd,
+    .sysfd = kvmfd,
     .run = run
   };
 
@@ -188,13 +191,16 @@ struct fork_info {
   int vcpu_fd;
 };
 
-void fork_child_with_ioctl(struct fork_info, int kvmfd){
-
+void child_run_vm(struct vm *vm, struct vcpu *vcpu){
+  return;
 }
-  
+
+
+void fork_child_with_ioctl(struct fork_info *info, int kvmfd);
+ 
 void execute(VM* vm) {
   struct fork_info info;
-  bool fork = false; 
+  int do_fork = 0; 
   struct kvm_regs regs;
   struct kvm_userspace_memory_region memreg;
   while(1) {
@@ -203,8 +209,8 @@ void execute(VM* vm) {
     switch (vm->run->exit_reason) {
     case KVM_EXIT_HLT:
       ioctl(vm->vcpufd, KVM_GET_REGS, &regs);
-      if(regs == 42){
-        if(fork){
+      if(regs.rax == 42){
+        if(do_fork){
           if(fork() == 0){
             printf("======CHILD VM STARTED=======\n");
             memreg.slot = 0;
@@ -248,7 +254,18 @@ void execute(VM* vm) {
     }
   }
 }
-
+void fork_child_with_ioctl(struct fork_info *info, int kvmfd){
+  struct kvm_userspace_memory_region *mem;
+  struct VM *vm; 
+  vm = (VM*) malloc(sizeof(VM));
+  mem = (struct kvm_userspace_memory_region *)info->kvm_userspace_mem;
+  vm->mem = mem;
+  vm->sysfd = kvmfd;
+  vm->vcpufd = info->vcpu_fd;
+  vm->vmfd = info->vm_fd;
+  execute(vm);
+}
+ 
 /* copy argv onto kernel's stack */
 void copy_argv(VM* vm, int argc, char *argv[]) {
   struct kvm_regs regs;
