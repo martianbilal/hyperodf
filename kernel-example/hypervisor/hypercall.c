@@ -10,6 +10,8 @@
 
 #include "hypercall.h"
 
+
+static int hp_handle_fork(VM*);
 static int hp_handle_open(VM*);
 static int hp_handle_read(VM*);
 static int hp_handle_write(VM*);
@@ -28,6 +30,7 @@ int hp_handler(uint16_t nr, VM* vm) {
   handle(close);
   handle(lseek);
   handle(exit);
+  handle(fork);
   handle(panic);
 
 #undef handle
@@ -181,4 +184,9 @@ static int hp_handle_panic(VM *vm) {
   fprintf(stderr, "[\e[31mPANIC\e[0m] %s\n", MEM_AT(offset));
   exit(1);
   return -1;
+}
+
+// function for handling the fork ioctlt call 
+static int hp_handle_fork(VM *vm){
+  return 0; 
 }
