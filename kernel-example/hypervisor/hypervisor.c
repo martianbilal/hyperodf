@@ -200,16 +200,25 @@ void fork_child_with_ioctl(struct fork_info *info, int kvmfd);
  
 void execute(VM* vm) {
   struct fork_info info;
-  int do_fork = 0; 
+  int do_fork = 1; 
   struct kvm_regs regs;
   struct kvm_userspace_memory_region memreg;
+  printf("Going into the Execute Function\n");
   while(1) {
     ioctl(vm->vcpufd, KVM_RUN, NULL);
     dump_regs(vm->vcpufd);
+    printf("Value of the exit reason %d \n ", vm->run->exit_reason);
     switch (vm->run->exit_reason) {
     case KVM_EXIT_HLT:
+      
+      fprintf(stderr, "KVM_EXIT_HLT\n");
+      
+      return;
+    case KVM_EXIT_IO:
       ioctl(vm->vcpufd, KVM_GET_REGS, &regs);
       if(regs.rax == 42){
+      printf("Checking for the fork \n ");
+      printf("Value of the regs %d \n ", regs.rax);
         if(do_fork){
           if(fork() == 0){
             printf("======CHILD VM STARTED=======\n");
@@ -224,17 +233,13 @@ void execute(VM* vm) {
             ioctl(vm->sysfd, KVM_FORK, &info);
             fork_child_with_ioctl(&info, vm->sysfd);
             printf("======CHILD VM Ended=======\n");
+            exit(1);
           } else {
             wait(NULL);
           }
           break;
         }
-        return;
       }
-      fprintf(stderr, "KVM_EXIT_HLT\n");
-      
-      return;
-    case KVM_EXIT_IO:
       if(!check_iopl(vm)) error("KVM_EXIT_SHUTDOWN\n");
       if(vm->run->io.port & HP_NR_MARK) {
         if(hp_handler(vm->run->io.port, vm) < 0) error("Hypercall failed\n");

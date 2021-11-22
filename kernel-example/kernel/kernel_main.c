@@ -1,4 +1,5 @@
 #include <hypercalls/hp_open.h>
+#include <hypercalls/hp_fork.h>
 #include <mm/kmalloc.h>
 #include <mm/translate.h>
 #include <syscalls/sys_execve.h>

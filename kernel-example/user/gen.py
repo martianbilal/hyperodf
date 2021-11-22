@@ -13,14 +13,14 @@ def generate(filename, data):
 context.arch = 'amd64'
 
 generate('orw.elf', asm(
-    f'''
+    '''
     mov rdi, [rsp]
     cmp rdi, 2
     jb exit
     mov rdi, [rsp + 16] /* argv[1] */
-    {shellcraft.open('rdi', 'O_RDONLY', 0)}
-    {shellcraft.read('rax', 'rsp', 0x1000)}
-    {shellcraft.write(1, 'rsp', 'rax')}
+    {}
+    {}
+    {}
 exit:
     xor rdi, rdi
     mov rax, 60
@@ -28,4 +28,4 @@ exit:
 
     /* should not reach here */
     hlt
-    '''))
+    '''.format(shellcraft.write(1, 'rsp', 'rax'), shellcraft.read('rax', 'rsp', 0x1000), shellcraft.open('rdi', 'O_RDONLY', 0))))
