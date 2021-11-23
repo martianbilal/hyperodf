@@ -490,7 +490,10 @@ restart:
 			fprintf(stderr,	"Got exit_reason %d,"
 				" expected KVM_EXIT_HLT (%d)\n",
 				vcpu->kvm_run->exit_reason, KVM_EXIT_HLT);
-			exit(1);
+	
+      	memcpy(&memval, &vm->mem[0x2000], sz);
+        printf("Memory at 0x2000 is : %lld", (unsigned long long)memval);
+      exit(1);
 		}
 	}
 
@@ -504,8 +507,8 @@ check_p:
 	// 	return 0;
 	// }
 
-	memcpy(&memval, &vm->mem[0x400], sz);
-
+	memcpy(&memval, &vm->mem[0x100], sz);
+  printf("Memory at 0x100 is : %lld", (unsigned long long)memval);
 	// if (memval != 42) {
 	// 	printf("Wrong result: memory at 0x400 is %lld\n",
 	// 	       (unsigned long long)memval);
@@ -685,19 +688,20 @@ static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 
 static void setup_long_mode(struct vm *vm, struct kvm_sregs *sregs)
 {
-	uint64_t pml4_addr = 0x2000;
+	uint64_t pml4_addr = 0x4000;
 	uint64_t *pml4 = (void *)(vm->mem + pml4_addr);
 
-	uint64_t pdpt_addr = 0x3000;
+	uint64_t pdpt_addr = 0x5000;
 	uint64_t *pdpt = (void *)(vm->mem + pdpt_addr);
 
-	uint64_t pd_addr = 0x4000;
+	uint64_t pd_addr = 0x6000;
 	uint64_t *pd = (void *)(vm->mem + pd_addr);
 
-	uint64_t pt_addr= 0x5000;
+	uint64_t pt_addr= 0x7000;
 	uint64_t *pt = (void *)(vm->mem + pt_addr);
 
-	pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
+  printf("--Start Setting the page tables--\n");
+  pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
 	pdpt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pd_addr;
 	pd[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pt_addr;
 	pt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER ;
@@ -718,7 +722,7 @@ int run_long_mode(struct vm *vm, struct vcpu *vcpu)
 	struct kvm_sregs sregs;
 	struct kvm_regs regs;
 	
-	printf("Testing 64-bit mode\n");
+	printf("LONG MODE == Testing 64-bit mode\n");
 
      
 	if (ioctl(vcpu->fd, KVM_GET_SREGS, &sregs) < 0) {
@@ -772,7 +776,7 @@ int main(int argc, char **argv)
 		PROTECTED_MODE,
 		PAGED_32BIT_MODE,
 		LONG_MODE,
-	} mode = REAL_MODE;
+	} mode = LONG_MODE;
 	int opt;
 
 	while ((opt = getopt(argc, argv, "rspl102")) != -1) {
@@ -823,6 +827,7 @@ int main(int argc, char **argv)
 	// child_vcpu_init(&parent_vcpu, &vm, &vcpu);
 
 	switch (mode) {
+  printf("value of mode %d", mode);
 	case REAL_MODE:
 		return !run_real_mode(&vm, &vcpu);
 
