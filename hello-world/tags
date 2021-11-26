@@ -1,0 +1,85 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+CFLAGS	Makefile	/^CFLAGS = -Wall -Wextra -Werror -O2$/;"	m
+CR0_AM	kvm-hello-world.c	23;"	d	file:
+CR0_CD	kvm-hello-world.c	25;"	d	file:
+CR0_EM	kvm-hello-world.c	18;"	d	file:
+CR0_ET	kvm-hello-world.c	20;"	d	file:
+CR0_MP	kvm-hello-world.c	17;"	d	file:
+CR0_NE	kvm-hello-world.c	21;"	d	file:
+CR0_NW	kvm-hello-world.c	24;"	d	file:
+CR0_PE	kvm-hello-world.c	16;"	d	file:
+CR0_PG	kvm-hello-world.c	26;"	d	file:
+CR0_TS	kvm-hello-world.c	19;"	d	file:
+CR0_WP	kvm-hello-world.c	22;"	d	file:
+CR4_DE	kvm-hello-world.c	32;"	d	file:
+CR4_FSGSBASE	kvm-hello-world.c	43;"	d	file:
+CR4_MCE	kvm-hello-world.c	35;"	d	file:
+CR4_OSFXSR	kvm-hello-world.c	38;"	d	file:
+CR4_OSXMMEXCPT	kvm-hello-world.c	39;"	d	file:
+CR4_OSXSAVE	kvm-hello-world.c	45;"	d	file:
+CR4_PAE	kvm-hello-world.c	34;"	d	file:
+CR4_PCE	kvm-hello-world.c	37;"	d	file:
+CR4_PCIDE	kvm-hello-world.c	44;"	d	file:
+CR4_PGE	kvm-hello-world.c	36;"	d	file:
+CR4_PSE	kvm-hello-world.c	33;"	d	file:
+CR4_PVI	kvm-hello-world.c	30;"	d	file:
+CR4_SMAP	kvm-hello-world.c	47;"	d	file:
+CR4_SMEP	kvm-hello-world.c	46;"	d	file:
+CR4_SMXE	kvm-hello-world.c	42;"	d	file:
+CR4_TSD	kvm-hello-world.c	31;"	d	file:
+CR4_UMIP	kvm-hello-world.c	40;"	d	file:
+CR4_VME	kvm-hello-world.c	29;"	d	file:
+CR4_VMXE	kvm-hello-world.c	41;"	d	file:
+EFER_LMA	kvm-hello-world.c	51;"	d	file:
+EFER_LME	kvm-hello-world.c	50;"	d	file:
+EFER_NXE	kvm-hello-world.c	52;"	d	file:
+EFER_SCE	kvm-hello-world.c	49;"	d	file:
+MODE	kvm-hello-world.c	/^char MODE;$/;"	v
+PDE32_PRESENT	kvm-hello-world.c	55;"	d	file:
+PDE32_PS	kvm-hello-world.c	58;"	d	file:
+PDE32_RW	kvm-hello-world.c	56;"	d	file:
+PDE32_USER	kvm-hello-world.c	57;"	d	file:
+PDE64_ACCESSED	kvm-hello-world.c	64;"	d	file:
+PDE64_DIRTY	kvm-hello-world.c	65;"	d	file:
+PDE64_G	kvm-hello-world.c	67;"	d	file:
+PDE64_PRESENT	kvm-hello-world.c	61;"	d	file:
+PDE64_PS	kvm-hello-world.c	66;"	d	file:
+PDE64_RW	kvm-hello-world.c	62;"	d	file:
+PDE64_USER	kvm-hello-world.c	63;"	d	file:
+_start	guest.c	/^_start(void) {$/;"	f
+child_run_vm	kvm-hello-world.c	/^int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)$/;"	f
+child_vcpu_init	kvm-hello-world.c	/^void child_vcpu_init(struct vcpu *parent_vcpu, struct vm *vm, struct vcpu *vcpu)$/;"	f
+child_vm_init	kvm-hello-world.c	/^void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {$/;"	f
+fd	kvm-hello-world.c	/^	int fd;$/;"	m	struct:vcpu	file:
+fd	kvm-hello-world.c	/^	int fd;$/;"	m	struct:vm	file:
+fork_child	kvm-hello-world.c	/^void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_regs parent_regs){$/;"	f
+fork_child_with_ioctl	kvm-hello-world.c	/^void fork_child_with_ioctl(struct fork_info *info, int sys_fd){$/;"	f
+fork_info	kvm-hello-world.c	/^struct fork_info { $/;"	s	file:
+guest16	guest16.s	/^guest16:$/;"	l
+guest16_end	guest16.s	/^guest16_end:$/;"	l
+kvm_run	kvm-hello-world.c	/^	struct kvm_run *kvm_run;$/;"	m	struct:vcpu	typeref:struct:vcpu::kvm_run	file:
+kvm_userspace_mem	kvm-hello-world.c	/^	unsigned long kvm_userspace_mem;$/;"	m	struct:fork_info	file:
+main	kvm-hello-world.c	/^int main(int argc, char **argv)$/;"	f
+mem	kvm-hello-world.c	/^	char *mem;$/;"	m	struct:vm	file:
+outb	guest.c	/^static void outb(uint16_t port, uint8_t value) {$/;"	f	file:
+run_long_mode	kvm-hello-world.c	/^int run_long_mode(struct vm *vm, struct vcpu *vcpu)$/;"	f
+run_paged_32bit_mode	kvm-hello-world.c	/^int run_paged_32bit_mode(struct vm *vm, struct vcpu *vcpu)$/;"	f
+run_protected_mode	kvm-hello-world.c	/^int run_protected_mode(struct vm *vm, struct vcpu *vcpu)$/;"	f
+run_real_mode	kvm-hello-world.c	/^int run_real_mode(struct vm *vm, struct vcpu *vcpu)$/;"	f
+run_vm	kvm-hello-world.c	/^int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)$/;"	f
+setup_64bit_code_segment	kvm-hello-world.c	/^static void setup_64bit_code_segment(struct kvm_sregs *sregs)$/;"	f	file:
+setup_long_mode	kvm-hello-world.c	/^static void setup_long_mode(struct vm *vm, struct kvm_sregs *sregs)$/;"	f	file:
+setup_paged_32bit_mode	kvm-hello-world.c	/^static void setup_paged_32bit_mode(struct vm *vm, struct kvm_sregs *sregs)$/;"	f	file:
+setup_protected_mode	kvm-hello-world.c	/^static void setup_protected_mode(struct kvm_sregs *sregs)$/;"	f	file:
+sys_fd	kvm-hello-world.c	/^	int sys_fd;$/;"	m	struct:vm	file:
+vcpu	kvm-hello-world.c	/^struct vcpu {$/;"	s	file:
+vcpu_fd	kvm-hello-world.c	/^	int vcpu_fd;$/;"	m	struct:fork_info	file:
+vcpu_init	kvm-hello-world.c	/^void vcpu_init(struct vm *vm, struct vcpu *vcpu)$/;"	f
+vm	kvm-hello-world.c	/^struct vm {$/;"	s	file:
+vm_fd	kvm-hello-world.c	/^	int vm_fd;$/;"	m	struct:fork_info	file:
+vm_init	kvm-hello-world.c	/^void vm_init(struct vm *vm, size_t mem_size)$/;"	f

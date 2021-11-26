@@ -409,7 +409,8 @@ restart:
 			perror("KVM_RUN - fc");
 			exit(1);
 		}
-		
+		memcpy(&memval, &vm->mem[0x8200], sz);
+ 
 		
 
 		
@@ -423,6 +424,7 @@ restart:
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
+        printf("Memory at 0x18000 is : %llu\n", (unsigned long long)memval);
 			if (parent_regs.rax == 42)
 			{				
 				if(MODE == 1){
@@ -491,8 +493,8 @@ restart:
 				" expected KVM_EXIT_HLT (%d)\n",
 				vcpu->kvm_run->exit_reason, KVM_EXIT_HLT);
 	
-      	memcpy(&memval, &vm->mem[0x2000], sz);
-        printf("Memory at 0x2000 is : %lld", (unsigned long long)memval);
+      	memcpy(&memval, &vm->mem[0x8000], sz);
+        printf("Memory at 0x8000 is : %lld", (unsigned long long)memval);
       exit(1);
 		}
 	}
@@ -507,7 +509,7 @@ check_p:
 	// 	return 0;
 	// }
 
-	memcpy(&memval, &vm->mem[0x100], sz);
+	memcpy(&memval, &vm->mem[0x8000], sz);
   printf("Memory at 0x100 is : %lld", (unsigned long long)memval);
 	// if (memval != 42) {
 	// 	printf("Wrong result: memory at 0x400 is %lld\n",
@@ -688,23 +690,26 @@ static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 
 static void setup_long_mode(struct vm *vm, struct kvm_sregs *sregs)
 {
-	uint64_t pml4_addr = 0x4000;
+	uint64_t pml4_addr = 0x2000;
 	uint64_t *pml4 = (void *)(vm->mem + pml4_addr);
 
-	uint64_t pdpt_addr = 0x5000;
+	uint64_t pdpt_addr = 0x8000;
 	uint64_t *pdpt = (void *)(vm->mem + pdpt_addr);
 
-	uint64_t pd_addr = 0x6000;
+	uint64_t pd_addr = 0x16000;
 	uint64_t *pd = (void *)(vm->mem + pd_addr);
 
-	uint64_t pt_addr= 0x7000;
-	uint64_t *pt = (void *)(vm->mem + pt_addr);
+	/* uint64_t pt_addr= 0x32000; */
+	/* uint64_t *pt = (void *)(vm->mem + pt_addr); */
 
   printf("--Start Setting the page tables--\n");
-  pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
-	pdpt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pd_addr;
-	pd[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pt_addr;
-	pt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER ;
+  pml4[0] = PDE64_PRESENT | PDE64_RW | pdpt_addr;
+	pdpt[0] = PDE64_PRESENT | PDE64_RW | pd_addr;
+	pd[0] = PDE64_PRESENT | PDE64_RW | PDE64_PS;
+  printf("the value of pdpt : %ld \n", pdpt[0]);
+  printf("the value of pdpt : %ld \n", pml4[0]);
+  printf("the value of pdpt : %ld \n", pd[0]);
+  /* pt[0] = PDE64_PRESENT |   | PDE64_RW; */
 
 	sregs->cr3 = pml4_addr;
 	sregs->cr4 = CR4_PAE;

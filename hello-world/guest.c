@@ -34,11 +34,13 @@ _start(void) {
 	// for(int i = 0; i < 1; i++){
 	// 	*(long *) 0x400 = i;
 	// }
-	*(long *) 0x2000 = 45;
+  asm("movl $0x8200, %eax");
+  asm("movl $0x10, (%eax)");
+  //*(long *) 0x8000 = 45;
 	
 	outb(0xE9, 't');
 	
-	*(long *) 0x400 = 42;
+	/* *(long *) 0x400 = 42; */
 	for (;;){
 		asm("hlt"::"a"(43):"memory");
 	}
