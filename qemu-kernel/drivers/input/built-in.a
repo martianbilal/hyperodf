@@ -1,0 +1,31 @@
+!<thin>
+//                                              230       `
+input.o/
+input-compat.o/
+input-mt.o/
+input-poller.o/
+ff-core.o/
+keyboard/atkbd.o/
+mouse/psmouse-base.o/
+mouse/synaptics.o/
+mouse/focaltech.o/
+mouse/alps.o/
+mouse/byd.o/
+mouse/logips2pp.o/
+mouse/trackpoint.o/
+mouse/cypress_ps2.o/
+
+/0              0           0     0     644     30728     `
+/9              0           0     0     644     1408      `
+/25             0           0     0     644     4520      `
+/37             0           0     0     644     4792      `
+/53             0           0     0     644     3736      `
+/64             0           0     0     644     19864     `
+/82             0           0     0     644     30616     `
+/104            0           0     0     644     20400     `
+/123            0           0     0     644     5432      `
+/142            0           0     0     644     30392     `
+/156            0           0     0     644     4760      `
+/169            0           0     0     644     6240      `
+/188            0           0     0     644     12896     `
+/208            0           0     0     644     7160      `
