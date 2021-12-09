@@ -2528,10 +2528,11 @@ int kvm_cpu_exec(CPUState *cpu)
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");
             /* Called outside BQL */
-            if(run->io.port == 0x3f8 &&
+            if(run->io.port == 0x300 &&
                 run->io.size == 1 &&
                 run->io.direction == KVM_EXIT_IO_OUT &&
-                run->io.count == 1){
+                run->io.count == 1 &&
+                *(((char *)run) + run->io.data_offset) == 'c'){
               printf("Finally touched this part ---  **** --- \n");
             } 
             kvm_handle_io(run->io.port, attrs,
