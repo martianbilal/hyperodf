@@ -2453,6 +2453,7 @@ int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
     int ret, run_ret;
+    pid_t pid; 
 
     DPRINTF("kvm_cpu_exec()\n");
 
@@ -2534,6 +2535,30 @@ int kvm_cpu_exec(CPUState *cpu)
                 run->io.count == 1 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
               printf("Finally touched this part ---  **** --- \n");
+              //call the function for forking here 
+              //Fork the process 
+              //--where to get the id of the parent vm ? 
+              //--do we necessarily need the id of the VM --> yes 
+              //--check the id of the cpu structure .. 
+              //--search the qemu repo on the code browser 
+              //Call the KVM_FORK IOCTL 
+              //Get the details of the child VM and store them in some structure 
+              //--Think about it later 
+              //
+              //
+              //
+              pid = fork();
+              if (pid < 0) {
+                ret = -1; 
+              } else if (pid == 0) {
+                //child process 
+                //make the kvm_fork call here 
+
+              } else {
+                //parent process 
+                
+              }
+              break;
             } 
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,
