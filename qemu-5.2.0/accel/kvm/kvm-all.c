@@ -78,6 +78,12 @@ struct KVMParkedVcpu {
     QLIST_ENTRY(KVMParkedVcpu) node;
 };
 
+struct fork_info {
+  unsigned long kvm_userspace_mem;
+  int vm_fd;
+  int vcpu_fd;
+}
+
 struct KVMState
 {
     AccelState parent_obj;
@@ -2452,9 +2458,9 @@ static void kvm_eat_signals(CPUState *cpu)
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
+    struct fork_info *info; 
     int ret, run_ret;
     pid_t pid; 
-
     DPRINTF("kvm_cpu_exec()\n");
 
     if (kvm_arch_process_async_events(cpu)) {
@@ -2547,16 +2553,17 @@ int kvm_cpu_exec(CPUState *cpu)
               //
               //
               //
+              
               pid = fork();
               if (pid < 0) {
                 ret = -1; 
               } else if (pid == 0) {
                 //child process 
                 //make the kvm_fork call here 
-
+                kvm_vm_ioctl(cpu->kvmstate, KVM_FORK, info);
               } else {
                 //parent process 
-                
+                wait(NULL);   
               }
               break;
             } 
