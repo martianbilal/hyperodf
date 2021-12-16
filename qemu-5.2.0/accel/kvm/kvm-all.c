@@ -2563,7 +2563,8 @@ int kvm_cpu_exec(CPUState *cpu)
                 wait(NULL);   
               }
               break;
-            } 
+            }
+            printf("Handling IO : %d \n", run->io.port);
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,
                           run->io.direction,

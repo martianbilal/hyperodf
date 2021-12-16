@@ -1,4 +1,4 @@
-/usr/local/bin/qemu-system-x86_64 \
+valgrind --tool=callgrind /usr/local/bin/qemu-system-x86_64 \
   -m 1G \
   -smp 1 \
   -cpu host,vmx=on \
