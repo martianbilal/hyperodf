@@ -2564,7 +2564,16 @@ int kvm_cpu_exec(CPUState *cpu)
               }
               break;
             }
-            printf("Handling IO : %d \n", run->io.port);
+            //use this to print a charachter
+            if(run->io.port == 0x300){
+              printf("%c", *(((char *)run) + run->io.data_offset));
+            }
+            if(run->io.port == 0x301 &&
+                *(((char *)run) + run->io.data_offset) == 'c'){
+              //fork here 
+              //
+              printf("Received the call for fork\n");
+            }
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,
                           run->io.direction,
