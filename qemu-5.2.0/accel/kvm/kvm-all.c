@@ -2452,8 +2452,12 @@ static void kvm_eat_signals(CPUState *cpu)
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
-    struct fork_info info; 
+    struct fork_info info;
+    struct KVMState *s; 
     int ret, run_ret;
+    int vmfd; //vm file descriptor for the child vm
+    int vcpufd; //vcpu file descriptro for child vcpu 
+    void *kvm_run;
     pid_t pid; 
     DPRINTF("kvm_cpu_exec()\n");
 
@@ -2572,6 +2576,63 @@ int kvm_cpu_exec(CPUState *cpu)
                 *(((char *)run) + run->io.data_offset) == 'c'){
               //fork here 
               //
+              //get the locks being used by the rest of the threads 
+              pid = fork();
+              if(pid < 0) {
+                 ret = -1; 
+              } else if (pid == 0){
+                //child process
+                //release the locks obtained before forking 
+                s = s->kvm_state;
+
+                //create new fds
+                //make a call for creating a vm 
+                vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+                if (vmfd < 0) {
+                  fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
+                    strerror(-ret));
+                }
+                s->vmfd = vmfd; 
+
+                //set up the shared memory for the child vm 
+                
+                
+                //make a call or creating onc vcpu for it 
+                vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
+                cpu->fd = vcpufd; 
+                //TODO: set the regs, sregs, .. etc for the vcpuid
+                kvm_set_vcpu_attrs(cpu);
+
+                //set up the kvm_run for the vcpu --> update it in the vmstate
+                kvm_run = mmap(vcpufd, MAP_PRIVATE|MAP_ANONYMOUS, 0, -1); 
+                mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
+                if (mmap_size < 0) {
+                    ret = mmap_size;
+                    error_setg_errno(errp, -mmap_size,
+                                     "kvm_init_vcpu: KVM_GET_VCPU_MMAP_SIZE failed");
+                    return -1;
+                }
+
+                cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                    cpu->kvm_fd, 0);
+                if (cpu->kvm_run == MAP_FAILED) {
+                    ret = -errno;
+                    error_setg_errno(errp, ret,
+                                     "kvm_init_vcpu: mmap'ing vcpu state failed (%lu)",
+                                     kvm_arch_vcpu_id(cpu));
+                    return -1; ;
+                }
+
+                //code for setting up the kvm_run for child vcpu in qemu state
+                kvmstate->kvm_run = kvm_run; 
+                //add these values to qemu book keeping structures
+                kvmstate->vmfd = vmfd; 
+                cpustate->kvmstate->vmfd = vmfd; 
+                cpustate->vcpufd = vpcufd; 
+              } else {
+                //parent process 
+                wait(NULL);
+              }  
               printf("Received the call for fork\n");
             }
             kvm_handle_io(run->io.port, attrs,
