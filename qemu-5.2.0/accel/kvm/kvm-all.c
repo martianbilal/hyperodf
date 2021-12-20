@@ -2509,10 +2509,13 @@ int  kvm_set_vcpu_attrs(struct kvm_regs *regs, struct kvm_sregs *sregs,  int vcp
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
+    struct kvm_userspace_memory_region mem; 
     struct fork_info info;
     struct KVMState *s;
+    struct KVMSlot slot;
     struct kvm_regs regs; 
     struct kvm_sregs sregs; 
+    int slot_size; 
     int mmap_size;
     int ret, run_ret;
     int vmfd; //vm file descriptor for the child vm
@@ -2634,9 +2637,19 @@ int kvm_cpu_exec(CPUState *cpu)
                 }
                 s->vmfd = vmfd; 
 
+                slot_size = cpu->kvm_state->nr_slots;
                 //set up the shared memory for the child vm 
-                kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); 
-                
+                /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+                for(int i = 0; i < slot_size; i++){
+                  slot = kvm_state->memory_listener.slots[i]; 
+                  mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                  mem.guest_phys_addr = slot.start_addr;
+                  mem.userspace_addr = (unsigned long)slot.ram;
+                  mem.flags = slot.flags;
+ 
+                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, mem);
+                }
+
                 //make a call or creating onc vcpu for it 
                 vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
                 //TODO: set the regs, sregs, .. etc for the vcpuid

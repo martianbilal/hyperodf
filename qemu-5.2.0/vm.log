@@ -5,10 +5,10 @@ WARNING: Image format was not specified for './boot-sect.bin' and probing guesse
 Booting from Hard Disk..dReceived the call for fork
 Starting child process
 starting set attrs
-error: kvm run failed Bad address
+error: kvm run failed No space left on device
 EAX=00000063 EBX=00000000 ECX=00000000 EDX=00000301
 ESI=00000000 EDI=00000000 EBP=00000000 ESP=00006ef0
-EIP=00007c2d EFL=00010296 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
+EIP=00007c2d EFL=00000296 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
 ES =0000 00000000 0000ffff 00009300
 CS =0000 00000000 0000ffff 00009b00
 SS =0000 00000000 0000ffff 00009300
