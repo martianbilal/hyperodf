@@ -2459,10 +2459,8 @@ static void kvm_eat_signals(CPUState *cpu)
  * set the attrs for vcpu id vcpufd same as that 
  * of the vcpu id cpu->fd
  * */
-int  kvm_set_vcpu_attrs(CPUState *cpu, int vcpufd){
+int  kvm_set_vcpu_attrs(struct kvm_regs *regs, struct kvm_sregs *sregs,  int vcpufd){
   int ret = 0;
-  struct kvm_regs *regs;
-  struct kvm_sregs *sregs; 
   struct kvm_fpu *fpu;
   struct kvm_msrs *msrs;
   struct kvm_xsave *xsave;
@@ -2475,27 +2473,22 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, int vcpufd){
   struct kvm_mp_state *mp_state;
   struct kvm_debugregs *debugregs;
   
-  //get regs
-  ret = kvm_vcpu_ioctl(cpu, KVM_GET_REGS, regs);
-  if(ret < 0)
-    goto err;
-
-  //get sregs
-  ret = kvm_vcpu_ioctl(cpu, KVM_GET_SREGS, sregs);
-  if(ret < 0)
-    goto err;
-
-  cpu->kvm_fd = vcpufd;
-
+  printf("starting set attrs\n");
   //set regs
-  ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs);
-  if(ret < 0)
-    goto err;
+  /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
+  do {
+    ret = ioctl(vcpufd, KVM_SET_REGS, regs);
+  } while (ret == -EINTR);
+
+  if(ret<0) printf("c\n");
   
   //set sregs
-  ret = kvm_vcpu_ioctl(cpu, KVM_SET_SREGS, sregs);
-  if(ret < 0)
-    goto err;
+  /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_SREGS, sregs); */
+  do {
+    ret = ioctl(vcpufd, KVM_SET_SREGS, sregs);
+  } while (ret == -EINTR);
+
+  if(ret<0) printf("d\n");
   
   //set fpu 
   //set msrs
@@ -2509,8 +2502,6 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, int vcpufd){
   //set mp_state
   //set debuggers
 
-err: 
-  perror("Failed to set attributes for Child VCPU");
   return ret; 
 
 }
@@ -2520,6 +2511,8 @@ int kvm_cpu_exec(CPUState *cpu)
     struct kvm_run *run = cpu->kvm_run;
     struct fork_info info;
     struct KVMState *s;
+    struct kvm_regs regs; 
+    struct kvm_sregs sregs; 
     int mmap_size;
     int ret, run_ret;
     int vmfd; //vm file descriptor for the child vm
@@ -2597,58 +2590,38 @@ int kvm_cpu_exec(CPUState *cpu)
 
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
         switch (run->exit_reason) {
+        case KVM_EXIT_HLT:
+            printf("Received the KVM_EXIT_HLT\n");
+            exit(0);
+            break; 
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");
             /* Called outside BQL */
-            if(run->io.port == 0x300 &&
-                run->io.size == 1 &&
-                run->io.direction == KVM_EXIT_IO_OUT &&
-                run->io.count == 1 &&
-                *(((char *)run) + run->io.data_offset) == 'c'){
-              printf("Finally touched this part ---  **** --- \n");
-              //call the function for forking here 
-              //Fork the process 
-              //--where to get the id of the parent vm ? 
-              //--do we necessarily need the id of the VM --> yes 
-              //--check the id of the cpu structure .. 
-              //--search the qemu repo on the code browser 
-              //Call the KVM_FORK IOCTL 
-              //Get the details of the child VM and store them in some structure 
-              //--Think about it later 
-              //
-              //
-              //
-              /* memreg. */
-              info.vm_fd = cpu->kvm_state->vmfd;
-              info.vcpu_fd = cpu->kvm_fd; 
-
-              pid = fork();
-              if (pid < 0) {
-                ret = -1; 
-              } else if (pid == 0) {
-                //child process 
-                //make the kvm_fork call here 
-                kvm_vm_ioctl(cpu->kvm_state, KVM_FORK, info);
-              } else {
-                //parent process 
-                wait(NULL);   
-              }
-              break;
-            }
+            
             //use this to print a charachter
             if(run->io.port == 0x300){
               printf("%c", *(((char *)run) + run->io.data_offset));
             }
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
+              
+              //get the values of the attributes before the fork
+              ret = ioctl(cpu->kvm_fd, KVM_GET_REGS, &regs);
+              ret = ioctl(cpu->kvm_fd, KVM_GET_SREGS, &sregs);
+               
               //fork here 
               //
               //get the locks being used by the rest of the threads 
+              printf("Received the call for fork\n");
+              qemu_mutex_lock_iothread();
+              
               pid = fork();
               if(pid < 0) {
-                 ret = -1; 
+                printf("Failed to fork\n");
+                ret = -1; 
               } else if (pid == 0){
                 //child process
+                printf("Starting child process\n");
                 //release the locks obtained before forking 
                 s = cpu->kvm_state;
 
@@ -2667,8 +2640,8 @@ int kvm_cpu_exec(CPUState *cpu)
                 //make a call or creating onc vcpu for it 
                 vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
                 //TODO: set the regs, sregs, .. etc for the vcpuid
-                kvm_set_vcpu_attrs(cpu, vcpufd);
-
+                kvm_set_vcpu_attrs(&regs, &sregs, vcpufd);
+                cpu->kvm_fd = vcpufd;
                 //set up the kvm_run for the vcpu --> update it in the vmstate
                 mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
                 if (mmap_size < 0) {
@@ -2681,14 +2654,19 @@ int kvm_cpu_exec(CPUState *cpu)
                 if (cpu->kvm_run == MAP_FAILED) {
                     return -1; 
                 }
-
+                //running this new vcpu
+                kvm_cpu_exec(cpu);
+                exit(0);
                 //code for setting up the kvm_run for child vcpu in qemu state
                 //add these values to qemu book keeping structures
               } else {
                 //parent process 
                 wait(NULL);
+                printf("Resuming Parent VM\n");
+
+                ret = 0;
+                break;
               }  
-              printf("Received the call for fork\n");
             }
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,

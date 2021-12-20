@@ -23,7 +23,12 @@ infinite:
     mov eax, 63h
     mov dx, 301h
     out dx, eax
-    jmp infinite ; jump to current address = infinite loop
+    mov eax, 63h
+    mov dx, 300h 
+    out dx, eax
+suspend:     
+    hlt 
+    jmp suspend ; jump to current address = infinite loop
 
 ;times 510-($-$$) db 0
 ;dw 0xAA55
