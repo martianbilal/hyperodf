@@ -2642,14 +2642,18 @@ int kvm_cpu_exec(CPUState *cpu)
                 /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
                 for(int i = 0; i < slot_size; i++){
                   slot = kvm_state->memory_listener.slots[i]; 
-                  if(slot.memory_size == 0 && slot.slot == 0 ){
+                  if(slot.memory_size == 0 ){
                     continue;
                   }
-                  mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                  mem.slot = slot.slot ;
                   mem.guest_phys_addr = slot.start_addr;
                   mem.userspace_addr = (unsigned long)slot.ram;
                   mem.flags = slot.flags;
- 
+                  printf("----Info regarding the slot -------\n");
+                  printf("Slot No: %d\n", slot.slot);
+                  printf("Slot size: %d\n", slot.memory_size);
+                  printf("Slot Guest Phys Addr : %d\n", slot.start_addr);
+                  printf("Slot Userspace Addr: %lu\n", (unsigned long)slot.ram);
                   ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
                   if(ret < 0){
                     printf("Failed to set memory \n");
