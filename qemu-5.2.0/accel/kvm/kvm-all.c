@@ -2577,7 +2577,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 ret = EXCP_INTERRUPT;
                 break;
             }
-            fprintf(stderr, "error: kvm run failed %s\n",
+            fprintf(stderr, "error: kvm run failed %d  %s\n", run_ret,
                     strerror(-run_ret));
 #ifdef TARGET_PPC
             if (run_ret == -EBUSY) {
@@ -2642,13 +2642,22 @@ int kvm_cpu_exec(CPUState *cpu)
                 /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
                 for(int i = 0; i < slot_size; i++){
                   slot = kvm_state->memory_listener.slots[i]; 
+                  if(slot.memory_size == 0 && slot.slot == 0 ){
+                    continue;
+                  }
                   mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
                   mem.guest_phys_addr = slot.start_addr;
                   mem.userspace_addr = (unsigned long)slot.ram;
                   mem.flags = slot.flags;
  
-                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, mem);
+                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                  if(ret < 0){
+                    printf("Failed to set memory \n");
+                    perror("KVM SET USER MEMORY REGION");
+                  
+                  }
                 }
+                /* kvm_memory_listener_register(s, &s->memory_listener, s->as->as, 0); */
 
                 //make a call or creating onc vcpu for it 
                 vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
@@ -2665,10 +2674,20 @@ int kvm_cpu_exec(CPUState *cpu)
                 cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                                     cpu->kvm_fd, 0);
                 if (cpu->kvm_run == MAP_FAILED) {
-                    return -1; 
+                  return -1; 
                 }
+                
+                for(int i = 0; i < 14; i ++ ){
+                  ret = ioctl(vcpufd, KVM_RUN, 0);                   
+                  printf("%d", cpu->kvm_run->exit_reason);
+               fprintf(stderr, "KVM: unknown exit, hardware reason %" PRIx64 "\n",
+                    (uint64_t)run->hw.hardware_exit_reason);
+              
+        cpu_dump_state(cpu, stderr, CPU_DUMP_CODE);
+                   }
+
                 //running this new vcpu
-                kvm_cpu_exec(cpu);
+                /* kvm_cpu_exec(cpu); */
                 exit(0);
                 //code for setting up the kvm_run for child vcpu in qemu state
                 //add these values to qemu book keeping structures

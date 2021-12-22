@@ -2,7 +2,7 @@
 make 
 make install
 gdb -q --args /usr/local/bin/qemu-system-x86_64 \
-  -m 1G \
+  -m 128 \
   -hda ./boot-sect.bin \
   -net none\
   -enable-kvm \
