@@ -2449,7 +2449,8 @@ static void kvm_eat_signals(CPUState *cpu)
     } while (sigismember(&chkset, SIG_IPI));
 }
 
-struct cpu_prefork_state { 
+struct cpu_prefork_state 
+{ 
   struct kvm_regs *regs; 
   struct kvm_sregs *sregs; 
   struct kvm_fpu *fpu;
@@ -2464,6 +2465,30 @@ struct cpu_prefork_state {
   struct kvm_mp_state *mp_state;
   struct kvm_debugregs *debugregs;
   
+};
+
+
+int cpu_get_prefork_state(struct cpu_prefork_state *state, int vcpufd) 
+{
+  int ret = 0; 
+  char *attr = "";
+
+  ret = ioctl(vcpufd, KVM_GET_REGS, state->regs);
+  attr = "regs";
+  if(ret < 0) goto err;
+    
+  ret = ioctl(vcpufd, KVM_GET_SREGS, state->sregs);
+  attr = "sregs";
+  if(ret < 0) goto err;
+
+  return ret; 
+
+
+err: 
+  printf("Failed to get attributes for %s, returned with reason: %d", attr, ret);
+  perror("FAILED TO GET VCPU ATTRIBUTES");
+  return -1;
+
 }
 
 /* int kvm_copy_attr(CPUState *cpu,int get_type, int set_type){ */
@@ -2476,7 +2501,8 @@ struct cpu_prefork_state {
  * set the attrs for vcpu id vcpufd same as that 
  * of the vcpu id cpu->fd
  * */
-int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd){
+int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
+{
   int ret = 0;
   struct kvm_fpu *fpu;
   struct kvm_msrs *msrs;
@@ -2627,9 +2653,8 @@ int kvm_cpu_exec(CPUState *cpu)
                 *(((char *)run) + run->io.data_offset) == 'c'){
               
               //get the values of the attributes before the fork
-              ret = ioctl(cpu->kvm_fd, KVM_GET_REGS, &regs);
-              ret = ioctl(cpu->kvm_fd, KVM_GET_SREGS, &sregs);
-               
+              ret = cpu_get_prefork_state(&state, cpu->kvm_fd);
+
               //fork here 
               //
               //get the locks being used by the rest of the threads 
@@ -2672,8 +2697,6 @@ int kvm_cpu_exec(CPUState *cpu)
                 }
                 /* kvm_memory_listener_register(s, &s->memory_listener, s->as->as, 0); */
 
-                state.regs = &regs;
-                state.sregs = &sregs;
                 //make a call or creating onc vcpu for it 
                 vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
                 //TODO: set the regs, sregs, .. etc for the vcpuid
