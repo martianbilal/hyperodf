@@ -2451,8 +2451,8 @@ static void kvm_eat_signals(CPUState *cpu)
 
 struct cpu_prefork_state 
 { 
-  struct kvm_regs *regs; 
-  struct kvm_sregs *sregs; 
+  struct kvm_regs regs; 
+  struct kvm_sregs sregs; 
   struct kvm_fpu *fpu;
   struct kvm_msrs *msrs;
   struct kvm_xsave *xsave;
@@ -2471,15 +2471,25 @@ struct cpu_prefork_state
 int cpu_get_prefork_state(struct cpu_prefork_state *state, int vcpufd) 
 {
   int ret = 0; 
+  struct kvm_regs regs; 
+  struct kvm_sregs sregs;
   char *attr = "";
-
-  ret = ioctl(vcpufd, KVM_GET_REGS, state->regs);
+  
+  do
+  {
+    ret = ioctl(vcpufd, KVM_GET_REGS, &regs);
+  } while(ret == -EINTR);
   attr = "regs";
   if(ret < 0) goto err;
+  state->regs = regs;
     
-  ret = ioctl(vcpufd, KVM_GET_SREGS, state->sregs);
+  do
+  {
+    ret = ioctl(vcpufd, KVM_GET_SREGS, &sregs);
+  } while(ret == -EINTR);
   attr = "sregs";
   if(ret < 0) goto err;
+  state->sregs = sregs;
 
   return ret; 
 
@@ -2504,6 +2514,7 @@ err:
 int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
 {
   int ret = 0;
+  char *attr; 
   struct kvm_fpu *fpu;
   struct kvm_msrs *msrs;
   struct kvm_xsave *xsave;
@@ -2520,18 +2531,18 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
   //set regs
   /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
   do {
-    ret = ioctl(vcpufd, KVM_SET_REGS, state->regs);
+    ret = ioctl(vcpufd, KVM_SET_REGS, &(state->regs));
   } while (ret == -EINTR);
-
-  if(ret<0) printf("c\n");
+  attr="regs";
+  if(ret<0) goto err;
   
   //set sregs
   /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_SREGS, sregs); */
   do {
-    ret = ioctl(vcpufd, KVM_SET_SREGS, state->sregs);
+    ret = ioctl(vcpufd, KVM_SET_SREGS, &(state->sregs));
   } while (ret == -EINTR);
-
-  if(ret<0) printf("d\n");
+  attr="sregs";
+  if(ret<0) goto err;
   
   //set fpu 
   //set msrs
@@ -2546,7 +2557,11 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
   //set debuggers
 
   return ret; 
-
+  
+err:
+  printf("Failed to set attributes for %s, returned with reason: %d", attr, ret);
+  perror("FAILED TO SET VCPU ATTRIBUTES");
+  return -1; 
 }
 
 int kvm_cpu_exec(CPUState *cpu)
@@ -2557,8 +2572,6 @@ int kvm_cpu_exec(CPUState *cpu)
     struct cpu_prefork_state state; 
     struct KVMState *s;
     struct KVMSlot slot;
-    struct kvm_regs regs; 
-    struct kvm_sregs sregs; 
     int slot_size; 
     int mmap_size;
     int ret, run_ret;
@@ -2652,14 +2665,15 @@ int kvm_cpu_exec(CPUState *cpu)
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
               
-              //get the values of the attributes before the fork
-              ret = cpu_get_prefork_state(&state, cpu->kvm_fd);
 
               //fork here 
               //
               //get the locks being used by the rest of the threads 
               printf("Received the call for fork\n");
               qemu_mutex_lock_iothread();
+              
+              //get the values of the attributes before the fork
+              ret = cpu_get_prefork_state(&state, cpu->kvm_fd);
               
               pid = fork();
               if(pid < 0) {
