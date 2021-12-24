@@ -2449,6 +2449,23 @@ static void kvm_eat_signals(CPUState *cpu)
     } while (sigismember(&chkset, SIG_IPI));
 }
 
+struct cpu_prefork_state { 
+  struct kvm_regs *regs; 
+  struct kvm_sregs *sregs; 
+  struct kvm_fpu *fpu;
+  struct kvm_msrs *msrs;
+  struct kvm_xsave *xsave;
+  struct kvm_vcpu_event *events;
+  struct kvm_lapic_state *lapic;
+  struct kvm_xcrs *xcrs; 
+  struct kvm_irqchip irqchip[3];
+  struct kvm_clock_data clock_data;
+  struct kvm_pit_state2 *pit2;
+  struct kvm_mp_state *mp_state;
+  struct kvm_debugregs *debugregs;
+  
+}
+
 /* int kvm_copy_attr(CPUState *cpu,int get_type, int set_type){ */
 /*   int ret = 0; */ 
 /*   kvm_vcpu_ioctl(cpu, get_type, ); */
@@ -2459,7 +2476,7 @@ static void kvm_eat_signals(CPUState *cpu)
  * set the attrs for vcpu id vcpufd same as that 
  * of the vcpu id cpu->fd
  * */
-int  kvm_set_vcpu_attrs(struct kvm_regs *regs, struct kvm_sregs *sregs,  int vcpufd){
+int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd){
   int ret = 0;
   struct kvm_fpu *fpu;
   struct kvm_msrs *msrs;
@@ -2477,7 +2494,7 @@ int  kvm_set_vcpu_attrs(struct kvm_regs *regs, struct kvm_sregs *sregs,  int vcp
   //set regs
   /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
   do {
-    ret = ioctl(vcpufd, KVM_SET_REGS, regs);
+    ret = ioctl(vcpufd, KVM_SET_REGS, state->regs);
   } while (ret == -EINTR);
 
   if(ret<0) printf("c\n");
@@ -2485,7 +2502,7 @@ int  kvm_set_vcpu_attrs(struct kvm_regs *regs, struct kvm_sregs *sregs,  int vcp
   //set sregs
   /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_SREGS, sregs); */
   do {
-    ret = ioctl(vcpufd, KVM_SET_SREGS, sregs);
+    ret = ioctl(vcpufd, KVM_SET_SREGS, state->sregs);
   } while (ret == -EINTR);
 
   if(ret<0) printf("d\n");
@@ -2511,6 +2528,7 @@ int kvm_cpu_exec(CPUState *cpu)
     struct kvm_run *run = cpu->kvm_run;
     struct kvm_userspace_memory_region mem; 
     struct fork_info info;
+    struct cpu_prefork_state state; 
     struct KVMState *s;
     struct KVMSlot slot;
     struct kvm_regs regs; 
@@ -2642,31 +2660,24 @@ int kvm_cpu_exec(CPUState *cpu)
                 /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
                 for(int i = 0; i < slot_size; i++){
                   slot = kvm_state->memory_listener.slots[i]; 
-                  if(slot.memory_size == 0 ){
+                  if(slot.memory_size == 0){
                     continue;
                   }
                   mem.slot = slot.slot ;
                   mem.guest_phys_addr = slot.start_addr;
                   mem.userspace_addr = (unsigned long)slot.ram;
                   mem.flags = slot.flags;
-                  printf("----Info regarding the slot -------\n");
-                  printf("Slot No: %d\n", slot.slot);
-                  printf("Slot size: %d\n", slot.memory_size);
-                  printf("Slot Guest Phys Addr : %d\n", slot.start_addr);
-                  printf("Slot Userspace Addr: %lu\n", (unsigned long)slot.ram);
-                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
-                  if(ret < 0){
-                    printf("Failed to set memory \n");
-                    perror("KVM SET USER MEMORY REGION");
-                  
-                  }
+ 
+                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, mem);
                 }
                 /* kvm_memory_listener_register(s, &s->memory_listener, s->as->as, 0); */
 
+                state.regs = &regs;
+                state.sregs = &sregs;
                 //make a call or creating onc vcpu for it 
                 vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
                 //TODO: set the regs, sregs, .. etc for the vcpuid
-                kvm_set_vcpu_attrs(&regs, &sregs, vcpufd);
+                kvm_set_vcpu_attrs(&state, vcpufd);
                 cpu->kvm_fd = vcpufd;
                 //set up the kvm_run for the vcpu --> update it in the vmstate
                 mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
@@ -2678,17 +2689,13 @@ int kvm_cpu_exec(CPUState *cpu)
                 cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                                     cpu->kvm_fd, 0);
                 if (cpu->kvm_run == MAP_FAILED) {
-                  return -1; 
+                    return -1; 
                 }
                 
                 for(int i = 0; i < 14; i ++ ){
                   ret = ioctl(vcpufd, KVM_RUN, 0);                   
                   printf("%d", cpu->kvm_run->exit_reason);
-               fprintf(stderr, "KVM: unknown exit, hardware reason %" PRIx64 "\n",
-                    (uint64_t)run->hw.hardware_exit_reason);
-              
-        cpu_dump_state(cpu, stderr, CPU_DUMP_CODE);
-                   }
+                }
 
                 //running this new vcpu
                 /* kvm_cpu_exec(cpu); */
