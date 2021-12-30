@@ -2873,6 +2873,9 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
                 printf("Starting child process\n");
                 //release the locks obtained before forking 
                 s = cpu->kvm_state;
+                close(s->fd);
+                close(s->vmfd);
+                s->fd = open("/dev/kvm", 2);
 
                 //create new fds
                 //make a call for creating a vm 
