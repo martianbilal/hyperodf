@@ -3,8 +3,10 @@ make
 make install
 /usr/local/bin/qemu-system-x86_64 \
   -m 512 \
+  -smp 1 \
   -hda ./boot-sect.bin \
-  -net none\
+  -net none \
+  -cpu host,vmx=on \
   -enable-kvm \
   -nographic \
   -pidfile vm.pid \

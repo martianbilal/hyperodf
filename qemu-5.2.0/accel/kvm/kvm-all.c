@@ -60,6 +60,8 @@
  */
 #define PAGE_SIZE qemu_real_host_page_size
 
+#define num_of_get_ioctls 7
+
 //#define DEBUG_KVM
 
 #ifdef DEBUG_KVM
@@ -1349,7 +1351,6 @@ void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
     for (i = 0; i < s->nr_slots; i++) {
         kml->slots[i].slot = i;
     }
-
     kml->listener.region_add = kvm_region_add;
     kml->listener.region_del = kvm_region_del;
     kml->listener.log_start = kvm_log_start;
@@ -2451,53 +2452,184 @@ static void kvm_eat_signals(CPUState *cpu)
 
 struct cpu_prefork_state 
 { 
-  struct kvm_regs regs; 
-  struct kvm_sregs sregs; 
-  struct kvm_fpu *fpu;
-  struct kvm_msrs *msrs;
-  struct kvm_xsave *xsave;
-  struct kvm_vcpu_event *events;
-  struct kvm_lapic_state *lapic;
-  struct kvm_xcrs *xcrs; 
-  struct kvm_irqchip irqchip[3];
-  struct kvm_clock_data clock_data;
-  struct kvm_pit_state2 *pit2;
-  struct kvm_mp_state *mp_state;
-  struct kvm_debugregs *debugregs;
-  
+    struct kvm_regs regs; 
+    struct kvm_sregs sregs; 
+    struct kvm_fpu fpu;
+    struct kvm_msrs msrs;
+    struct kvm_xsave xsave;
+    struct kvm_vcpu_event *events;
+    struct kvm_lapic_state lapic;
+    struct kvm_xcrs xcrs; 
+    struct kvm_irqchip irqchip[3];
+    struct kvm_clock_data clock_data;
+    struct kvm_pit_state2 pit2;
+    struct kvm_mp_state mp_state;
+    struct kvm_debugregs debugregs;
+    struct kvm_cpuid2 cpuid2; 
+    struct kvm_vcpu_events vcpu_events;
+    int *tsc_khz;
 };
 
-
-int cpu_get_prefork_state(struct cpu_prefork_state *state, int vcpufd) 
+//union to be used in the get_attr() ioctl call 
+union get_structure 
 {
-  int ret = 0; 
-  struct kvm_regs regs; 
-  struct kvm_sregs sregs;
-  char *attr = "";
-  
-  do
-  {
-    ret = ioctl(vcpufd, KVM_GET_REGS, &regs);
-  } while(ret == -EINTR);
-  attr = "regs";
-  if(ret < 0) goto err;
-  state->regs = regs;
-    
-  do
-  {
-    ret = ioctl(vcpufd, KVM_GET_SREGS, &sregs);
-  } while(ret == -EINTR);
-  attr = "sregs";
-  if(ret < 0) goto err;
-  state->sregs = sregs;
+    struct kvm_regs *regs; 
+    struct kvm_sregs *sregs;
+    struct kvm_cpuid2 *cpuid2; 
+    struct kvm_msrs *msrs; 
+    int *tsc_khz;
+    struct kvm_xsave *xsave; 
+    struct kvm_xcrs *xcrs; 
 
-  return ret; 
+}; 
+
+//saves the state of Parent VM
+int vm_pre_fork(struct KVMState *kvm) 
+{
+    return 0; 
+}
+
+//sets up the state of the Child VM  
+int vm_post_fork_child(struct KVMState *kvm) 
+{
+    return 0; 
+}
+
+int get_attr(int ioctl_id, int vcpufd, union get_structure in_union)
+{   
+    int ret = 0; 
+    do 
+    {
+        ret = ioctl(vcpufd, ioctl_id, in_union); 
+    } while ( ret == -EINTR); 
+    return ret; 
+}
+
+int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd) 
+{ 
+
+    int ret = 0; 
+    int get_ioctls[num_of_get_ioctls] = {KVM_GET_REGS, KVM_SET_REGS, KVM_GET_CPUID2, KVM_GET_MSRS, KVM_GET_TSC_KHZ, KVM_GET_XSAVE, KVM_GET_XCRS}; 
+    
+    struct kvm_regs regs; 
+    struct kvm_sregs sregs;
+    struct kvm_cpuid2 cpuid2;
+    struct kvm_msrs msrs;  
+    struct kvm_xsave xsave;
+    struct kvm_xcrs xcrs; 
+    struct kvm_vcpu_events vcpu_events;
+    struct kvm_mp_state mp_state;
+
+    int tsc_khz; 
+    union get_structure structs[num_of_get_ioctls] = {};
+
+    
+    char *attr = "";
+    
+    // for(int i = 0; i < num_of_get_ioctls; i++)
+    // {
+    //     get_attr(get_ioctls[i], vcpufd, get_struct[i]);
+    // }
+
+    // get_attr(KVM_GET_REGS, vcpufd, regs);
+    // get_attr(KVM_GET_SREGS, vcpufd, sregs);
+
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_REGS, &regs);
+    } while (ret == -EINTR);
+    attr = "regs";
+    if(ret < 0) goto err;
+    state->regs = regs;
+        
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_SREGS, &sregs);
+    } while (ret == -EINTR);
+    attr = "sregs";
+    if(ret < 0) goto err;
+    state->sregs = sregs;
+
+    // uncomment this code if we need to set the cpuid later on
+    // TODO: Set up the cpuid2 properly 
+    // do
+    // {
+    //     ret = ioctl(vcpufd, KVM_GET_CPUID2, &cpuid2);
+    // } while (ret == -EINTR);
+    // attr = "cpuid2";
+    // if(ret < 0) goto err;
+    // state->cpuid2 = cpuid2;
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_MSRS, &msrs);
+    } while (ret == -EINTR);
+    attr = "msrs";
+    if(ret < 0) goto err;
+    state->msrs = msrs;
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_TSC_KHZ, &tsc_khz);
+    } while (ret == -EINTR);
+    attr = "tsc_khz";
+    if(ret < 0) goto err;
+    state->tsc_khz = tsc_khz;
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_XSAVE, &xsave);
+    } while (ret == -EINTR);
+    attr = "xsave";
+    if(ret < 0) goto err;
+    state->xsave = xsave;
+
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_XCRS, &xcrs);
+    } while (ret == -EINTR);
+    attr = "xcrs";
+    if(ret < 0) goto err;
+    state->xcrs = xcrs;
+
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &vcpu_events);
+    } while (ret == -EINTR);
+    attr = "kvm_vcpu_events";
+    if(ret < 0) goto err;
+    state->vcpu_events = vcpu_events;
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_MP_STATE, &mp_state);
+    } while (ret == -EINTR);
+    attr = "mp_state";
+    if(ret < 0) goto err;
+    state->mp_state = mp_state;
+
+
+
+        //for more complex ioctls 
+        //TODO: write this function
+        // kvm_ioctl_get_state(int ioctl_id, int vcpufd, void* input_args);
+
+        // kvm_set_state(void *input_args);
+
+        //In case attribute's state can not be retrieved from KVM 
+        //this function gets state from the CPUState or KVMState
+        // kvm_cpu_get_state(void* input_args);
+
+    return ret; 
 
 
 err: 
-  printf("Failed to get attributes for %s, returned with reason: %d", attr, ret);
-  perror("FAILED TO GET VCPU ATTRIBUTES");
-  return -1;
+    printf("Failed to get attributes for %s, returned with reason: %d", attr, ret);
+    perror("FAILED TO GET VCPU ATTRIBUTES");
+    return -1;
 
 }
 
@@ -2513,55 +2645,113 @@ err:
  * */
 int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
 {
-  int ret = 0;
-  char *attr; 
-  struct kvm_fpu *fpu;
-  struct kvm_msrs *msrs;
-  struct kvm_xsave *xsave;
-  struct kvm_vcpu_event *events;
-  struct kvm_lapic_state *lapic;
-  struct kvm_xcrs *xcrs; 
-  struct kvm_irqchip irqchip[3];
-  struct kvm_clock_data clock_data;
-  struct kvm_pit_state2 *pit2;
-  struct kvm_mp_state *mp_state;
-  struct kvm_debugregs *debugregs;
-  
-  printf("starting set attrs\n");
-  //set regs
-  /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
-  do {
-    ret = ioctl(vcpufd, KVM_SET_REGS, &(state->regs));
-  } while (ret == -EINTR);
-  attr="regs";
-  if(ret<0) goto err;
-  
-  //set sregs
-  /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_SREGS, sregs); */
-  do {
-    ret = ioctl(vcpufd, KVM_SET_SREGS, &(state->sregs));
-  } while (ret == -EINTR);
-  attr="sregs";
-  if(ret<0) goto err;
-  
-  //set fpu 
-  //set msrs
-  //set xsave 
-  //set events 
-  //set lapic
-  //set xcrs 
-  //set irqchip[3]
-  //set clock data
-  //set pit2
-  //set mp_state
-  //set debuggers
+    int ret = 0;
+    char *attr; 
+    struct kvm_fpu *fpu;
+    struct kvm_msrs *msrs;
+    struct kvm_xsave *xsave;
+    struct kvm_vcpu_event *events;
+    struct kvm_lapic_state *lapic;
+    struct kvm_xcrs *xcrs; 
+    struct kvm_irqchip irqchip[3];
+    struct kvm_clock_data clock_data;
+    struct kvm_pit_state2 *pit2;
+    struct kvm_mp_state *mp_state;
+    struct kvm_debugregs *debugregs;
+    
+    printf("starting set attrs\n");
+    //set regs
+    /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_REGS, &(state->regs));
+    } while (ret == -EINTR);
+    attr="regs";
+    if(ret<0) goto err;
+    
+    //set sregs
+    /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_SREGS, sregs); */
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_SREGS, &(state->sregs));
+    } while (ret == -EINTR);
+    attr="sregs";
+    if(ret<0) goto err;
 
-  return ret; 
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
+    } while (ret == -EINTR);
+    attr="tsc_khz";
+    if(ret<0) goto err;
+    
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_MSRS, &(state->msrs));
+    } while (ret == -EINTR);
+    attr="msrs";
+    if(ret<0) goto err;
+
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_XSAVE, &(state->xsave));
+    } while (ret == -EINTR);
+    attr="xsave";
+    if(ret<0) goto err;
+
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_XCRS, &(state->xcrs));
+    } while (ret == -EINTR);
+    attr="xcrs";
+    if(ret<0) goto err;
+
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_VCPU_EVENTS, &(state->vcpu_events));
+    // } while (ret == -EINTR);
+    // attr="vcpu_events";
+    // if(ret<0) goto err;
+    
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_MP_STATE, &(state->mp_state));
+    } while (ret == -EINTR);
+    attr="mp_state";
+    if(ret<0) goto err;
+
+    
+
+
+    // //set mce 
+    // do { 
+    //     ret = ioctl(vcpufd, KVM_X86_SETUP_MCE, state->mce_num);
+    // } while (ret == -EINTR); 
+
+    // //set cpuid2 
+    // do  {
+
+    // }
+    
+
+    //set fpu 
+    //set msrs
+    //set xsave 
+    //set events 
+    //set lapic
+    //set xcrs 
+    //set irqchip[3]
+    //set clock data
+    //set pit2
+    //set mp_state
+    //set debuggers
+
+    return ret; 
   
 err:
-  printf("Failed to set attributes for %s, returned with reason: %d", attr, ret);
-  perror("FAILED TO SET VCPU ATTRIBUTES");
-  return -1; 
+    printf("Failed to set attributes for %s, returned with reason: %d", attr, ret);
+    perror("FAILED TO SET VCPU ATTRIBUTES");
+    return -1; 
 }
 
 int kvm_cpu_exec(CPUState *cpu)
@@ -2577,6 +2767,7 @@ int kvm_cpu_exec(CPUState *cpu)
     int ret, run_ret;
     int vmfd; //vm file descriptor for the child vm
     int vcpufd; //vcpu file descriptro for child vcpu 
+    int identity_base = 0xfeffc000;
     void *kvm_run;
     pid_t pid; 
     DPRINTF("kvm_cpu_exec()\n");
@@ -2596,9 +2787,7 @@ int kvm_cpu_exec(CPUState *cpu)
             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
             cpu->vcpu_dirty = false;
         }
-
-        kvm_arch_pre_run(cpu, run);
-        if (qatomic_read(&cpu->exit_request)) {
+kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
             DPRINTF("interrupt exit requested\n");
             /*
              * KVM requires us to reenter the kernel after IO exits to complete
@@ -2673,7 +2862,7 @@ int kvm_cpu_exec(CPUState *cpu)
               qemu_mutex_lock_iothread();
               
               //get the values of the attributes before the fork
-              ret = cpu_get_prefork_state(&state, cpu->kvm_fd);
+              ret = cpu_get_pre_fork_state(&state, cpu->kvm_fd);
               
               pid = fork();
               if(pid < 0) {
@@ -2699,9 +2888,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
                 for(int i = 0; i < slot_size; i++){
                   slot = kvm_state->memory_listener.slots[i]; 
-                  if(slot.memory_size == 0){
-                    continue;
-                  }
+                //   if(slot.memory_size == 0){
+                //     continue;
+                //   }
                   mem.slot = slot.slot ;
                   mem.guest_phys_addr = slot.start_addr;
                   mem.userspace_addr = (unsigned long)slot.ram;
@@ -2714,6 +2903,16 @@ int kvm_cpu_exec(CPUState *cpu)
                 //make a call or creating onc vcpu for it 
                 vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
                 //TODO: set the regs, sregs, .. etc for the vcpuid
+                do 
+                {
+                    ret = ioctl(vmfd, KVM_SET_IDENTITY_MAP_ADDR, &identity_base);
+                } while (ret == -EINTR);
+                
+                do 
+                {
+                    ret = ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
+                } while (ret == -EINTR);
+
                 kvm_set_vcpu_attrs(&state, vcpufd);
                 cpu->kvm_fd = vcpufd;
                 //set up the kvm_run for the vcpu --> update it in the vmstate
@@ -2730,8 +2929,10 @@ int kvm_cpu_exec(CPUState *cpu)
                 }
                 
                 for(int i = 0; i < 14; i ++ ){
-                  ret = ioctl(vcpufd, KVM_RUN, 0);                   
-                  printf("%d", cpu->kvm_run->exit_reason);
+                  ret = ioctl(vcpufd, KVM_RUN, 0);  
+                  printf("return eintr: %d\n", EINTR);                
+                  printf("%d\n", cpu->kvm_run->exit_reason);
+                  printf("return value : %d \n", ret);
                 }
 
                 //running this new vcpu
