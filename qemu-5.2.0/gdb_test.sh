@@ -2,9 +2,11 @@
 make 
 make install
 gdb -q --args /usr/local/bin/qemu-system-x86_64 \
-  -m 128 \
+  -m 512 \
+  -smp 1 \
   -hda ./boot-sect.bin \
-  -net none\
+  -net none \
+  -cpu host,vmx=on \
   -enable-kvm \
   -nographic \
   -pidfile vm.pid \

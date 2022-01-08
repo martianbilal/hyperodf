@@ -2457,7 +2457,6 @@ struct cpu_prefork_state
     struct kvm_fpu fpu;
     struct kvm_msrs msrs;
     struct kvm_xsave xsave;
-    struct kvm_vcpu_event *events;
     struct kvm_lapic_state lapic;
     struct kvm_xcrs xcrs; 
     struct kvm_irqchip irqchip[3];
@@ -2517,8 +2516,9 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     struct kvm_msrs msrs;  
     struct kvm_xsave xsave;
     struct kvm_xcrs xcrs; 
-    struct kvm_vcpu_events vcpu_events;
     struct kvm_mp_state mp_state;
+    struct kvm_vcpu_events vcpu_events;
+    struct kvm_fpu fpu; 
 
     int tsc_khz; 
     union get_structure structs[num_of_get_ioctls] = {};
@@ -2550,6 +2550,14 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     attr = "sregs";
     if(ret < 0) goto err;
     state->sregs = sregs;
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_FPU, &fpu);
+    } while (ret == -EINTR);
+    attr = "fpu";
+    if(ret < 0) goto err;
+    state->fpu = fpu;
 
     // uncomment this code if we need to set the cpuid later on
     // TODO: Set up the cpuid2 properly 
@@ -2593,16 +2601,7 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     attr = "xcrs";
     if(ret < 0) goto err;
     state->xcrs = xcrs;
-
-
-    do
-    {
-        ret = ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &vcpu_events);
-    } while (ret == -EINTR);
-    attr = "kvm_vcpu_events";
-    if(ret < 0) goto err;
-    state->vcpu_events = vcpu_events;
-
+    
     do
     {
         ret = ioctl(vcpufd, KVM_GET_MP_STATE, &mp_state);
@@ -2610,6 +2609,15 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     attr = "mp_state";
     if(ret < 0) goto err;
     state->mp_state = mp_state;
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &vcpu_events);
+    } while (ret == -EINTR);
+    attr = "vcpu_events";
+    if(ret < 0) goto err;
+    state->vcpu_events = vcpu_events;
+
 
 
 
@@ -2647,17 +2655,7 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
 {
     int ret = 0;
     char *attr; 
-    struct kvm_fpu *fpu;
-    struct kvm_msrs *msrs;
-    struct kvm_xsave *xsave;
-    struct kvm_vcpu_event *events;
-    struct kvm_lapic_state *lapic;
-    struct kvm_xcrs *xcrs; 
-    struct kvm_irqchip irqchip[3];
-    struct kvm_clock_data clock_data;
-    struct kvm_pit_state2 *pit2;
-    struct kvm_mp_state *mp_state;
-    struct kvm_debugregs *debugregs;
+
     
     printf("starting set attrs\n");
     //set regs
@@ -2685,6 +2683,13 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
     attr="tsc_khz";
     if(ret<0) goto err;
     
+    do
+    {
+        ret = ioctl(vcpufd, KVM_SET_FPU, &(state->fpu));
+    } while (ret == -EINTR);
+    attr = "fpu";
+    if(ret < 0) goto err;
+
     do 
     {
         ret = ioctl(vcpufd, KVM_SET_MSRS, &(state->msrs));
@@ -2752,6 +2757,16 @@ err:
     printf("Failed to set attributes for %s, returned with reason: %d", attr, ret);
     perror("FAILED TO SET VCPU ATTRIBUTES");
     return -1; 
+}
+
+int vcpu_complete_io(CPUState *cpu) 
+{
+    int ret = 0; 
+    cpu->kvm_run->immediate_exit = 1; 
+    ret = ioctl(cpu->kvm_fd, KVM_RUN, NULL);
+    printf("return value for complete io : %d \n", ret);
+    cpu->kvm_run->immediate_exit = 0; 
+    return ret; 
 }
 
 int kvm_cpu_exec(CPUState *cpu)
@@ -2851,16 +2866,24 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
             if(run->io.port == 0x300){
               printf("%c", *(((char *)run) + run->io.data_offset));
             }
+            if(run->io.port == 0x300 &&
+                *(((char *)run) + run->io.data_offset) == 'c'){
+                exit(0);
+                break;
+            }
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
               
-
+                    
               //fork here 
               //
               //get the locks being used by the rest of the threads 
               printf("Received the call for fork\n");
               qemu_mutex_lock_iothread();
               
+              //complete the I/O before copying state
+              vcpu_complete_io(cpu);
+
               //get the values of the attributes before the fork
               ret = cpu_get_pre_fork_state(&state, cpu->kvm_fd);
               
@@ -2880,6 +2903,9 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
                 //create new fds
                 //make a call for creating a vm 
                 vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+                do{
+                    ret = ioctl(vmfd, KVM_CREATE_IRQCHIP, 0);
+                } while(ret == -EINTR); 
                 if (vmfd < 0) {
                   fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
                     strerror(-ret));
@@ -2930,10 +2956,9 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
                 if (cpu->kvm_run == MAP_FAILED) {
                     return -1; 
                 }
-                
+                kvm_arch_pre_run(cpu, run);
                 for(int i = 0; i < 14; i ++ ){
                   ret = ioctl(vcpufd, KVM_RUN, 0);  
-                  printf("return eintr: %d\n", EINTR);                
                   printf("%d\n", cpu->kvm_run->exit_reason);
                   printf("return value : %d \n", ret);
                 }
