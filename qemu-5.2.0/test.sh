@@ -8,6 +8,7 @@ make install
   -net none \
   -cpu host,vmx=on \
   -enable-kvm \
+  --trace events=./events \
   -nographic \
   -pidfile vm.pid \
   2>&1 | tee vm.log

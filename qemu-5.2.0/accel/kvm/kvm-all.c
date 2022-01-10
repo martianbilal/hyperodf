@@ -353,7 +353,7 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot, boo
     KVMState *s = kvm_state;
     struct kvm_userspace_memory_region mem;
     int ret;
-
+ 
     mem.slot = slot->slot | (kml->as_id << 16);
     mem.guest_phys_addr = slot->start_addr;
     mem.userspace_addr = (unsigned long)slot->ram;
@@ -2917,15 +2917,21 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
                 /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
                 for(int i = 0; i < slot_size; i++){
                   slot = kvm_state->memory_listener.slots[i]; 
-                //   if(slot.memory_size == 0){
-                //     continue;
-                //   }
-                  mem.slot = slot.slot ;
+                  if(slot.memory_size == 0){
+                    continue;
+                  }
+
+                    // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                    //  | (kvm_state->memory_listener.as_id << 16)
+                  mem.slot = slot.slot;
                   mem.guest_phys_addr = slot.start_addr;
                   mem.userspace_addr = (unsigned long)slot.ram;
                   mem.flags = slot.flags;
+                  mem.memory_size = slot.memory_size;
  
-                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, mem);
+                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                  trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                              mem.memory_size, mem.userspace_addr, ret);
                 }
                 /* kvm_memory_listener_register(s, &s->memory_listener, s->as->as, 0); */
 
@@ -2958,7 +2964,10 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
                 }
                 kvm_arch_pre_run(cpu, run);
                 for(int i = 0; i < 14; i ++ ){
-                  ret = ioctl(vcpufd, KVM_RUN, 0);  
+                  ret = ioctl(vcpufd, KVM_RUN, 0);
+                //   if(cpu->kvm_run->exit_reason == KVM_EXIT_INTERNAL_ERROR) {
+                //       kvm_handle_internal_error(cpu, cpu->kvm_run);
+                //   }  
                   printf("%d\n", cpu->kvm_run->exit_reason);
                   printf("return value : %d \n", ret);
                 }
