@@ -2802,7 +2802,8 @@ int kvm_cpu_exec(CPUState *cpu)
             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
             cpu->vcpu_dirty = false;
         }
-kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
+        kvm_arch_pre_run(cpu, run); 
+        if (qatomic_read(&cpu->exit_request)) {
             DPRINTF("interrupt exit requested\n");
             /*
              * KVM requires us to reenter the kernel after IO exits to complete
@@ -2896,9 +2897,9 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
                 printf("Starting child process\n");
                 //release the locks obtained before forking 
                 s = cpu->kvm_state;
-                close(s->fd);
-                close(s->vmfd);
-                s->fd = open("/dev/kvm", 2);
+                // close(s->fd);
+                // close(s->vmfd);
+                // s->fd = open("/dev/kvm", 2);
 
                 //create new fds
                 //make a call for creating a vm 
@@ -2970,6 +2971,8 @@ kvm_arch_pre_run(cpu, run); if (qatomic_read(&cpu->exit_request)) {
                 //   }  
                   printf("%d\n", cpu->kvm_run->exit_reason);
                   printf("return value : %d \n", ret);
+                  fprintf(stderr, "KVM: unknown exit, hardware reason %" PRIx64 "\n",
+                    (uint64_t)cpu->kvm_run->hw.hardware_exit_reason);
                 }
 
                 //running this new vcpu
