@@ -2874,120 +2874,116 @@ int kvm_cpu_exec(CPUState *cpu)
             }
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
-              
-                    
-              //fork here 
-              //
-              //get the locks being used by the rest of the threads 
-              printf("Received the call for fork\n");
-              qemu_mutex_lock_iothread();
-              
-              //complete the I/O before copying state
-              vcpu_complete_io(cpu);
-
-              //get the values of the attributes before the fork
-              ret = cpu_get_pre_fork_state(&state, cpu->kvm_fd);
-              
-              pid = fork();
-              if(pid < 0) {
-                printf("Failed to fork\n");
-                ret = -1; 
-              } else if (pid == 0){
-                //child process
-                printf("Starting child process\n");
-                //release the locks obtained before forking 
-                s = cpu->kvm_state;
-                // close(s->fd);
-                // close(s->vmfd);
-                // s->fd = open("/dev/kvm", 2);
-
-                //create new fds
-                //make a call for creating a vm 
-                vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
-                do{
-                    ret = ioctl(vmfd, KVM_CREATE_IRQCHIP, 0);
-                } while(ret == -EINTR); 
-                if (vmfd < 0) {
-                  fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
-                    strerror(-ret));
-                }
-                s->vmfd = vmfd; 
-
-                slot_size = cpu->kvm_state->nr_slots;
-                //set up the shared memory for the child vm 
-                /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
-                for(int i = 0; i < slot_size; i++){
-                  slot = kvm_state->memory_listener.slots[i]; 
-                  if(slot.memory_size == 0){
-                    continue;
-                  }
-
-                    // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
-                    //  | (kvm_state->memory_listener.as_id << 16)
-                  mem.slot = slot.slot;
-                  mem.guest_phys_addr = slot.start_addr;
-                  mem.userspace_addr = (unsigned long)slot.ram;
-                  mem.flags = slot.flags;
-                  mem.memory_size = slot.memory_size;
- 
-                  ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
-                  trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
-                              mem.memory_size, mem.userspace_addr, ret);
-                }
-                /* kvm_memory_listener_register(s, &s->memory_listener, s->as->as, 0); */
-
-                //make a call or creating onc vcpu for it 
-                vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
-                //TODO: set the regs, sregs, .. etc for the vcpuid
-                do 
-                {
-                    ret = ioctl(vmfd, KVM_SET_IDENTITY_MAP_ADDR, &identity_base);
-                } while (ret == -EINTR);
                 
-                do 
-                {
-                    ret = ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
-                } while (ret == -EINTR);
+                        
+                //fork here 
+                //
+                //get the locks being used by the rest of the threads 
+                printf("Received the call for fork\n");
+                qemu_mutex_lock_iothread();
+                
+                //complete the I/O before copying state
 
-                kvm_set_vcpu_attrs(&state, vcpufd);
-                cpu->kvm_fd = vcpufd;
-                //set up the kvm_run for the vcpu --> update it in the vmstate
-                mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
-                if (mmap_size < 0) {
-                    ret = mmap_size;
-                    return -1;
-                }
+                //get the values of the attributes before the fork
+                ret = cpu_get_pre_fork_state(&state, cpu->kvm_fd);
+                pid = fork();
+                if(pid < 0) {
+                    printf("Failed to fork\n");
+                    ret = -1; 
+                } else if (pid == 0){
+                    vcpu_complete_io(cpu);
+                    //child process
+                    printf("Starting child process\n");
+                    //release the locks obtained before forking 
+                    s = cpu->kvm_state;
+                    // close(s->fd);
+                    // close(s->vmfd);
+                    // s->fd = open("/dev/kvm", 2);
 
-                cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                                    cpu->kvm_fd, 0);
-                if (cpu->kvm_run == MAP_FAILED) {
-                    return -1; 
-                }
-                kvm_arch_pre_run(cpu, run);
-                for(int i = 0; i < 14; i ++ ){
-                  ret = ioctl(vcpufd, KVM_RUN, 0);
-                //   if(cpu->kvm_run->exit_reason == KVM_EXIT_INTERNAL_ERROR) {
-                //       kvm_handle_internal_error(cpu, cpu->kvm_run);
-                //   }  
-                  printf("%d\n", cpu->kvm_run->exit_reason);
-                  printf("return value : %d \n", ret);
-                  fprintf(stderr, "KVM: unknown exit, hardware reason %" PRIx64 "\n",
-                    (uint64_t)cpu->kvm_run->hw.hardware_exit_reason);
-                }
+                    //create new fds
+                    //make a call for creating a vm 
+                    vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+                    
+                    if (vmfd < 0) {
+                    fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
+                        strerror(-ret));
+                    }
+                    s->vmfd = vmfd; 
 
-                //running this new vcpu
-                /* kvm_cpu_exec(cpu); */
-                exit(0);
-                //code for setting up the kvm_run for child vcpu in qemu state
-                //add these values to qemu book keeping structures
-              } else {
+                    slot_size = cpu->kvm_state->nr_slots;
+                    //set up the shared memory for the child vm 
+                    /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+                    for(int i = 0; i < slot_size; i++){
+                        slot = kvm_state->memory_listener.slots[i]; 
+                        if(slot.memory_size == 0){
+                            continue;
+                        }
+
+                            // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                            //  | (kvm_state->memory_listener.as_id << 16)
+                        mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                        mem.guest_phys_addr = slot.start_addr;
+                        mem.userspace_addr = (unsigned long)slot.ram;
+                        mem.flags = slot.flags;
+                        mem.memory_size = slot.memory_size;
+        
+                        ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                        trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                                    mem.memory_size, mem.userspace_addr, ret);
+                    }
+                    /* kvm_memory_listener_register(s, &s->memory_listener, s->as->as, 0); */
+
+                    //make a call or creating onc vcpu for it 
+                    vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
+                    //TODO: set the regs, sregs, .. etc for the vcpuid
+                    do 
+                    {
+                        ret = ioctl(vmfd, KVM_SET_IDENTITY_MAP_ADDR, &identity_base);
+                    } while (ret == -EINTR);
+                    
+                    do 
+                    {
+                        ret = ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
+                    } while (ret == -EINTR);
+
+                    kvm_set_vcpu_attrs(&state, vcpufd);
+                    cpu->kvm_fd = vcpufd;
+                    //set up the kvm_run for the vcpu --> update it in the vmstate
+                    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
+                    if (mmap_size < 0) {
+                        ret = mmap_size;
+                        return -1;
+                    }
+
+                    cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                        cpu->kvm_fd, 0);
+                    if (cpu->kvm_run == MAP_FAILED) {
+                        return -1; 
+                    }
+                    kvm_arch_pre_run(cpu, run);
+                    for(int i = 0; i < 14; i ++ ){
+                        ret = ioctl(vcpufd, KVM_RUN, 0);
+                        //   if(cpu->kvm_run->exit_reason == KVM_EXIT_INTERNAL_ERROR) {
+                        //       kvm_handle_internal_error(cpu, cpu->kvm_run);
+                        //   }  
+                        printf("%d\n", cpu->kvm_run->exit_reason);
+                        printf("return value : %d \n", ret);
+                    
+                    }
+
+                    //running this new vcpu
+                    /* kvm_cpu_exec(cpu); */
+                    exit(0);
+                    //code for setting up the kvm_run for child vcpu in qemu state
+                    //add these values to qemu book keeping structures
+                } 
                 //parent process 
                 wait(NULL);
                 printf("Resuming Parent VM\n");
 
                 ret = 0;
                 break;
-              }  
+            
             }
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,
