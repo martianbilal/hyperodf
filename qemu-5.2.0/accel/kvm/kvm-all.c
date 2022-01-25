@@ -3032,15 +3032,25 @@ int kvm_cpu_exec(CPUState *cpu)
                         return 0;                  
                     }
                     printf("Exiting child process!\n");
-                    sleep(50);
+                    // sleep(50);
                     // kvm_arch_pre_run(cpu, run);
                     for(int i = 0; i < 14; i ++ ){
                         ret = ioctl(vcpufd, KVM_RUN, 0);
-                        //   if(cpu->kvm_run->exit_reason == KVM_EXIT_INTERNAL_ERROR) {
-                        //       kvm_handle_internal_error(cpu, cpu->kvm_run);
-                        //   }  
-                        printf("%d\n", cpu->kvm_run->exit_reason);
-                        printf("return value : %d \n", ret);
+                                printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                        switch(cpu->kvm_run->exit_reason){
+                           case KVM_EXIT_IO:
+                                DPRINTF("handle_io\n");
+                                /* Called outside BQL */
+                                //use this to print a charachter
+                                if(run->io.port == 0x300){
+                                    printf("%c", *(((char *)run) + run->io.data_offset));
+                                }
+                                if(run->io.port == 0x300 &&
+                                    *(((char *)run) + run->io.data_offset) == 'c'){
+                                    exit(0);
+                                    break;
+                                } 
+                        }
                     
                     }
                     _exit(0);
