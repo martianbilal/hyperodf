@@ -115,6 +115,8 @@ void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 	memreg.flags = 0;
 	memreg.guest_phys_addr = 0;
 	memreg.memory_size = mem_size;
+	printf("This is the address of the memory region in child : %lx", (unsigned long)parent_vm->mem);
+
 	memreg.userspace_addr = (unsigned long)parent_vm->mem;
         if (ioctl(vm->fd, KVM_SET_USER_MEMORY_REGION, &memreg) < 0) {
 		perror("KVM_SET_USER_MEMORY_REGION");
@@ -424,16 +426,21 @@ restart:
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
-        printf("Memory at 0x18000 is : %llu\n", (unsigned long long)memval);
 			if (parent_regs.rax == 42)
 			{				
 				if(MODE == 1){
-					if(syscall(439) == 0){
+					printf("This is the pid of the parent : %ld", (long)getpid());
+					fflush(stdout);
+					if(fork() == 0){
 						printf("== Child VM Started====\n");
 						//do work for the child 
 						//setup the vm --> with the same memory as that of the parent store in the 
 						//in vm->mem =====> Do all of the child vm init
 						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
+						printf("This is the pid of child : %ld", (long)getpid());
+						fflush(stdout);
+						sleep(50);
+						
 						fork_child(vm, parent_sregs, parent_regs);
 						printf("== Child VM Ended====\n");
 						return 0;
@@ -452,6 +459,9 @@ restart:
 						memreg.guest_phys_addr = 0;
 						memreg.memory_size = 0x200000;
 						memreg.userspace_addr = (unsigned long)vm->mem;
+						printf("This is the address of the memory region in child : %lu", (unsigned long)vm->mem);
+						
+
 						info.kvm_userspace_mem = (unsigned long)&memreg;
 						info.vcpu_fd = vcpu->fd;
 						info.vm_fd = vm->fd;
@@ -832,7 +842,6 @@ int main(int argc, char **argv)
 	// child_vcpu_init(&parent_vcpu, &vm, &vcpu);
 
 	switch (mode) {
-  printf("value of mode %d", mode);
 	case REAL_MODE:
 		return !run_real_mode(&vm, &vcpu);
 

@@ -2882,42 +2882,57 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
+                kvm_slots_lock(&(cpu->kvm_state->memory_listener));
                 qemu_mutex_lock_iothread();
                 
                 //complete the I/O before copying state
+                vcpu_complete_io(cpu);
 
                 //get the values of the attributes before the fork
                 ret = cpu_get_pre_fork_state(&state, cpu->kvm_fd);
-                // slot_size = cpu->kvm_state->nr_slots;
+                slot_size = cpu->kvm_state->nr_slots;
                 // //set up the shared memory for the child vm 
                 // /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
-                // for(int i = 0; i < slot_size; i++){
-                //     slot = cpu->kvm_state->memory_listener.slots[i]; 
-                //     if(slot.memory_size == 0){
-                //         continue;
-                //     }
-
-                //         // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
-                //         //  | (kvm_state->memory_listener.as_id << 16)
-                //     mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
-                //     mem.guest_phys_addr = 0;
-                //     mem.userspace_addr = 0;
-                //     mem.flags = 0;
-                //     mem.memory_size = 0;
+                for(int i = 0; i < slot_size; i++){
+                    slot = cpu->kvm_state->memory_listener.slots[i]; 
+                    if(slot.memory_size == 0){
+                        continue;
+                    }
+                    mprotect(slot.ram, slot.memory_size, PROT_READ | PROT_WRITE);
+                        // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                        //  | (kvm_state->memory_listener.as_id << 16)
+                    // mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                    // mem.guest_phys_addr = 0;
+                    // mem.userspace_addr = 0;
+                    // mem.flags = 0;
+                    // mem.memory_size = 0;
     
-                //     ret = ioctl(cpu->kvm_state->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
-                //     trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
-                //                 mem.memory_size, mem.userspace_addr, ret);
-                // }
+                    // ret = ioctl(cpu->kvm_state->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                    // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                    //             mem.memory_size, mem.userspace_addr, ret);
+                }
+
+                //printing a value from the first slot before fork 
+
+                // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
+                printf("Parent PID : %ld\n", (long)getpid());
+                
+                fflush(stdout);
+                
                 pid = fork();
                 if(pid < 0) {
                     printf("Failed to fork\n");
                     ret = -1; 
                 } else if (pid == 0){
-                    // vcpu_complete_io(cpu);
                     //child process
-                    printf("Starting child process\n");
+
+                    printf("Starting child process : %d\n", pid);
+                    printf("Child PID : %ld\n", (long)getpid());
                     //release the locks obtained before forking 
+                    // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
+                    fflush(stdout);
+                    // *(int*)(cpu->kvm_state->memory_listener.slots[0].ram) = 1;
+                    // printf("Memory at GPA 0 in child aftr changing: %d", *(int*)(cpu->kvm_state->memory_listener.slots[0].ram));
                     s = cpu->kvm_state;
                     close(cpu->kvm_fd);
                     close(s->fd);
@@ -2939,11 +2954,13 @@ int kvm_cpu_exec(CPUState *cpu)
                     /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
                     for(int i = 0; i < slot_size; i++){
                         
-                        slot = kvm_state->memory_listener.slots[i]; 
+                        slot = cpu->kvm_state->memory_listener.slots[i]; 
                         
                         if(slot.memory_size == 0){
                             continue;
                         }
+                        printf("slot Address : %ld", slot.ram);
+
                         // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
                         // if(new_ram == MAP_FAILED) { 
                         //     printf("Failed to allocated memory!");
@@ -3012,20 +3029,22 @@ int kvm_cpu_exec(CPUState *cpu)
                     
                     if (cpu->kvm_run == MAP_FAILED) {
                         printf("mmap failed!"); 
-                        exit(0);                        
+                        return 0;                  
                     }
                     printf("Exiting child process!\n");
-                    _exit(0);
+                    sleep(50);
                     // kvm_arch_pre_run(cpu, run);
-                    // for(int i = 0; i < 14; i ++ ){
-                    //     ret = ioctl(vcpufd, KVM_RUN, 0);
-                    //     //   if(cpu->kvm_run->exit_reason == KVM_EXIT_INTERNAL_ERROR) {
-                    //     //       kvm_handle_internal_error(cpu, cpu->kvm_run);
-                    //     //   }  
-                    //     printf("%d\n", cpu->kvm_run->exit_reason);
-                    //     printf("return value : %d \n", ret);
+                    for(int i = 0; i < 14; i ++ ){
+                        ret = ioctl(vcpufd, KVM_RUN, 0);
+                        //   if(cpu->kvm_run->exit_reason == KVM_EXIT_INTERNAL_ERROR) {
+                        //       kvm_handle_internal_error(cpu, cpu->kvm_run);
+                        //   }  
+                        printf("%d\n", cpu->kvm_run->exit_reason);
+                        printf("return value : %d \n", ret);
                     
-                    // }
+                    }
+                    _exit(0);
+
 
                     //running this new vcpu
                     /* kvm_cpu_exec(cpu); */
@@ -3048,6 +3067,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 }
 
                 printf("Resuming Parent VM\n");
+                kvm_slots_unlock(&cpu->kvm_state->memory_listener);
 
                 ret = 0;
                 break;
