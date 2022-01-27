@@ -25,6 +25,7 @@
 #include "qemu/osdep.h"
 #include "qemu-common.h"
 #include "sysemu/sysemu.h"
+#include <sys/time.h>
 
 #ifdef CONFIG_SDL
 #if defined(__APPLE__) || defined(main)
@@ -46,9 +47,23 @@ int main(int argc, char **argv)
 
 int main(int argc, char **argv, char **envp)
 {
+    struct timeval t;
+    printf("Starting QEMU === -_-\n");
+    long long milliseconds;
+    gettimeofday(&t, NULL);
+
+    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+
+
+    printf("Timestamp when starting QEMU: %lld\n", milliseconds);
+
     qemu_init(argc, argv, envp);
     qemu_main_loop();
     qemu_cleanup();
+
+
+
+    
 
     return 0;
 }

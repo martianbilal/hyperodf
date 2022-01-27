@@ -13,6 +13,8 @@
  *
  */
 
+#include <time.h>
+#include <sys/time.h>
 #include "qemu/osdep.h"
 #include <sys/ioctl.h>
 
@@ -2777,7 +2779,11 @@ int kvm_cpu_exec(CPUState *cpu)
     struct cpu_prefork_state state; 
     struct KVMState *s;
     struct KVMSlot slot;
-    int status; 
+    struct timeval t;
+    long long milliseconds;
+    long long timestamps[4];
+    int io_end = 0; 
+    int status;
     int slot_size; 
     int mmap_size;
     int ret, run_ret;
@@ -2788,6 +2794,12 @@ int kvm_cpu_exec(CPUState *cpu)
     pid_t pid; 
     void *new_ram;
     DPRINTF("kvm_cpu_exec()\n");
+    
+
+    gettimeofday(&t, NULL);
+
+    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+    timestamps[0] = milliseconds;
 
     if (kvm_arch_process_async_events(cpu)) {
         qatomic_set(&cpu->exit_request, 0);
@@ -2871,8 +2883,27 @@ int kvm_cpu_exec(CPUState *cpu)
             }
             if(run->io.port == 0x300 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
-                exit(0);
-                break;
+                    fflush(stdout);
+                    // qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+                    // ret = EXCP_INTERRUPT;
+                    // ret = 0;
+                    // goto end_loop;
+                    // io_end = 1; 
+                    // qemu_mutex_unlock_iothread();
+                    gettimeofday(&t, NULL);
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[3] = milliseconds;
+                    
+                    
+                    printf("\n========Timestamp when Parent calls cpu_exec: %lld\n", timestamps[0]);
+                    printf("Timestamp when QEMU Forks: %lld\n", timestamps[1]);
+                    printf("Timestamp when Parent exits: %lld ========\n", timestamps[3]);
+                    
+                    
+                    
+                    exit(0);
+                    // return ret;
+                    break;
             }
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
@@ -2882,8 +2913,6 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
-                kvm_slots_lock(&(cpu->kvm_state->memory_listener));
-                qemu_mutex_lock_iothread();
                 
                 //complete the I/O before copying state
                 vcpu_complete_io(cpu);
@@ -2918,7 +2947,12 @@ int kvm_cpu_exec(CPUState *cpu)
                 printf("Parent PID : %ld\n", (long)getpid());
                 
                 fflush(stdout);
-                
+                gettimeofday(&t, NULL);
+
+                milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                timestamps[1] = milliseconds;
+
+                // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
                 pid = fork();
                 if(pid < 0) {
                     printf("Failed to fork\n");
@@ -2959,7 +2993,7 @@ int kvm_cpu_exec(CPUState *cpu)
                         if(slot.memory_size == 0){
                             continue;
                         }
-                        printf("slot Address : %ld", slot.ram);
+                        // printf("slot Address : %ld", slot.ram);
 
                         // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
                         // if(new_ram == MAP_FAILED) { 
@@ -3025,18 +3059,19 @@ int kvm_cpu_exec(CPUState *cpu)
 
                     cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                                         cpu->kvm_fd, 0);
-                    printf("Exiting child process!\n");
+                    // printf("Exiting child process!\n");
                     
                     if (cpu->kvm_run == MAP_FAILED) {
                         printf("mmap failed!"); 
                         return 0;                  
                     }
-                    printf("Exiting child process!\n");
+                    // printf("Exiting child process!\n");
                     // sleep(50);
                     // kvm_arch_pre_run(cpu, run);
-                    for(int i = 0; i < 14; i ++ ){
+                    for(int i = 0; i < 2; i ++ ){
                         ret = ioctl(vcpufd, KVM_RUN, 0);
-                                printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                        // printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                        fflush(stdout);
                         switch(cpu->kvm_run->exit_reason){
                            case KVM_EXIT_IO:
                                 DPRINTF("handle_io\n");
@@ -3047,12 +3082,25 @@ int kvm_cpu_exec(CPUState *cpu)
                                 }
                                 if(run->io.port == 0x300 &&
                                     *(((char *)run) + run->io.data_offset) == 'c'){
+                                    // qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+                                    // ret = EXCP_INTERRUPT;
+                                    // goto end_loop;
                                     exit(0);
                                     break;
                                 } 
                         }
                     
                     }
+                    // close(4);
+                    // close(7);
+                    // close(9);
+                    // close(10);
+                    // close(0);
+                    // qemu_mutex_unlock_iothread();
+                    gettimeofday(&t, NULL);
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[2] = milliseconds;
+                    printf("\nTimestamp when Child exits: %lld\n", milliseconds);
                     _exit(0);
 
 
@@ -3064,21 +3112,25 @@ int kvm_cpu_exec(CPUState *cpu)
                 //parent process 
                 printf("Waiting for the child VM\n");
 
-                if(waitpid(pid, &status, 0) < 0)
-                {
-                    printf("Could not wait");
-                    ret = 0;
-                    break;
-                }
+                wait(NULL);
+                
+                
+                // if(waitpid(pid, &status, 0) < 0)
+                // {
+                //     printf("Could not wait");
+                //     ret = 0;
+                //     break;
+                // }
 
-                if(WIFEXITED(status) && WEXITSTATUS(status) != 0)
-                {
-                    printf("Child exited with some error! ");
-                }
+                // if(WIFEXITED(status) && WEXITSTATUS(status) != 0)
+                // {
+                //     printf("Child exited with some error! ");
+                // }
 
                 printf("Resuming Parent VM\n");
-                kvm_slots_unlock(&cpu->kvm_state->memory_listener);
-
+                // kvm_slots_unlock(&cpu->kvm_state->memory_listener);
+                // qemu_mutex_unlock_iothread();
+                
                 ret = 0;
                 break;
             
@@ -3146,7 +3198,7 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         }
     } while (ret == 0);
-
+end_loop:
     cpu_exec_end(cpu);
     qemu_mutex_lock_iothread();
 

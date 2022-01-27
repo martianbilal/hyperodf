@@ -25,7 +25,7 @@ infinite:
     out dx, eax
     mov eax, 63h
     mov dx, 300h 
-    out dx, eax
+    out dx, eax 
     hlt
     jmp infinite; jump to current address = infinite loop
 
