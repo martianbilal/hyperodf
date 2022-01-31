@@ -27,6 +27,8 @@
 #include "sysemu/sysemu.h"
 #include <sys/time.h>
 
+#define TIMESTAMP_PRINT 1
+
 #ifdef CONFIG_SDL
 #if defined(__APPLE__) || defined(main)
 #include <SDL.h>
@@ -54,8 +56,9 @@ int main(int argc, char **argv, char **envp)
 
     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
 
-
+    #ifdef TIMESTAMP_PRINT
     printf("Timestamp when starting QEMU: %lld\n", milliseconds);
+    #endif
 
     qemu_init(argc, argv, envp);
     qemu_main_loop();

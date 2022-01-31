@@ -64,6 +64,10 @@
 
 #define num_of_get_ioctls 7
 
+#define FORK_TEST 1 
+
+#define TIMESTAMP_PRINT 1 
+
 //#define DEBUG_KVM
 
 #ifdef DEBUG_KVM
@@ -2783,6 +2787,7 @@ int kvm_cpu_exec(CPUState *cpu)
     long long milliseconds;
     long long timestamps[4];
     int io_end = 0; 
+    int counter = 0;
     int status;
     int slot_size; 
     int mmap_size;
@@ -2894,11 +2899,11 @@ int kvm_cpu_exec(CPUState *cpu)
                     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
                     timestamps[3] = milliseconds;
                     
-                    
+                    #ifdef TIMESTAMP_PRINT
                     printf("\n========Timestamp when Parent calls cpu_exec: %lld\n", timestamps[0]);
                     printf("Timestamp when QEMU Forks: %lld\n", timestamps[1]);
                     printf("Timestamp when Parent exits: %lld ========\n", timestamps[3]);
-                    
+                    #endif
                     
                     
                     exit(0);
@@ -2953,6 +2958,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 timestamps[1] = milliseconds;
 
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
+child_spawn: 
                 pid = fork();
                 if(pid < 0) {
                     printf("Failed to fork\n");
@@ -3068,6 +3074,14 @@ int kvm_cpu_exec(CPUState *cpu)
                     // printf("Exiting child process!\n");
                     // sleep(50);
                     // kvm_arch_pre_run(cpu, run);
+                    gettimeofday(&t, NULL);
+
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[1] = milliseconds;
+
+                    #ifdef TIMESTAMP_PRINT
+                    printf("Timestamp when child starts executing: %lld\n", milliseconds);
+                    #endif
                     for(int i = 0; i < 2; i ++ ){
                         ret = ioctl(vcpufd, KVM_RUN, 0);
                         // printf("exit reason : %d", cpu->kvm_run->exit_reason);
@@ -3100,7 +3114,11 @@ int kvm_cpu_exec(CPUState *cpu)
                     gettimeofday(&t, NULL);
                     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
                     timestamps[2] = milliseconds;
+                    
+                    #ifdef TIMESTAMP_PRINT
                     printf("\nTimestamp when Child exits: %lld\n", milliseconds);
+                    #endif
+                    
                     _exit(0);
 
 
@@ -3113,6 +3131,8 @@ int kvm_cpu_exec(CPUState *cpu)
                 printf("Waiting for the child VM\n");
 
                 wait(NULL);
+                counter = counter + 1; 
+                if(counter < 10) goto child_spawn;
                 
                 
                 // if(waitpid(pid, &status, 0) < 0)
