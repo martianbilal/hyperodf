@@ -2906,7 +2906,7 @@ int kvm_cpu_exec(CPUState *cpu)
                     #endif
                     
                     
-                    exit(0);
+                    _exit(0);
                     // return ret;
                     break;
             }
@@ -3072,6 +3072,7 @@ child_spawn:
 
                     cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                                         cpu->kvm_fd, 0);
+                    run = cpu->kvm_run;
                     // printf("Exiting child process!\n");
                     // for(int i = 0 ; i < 2; i++) {
                     //     printf("exit reason : %d", cpu->kvm_run->exit_reason);
