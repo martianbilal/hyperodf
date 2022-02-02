@@ -64,9 +64,9 @@
 
 #define num_of_get_ioctls 7
 
-#define FORK_TEST 1 
+// #define FORK_TEST 1 
 
-#define TIMESTAMP_PRINT 1 
+// #define TIMESTAMP_PRINT 1 
 
 //#define DEBUG_KVM
 
@@ -2800,7 +2800,6 @@ int kvm_cpu_exec(CPUState *cpu)
     void *new_ram;
     DPRINTF("kvm_cpu_exec()\n");
     
-
     gettimeofday(&t, NULL);
 
     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
@@ -2837,6 +2836,7 @@ int kvm_cpu_exec(CPUState *cpu)
          */
         smp_rmb();
 
+        printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
 
         attrs = kvm_arch_post_run(cpu, run);
@@ -2900,7 +2900,7 @@ int kvm_cpu_exec(CPUState *cpu)
                     timestamps[3] = milliseconds;
                     
                     #ifdef TIMESTAMP_PRINT
-                    printf("\n========Timestamp when Parent calls cpu_exec: %lld\n", timestamps[0]);
+                    printf("\n=====>>>>>Timestamp when Parent calls cpu_exec: %lld\n", timestamps[0]);
                     printf("Timestamp when QEMU Forks: %lld\n", timestamps[1]);
                     printf("Timestamp when Parent exits: %lld ========\n", timestamps[3]);
                     #endif
@@ -2965,7 +2965,14 @@ child_spawn:
                     ret = -1; 
                 } else if (pid == 0){
                     //child process
+                    gettimeofday(&t, NULL);
 
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[1] = milliseconds;
+
+                    #ifdef TIMESTAMP_PRINT
+                    printf("Starting child process : %lld\n", milliseconds);
+                    #endif
                     printf("Starting child process : %d\n", pid);
                     printf("Child PID : %ld\n", (long)getpid());
                     //release the locks obtained before forking 
@@ -3066,11 +3073,18 @@ child_spawn:
                     cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                                         cpu->kvm_fd, 0);
                     // printf("Exiting child process!\n");
-                    
+                    // for(int i = 0 ; i < 2; i++) {
+                    //     printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                    //     ret = ioctl(vcpufd, KVM_RUN, 0);
+                    // }
                     if (cpu->kvm_run == MAP_FAILED) {
                         printf("mmap failed!"); 
                         return 0;                  
                     }
+
+                    ret = 0; 
+                    break;
+    
                     // printf("Exiting child process!\n");
                     // sleep(50);
                     // kvm_arch_pre_run(cpu, run);
@@ -3084,14 +3098,15 @@ child_spawn:
                     #endif
                     for(int i = 0; i < 2; i ++ ){
                         ret = ioctl(vcpufd, KVM_RUN, 0);
-                        // printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                        printf("exit reason : %d", cpu->kvm_run->exit_reason);
                         fflush(stdout);
+                        
                         switch(cpu->kvm_run->exit_reason){
                            case KVM_EXIT_IO:
                                 DPRINTF("handle_io\n");
                                 /* Called outside BQL */
                                 //use this to print a charachter
-                                if(run->io.port == 0x300){
+                                if(cpu->kvm_run->io.port == 0x300){
                                     printf("%c", *(((char *)run) + run->io.data_offset));
                                 }
                                 if(run->io.port == 0x300 &&
@@ -3131,9 +3146,10 @@ child_spawn:
                 printf("Waiting for the child VM\n");
 
                 wait(NULL);
+                #ifdef FORK_TEST
                 counter = counter + 1; 
                 if(counter < 10) goto child_spawn;
-                
+                #endif 
                 
                 // if(waitpid(pid, &status, 0) < 0)
                 // {
