@@ -557,6 +557,8 @@ void qemu_thread_create(QemuThread *thread, const char *name,
     qemu_thread_args->start_routine = start_routine;
     qemu_thread_args->arg = arg;
 
+    printf("This is the name of the name of the thread: %s\n", qemu_thread_args->name);
+
     err = pthread_create(&thread->thread, &attr,
                          qemu_thread_start, qemu_thread_args);
 

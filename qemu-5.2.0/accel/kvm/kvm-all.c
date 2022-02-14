@@ -1393,6 +1393,7 @@ int kvm_set_irq(KVMState *s, int irq, int level)
     event.irq = irq;
     ret = kvm_vm_ioctl(s, s->irq_set_ioctl, &event);
     if (ret < 0) {
+        printf("SET IRQ failed : %d, %d\n", irq, level);
         perror("kvm_set_irq");
         abort();
     }
@@ -2775,6 +2776,28 @@ int vcpu_complete_io(CPUState *cpu)
     return ret; 
 }
 
+
+//performs the initial setup/bookkeeping/lock acquisition for Parent VM 
+void start_fork()
+{
+    return; 
+}
+
+
+//performs the post fork setup/../.. in Child VM
+void end_fork_child()
+{
+    return; 
+}
+
+//performs the post fork setup/../.. in Parent VM
+void end_fork()
+{
+    return; 
+}
+
+
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -2836,7 +2859,7 @@ int kvm_cpu_exec(CPUState *cpu)
          */
         smp_rmb();
 
-        printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
+        // printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
 
         attrs = kvm_arch_post_run(cpu, run);
@@ -2881,7 +2904,9 @@ int kvm_cpu_exec(CPUState *cpu)
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");
             /* Called outside BQL */
-            
+            fflush(stdout);
+            // printf("KVM_Exit_IO Called!\n");
+            // fflush(stdout);
             //use this to print a charachter
             if(run->io.port == 0x300){
               printf("%c", *(((char *)run) + run->io.data_offset));
@@ -2959,12 +2984,14 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
 child_spawn: 
+                start_fork();
                 pid = fork();
                 if(pid < 0) {
                     printf("Failed to fork\n");
                     ret = -1; 
                 } else if (pid == 0){
                     //child process
+                    end_fork_child();
                     gettimeofday(&t, NULL);
 
                     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
@@ -3061,6 +3088,7 @@ child_spawn:
                         ret = ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
                     } while (ret == -EINTR);
 
+                    // kvm_irqchip_create(s);
                     kvm_set_vcpu_attrs(&state, vcpufd);
                     cpu->kvm_fd = vcpufd;
                     //set up the kvm_run for the vcpu --> update it in the vmstate
@@ -3097,7 +3125,7 @@ child_spawn:
                     #ifdef TIMESTAMP_PRINT
                     printf("Timestamp when child starts executing: %lld\n", milliseconds);
                     #endif
-                    for(int i = 0; i < 2; i ++ ){
+                    for(int i = 0; i < 2; i++ ){
                         ret = ioctl(vcpufd, KVM_RUN, 0);
                         printf("exit reason : %d", cpu->kvm_run->exit_reason);
                         fflush(stdout);
@@ -3147,6 +3175,9 @@ child_spawn:
                 printf("Waiting for the child VM\n");
 
                 wait(NULL);
+                
+                end_fork();
+
                 #ifdef FORK_TEST
                 counter = counter + 1; 
                 if(counter < 10) goto child_spawn;

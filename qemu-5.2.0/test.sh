@@ -6,6 +6,7 @@
   -L ./pc-bios \
   -cpu host,vmx=on \
   -device loader,file=./boot-sect.bin,force-raw=on,cpu-num=0 \
+  -drive file=$IMAGE/stretch.img,format=raw \
   -enable-kvm \
   -nographic \
   -pidfile vm.pid \
