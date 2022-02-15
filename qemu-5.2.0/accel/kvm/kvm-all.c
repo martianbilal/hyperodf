@@ -17,6 +17,9 @@
 #include <sys/time.h>
 #include "qemu/osdep.h"
 #include <sys/ioctl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <linux/kvm.h>
 
@@ -139,6 +142,110 @@ struct KVMState
         AddressSpace *as;
     } *as;
 };
+
+
+/*
+
+Dumps the Values of the KVMState to a file 
+
+
+
+TODO: Add the support 
+        - printing gsimap
+        - printing parent_obj
+*/
+void dumpKVMState(struct KVMState *s, char* filename, char *description){
+    
+    printf("Start printing out the KVM State : \n");
+    FILE *dumpFile; 
+    dumpFile = fopen(filename, "w");
+
+    fprintf(dumpFile, "---- This is the struct for : %s --- \n", description);
+
+    // AccelState parent_obj;
+    fprintf(dumpFile, "Accel State - parent_obj : %lx\n", s->parent_obj);
+    // int nr_slots;
+    fprintf(dumpFile, "nr_slots : %d\n", s->nr_slots);
+    // int fd;
+    fprintf(dumpFile, "fd : %d\n", s->fd);
+    // int vmfd;
+    fprintf(dumpFile, "vmfd : %d\n", s->vmfd);
+
+    // int coalesced_mmio;
+    fprintf(dumpFile, "coalesced_mmio : %d\n", s->coalesced_mmio);
+    // int coalesced_pio;
+    fprintf(dumpFile, "coalesced_pio : %d\n", s->coalesced_pio);
+    
+    // struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
+    fprintf(dumpFile, "coalesced_mmio_ring : %lx\n", s->coalesced_mmio_ring);
+    // bool coalesced_flush_in_progress;
+    fprintf(dumpFile, "coalesced_flush_in_progress : %d\n", s->coalesced_flush_in_progress);
+    // int vcpu_events;
+    fprintf(dumpFile, "vcpu_events : %d\n", s->vcpu_events);
+    // int robust_singlestep;
+    fprintf(dumpFile, "robust_singlestep : %d \n", s->robust_singlestep);
+    // int debugregs;
+    fprintf(dumpFile, "debugregs : %d \n", s->debugregs);
+    
+    // int max_nested_state_len;
+    fprintf(dumpFile, "max_nested_state_len : %d \n", s->max_nested_state_len);
+    
+    // int many_ioeventfds;
+    fprintf(dumpFile, "many_ioeventfds : %d \n", s->many_ioeventfds);
+    
+    // int intx_set_mask;
+    fprintf(dumpFile, "intx_set_mask : %d \n", s->intx_set_mask);
+
+    // int kvm_shadow_mem;
+    fprintf(dumpFile, "kvm_shadow_mem : %d \n", s->kvm_shadow_mem);
+    // bool kernel_irqchip_allowed;
+    fprintf(dumpFile, "kernel_irqchip_allowed : %d \n", s->kernel_irqchip_allowed);
+    
+    // bool kernel_irqchip_required;
+    fprintf(dumpFile, "kernel_irqchip_required : %d \n", s->kernel_irqchip_required);
+    // OnOffAuto kernel_irqchip_split;
+    fprintf(dumpFile, "kernel_irqchip_split : %d \n", s->kernel_irqchip_split);
+    // bool sync_mmu;
+    fprintf(dumpFile, "sync_mmu : %d\n", s->sync_mmu);
+    // uint64_t manual_dirty_log_protect;
+    fprintf(dumpFile, "manual_dirty_log_protect : %d\n", s->manual_dirty_log_protect);
+    /* The man page (and posix) say ioctl numbers are signed int, but
+     * they're not.  Linux, glibc and *BSD all treat ioctl numbers as
+     * unsigned, and treating them as signed here can break things */
+    // unsigned irq_set_ioctl;
+    fprintf(dumpFile, "irq_set_ioctl : %x\n", s->irq_set_ioctl);
+    // unsigned int sigmask_len;
+    fprintf(dumpFile, "sigmask_len : %x\n", s->sigmask_len);
+
+    // GHashTable *gsimap;
+    
+#ifdef KVM_CAP_IRQ_ROUTING
+    // struct kvm_irq_routing *irq_routes;
+    fprintf(dumpFile, "irq_routes : %lx\n", s->irq_routes);
+    // int nr_allocated_irq_routes;
+    fprintf(dumpFile, "nr_allocated_irq_routes : %d\n", s->nr_allocated_irq_routes);
+    // unsigned long *used_gsi_bitmap;
+    fprintf(dumpFile, "used_gsi_bitmap : %lx\n", *(s->used_gsi_bitmap));
+    // unsigned int gsi_count;
+    fprintf(dumpFile, "gsi_count : %u\n", s->gsi_count);
+    // QTAILQ_HEAD(, KVMMSIRoute) msi_hashtab[KVM_MSI_HASHTAB_SIZE];
+#endif
+    // KVMMemoryListener memory_listener;
+    // QLIST_HEAD(, KVMParkedVcpu) kvm_parked_vcpus;
+
+    // /* memory encryption */
+    // void *memcrypt_handle;
+    // int (*memcrypt_encrypt_data)(void *handle, uint8_t *ptr, uint64_t len);
+
+    // /* For "info mtree -f" to tell if an MR is registered in KVM */
+    // int nr_as;
+    // struct KVMAs {
+    //     KVMMemoryListener *ml;
+    //     AddressSpace *as;
+    // } *as;
+    fclose(dumpFile);
+
+}
 
 KVMState *kvm_state;
 bool kvm_kernel_irqchip;
@@ -2526,6 +2633,7 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     struct kvm_mp_state mp_state;
     struct kvm_vcpu_events vcpu_events;
     struct kvm_fpu fpu; 
+    struct kvm_irqchip irqchip[3];
 
     int tsc_khz; 
     union get_structure structs[num_of_get_ioctls] = {};
@@ -2541,6 +2649,7 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     // get_attr(KVM_GET_REGS, vcpufd, regs);
     // get_attr(KVM_GET_SREGS, vcpufd, sregs);
 
+    
 
     do
     {
@@ -2617,10 +2726,9 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     if(ret < 0) goto err;
     state->mp_state = mp_state;
 
-    do
-    {
-        ret = ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &vcpu_events);
-    } while (ret == -EINTR);
+
+    memset(&vcpu_events, 0, sizeof(vcpu_events));
+    ret = ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &vcpu_events);
     attr = "vcpu_events";
     if(ret < 0) goto err;
     state->vcpu_events = vcpu_events;
@@ -2667,6 +2775,7 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
     printf("starting set attrs\n");
     //set regs
     /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
+
     do 
     {
         ret = ioctl(vcpufd, KVM_SET_REGS, &(state->regs));
@@ -2718,12 +2827,13 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
     attr="xcrs";
     if(ret<0) goto err;
 
-    // do 
-    // {
-    //     ret = ioctl(vcpufd, KVM_SET_VCPU_EVENTS, &(state->vcpu_events));
-    // } while (ret == -EINTR);
-    // attr="vcpu_events";
-    // if(ret<0) goto err;
+
+    state->vcpu_events.flags=0x00;
+    ret = ioctl(vcpufd, KVM_SET_VCPU_EVENTS, &(state->vcpu_events));
+    attr="vcpu_events";
+    if(ret<0) goto err;
+
+
     
     do 
     {
@@ -2804,7 +2914,7 @@ int kvm_cpu_exec(CPUState *cpu)
     struct kvm_userspace_memory_region mem; 
     struct fork_info info;
     struct cpu_prefork_state state; 
-    struct KVMState *s;
+    struct KVMState *s = KVM_STATE(current_accel());;
     struct KVMSlot slot;
     struct timeval t;
     long long milliseconds;
@@ -2821,6 +2931,7 @@ int kvm_cpu_exec(CPUState *cpu)
     void *kvm_run;
     pid_t pid; 
     void *new_ram;
+    struct kvm_irqchip irqchip[3];
     DPRINTF("kvm_cpu_exec()\n");
     
     gettimeofday(&t, NULL);
@@ -2938,7 +3049,7 @@ int kvm_cpu_exec(CPUState *cpu)
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
                 
-                        
+                      
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 
@@ -2978,11 +3089,38 @@ int kvm_cpu_exec(CPUState *cpu)
                 
                 fflush(stdout);
                 gettimeofday(&t, NULL);
+                
+                irqchip[0].chip_id = KVM_IRQCHIP_PIC_MASTER;
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &irqchip);
+                } while (ret == -EINTR);
+                if(ret < 0) 
+                {
+                    fflush(stdout);
+                    perror("master failed");
+                }  
+                
+                irqchip[1].chip_id = KVM_IRQCHIP_PIC_SLAVE;
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &irqchip[1]);
+                } while (ret == -EINTR);
+                if(ret < 0) printf("slave failed ");
+
+                irqchip[2].chip_id = KVM_IRQCHIP_IOAPIC;
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &irqchip[2]);
+                } while (ret == -EINTR);
+                if(ret < 0) printf("ioapic failed ");
+
 
                 milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
                 timestamps[1] = milliseconds;
 
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
+                dumpKVMState(s, "./ParentKVMDump", "Parent VM");
 child_spawn: 
                 start_fork();
                 pid = fork();
@@ -3009,13 +3147,15 @@ child_spawn:
                     // printf("Memory at GPA 0 in child aftr changing: %d", *(int*)(cpu->kvm_state->memory_listener.slots[0].ram));
                     s = cpu->kvm_state;
                     close(cpu->kvm_fd);
-                    close(s->fd);
                     close(s->vmfd);
+                    close(s->fd);
                     s->fd = open("/dev/kvm", 2);
 
                     //create new fds
                     //make a call for creating a vm 
                     vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+
+                    
                     
                     if (vmfd < 0) {
                     fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
@@ -3054,7 +3194,32 @@ child_spawn:
                         trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
                                     mem.memory_size, mem.userspace_addr, ret);
                     }
+                    //creating irqchip for new VM
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_CREATE_IRQCHIP);
+                    } while (ret == -EINTR);
+                    if(ret < 0) goto end_loop;
                     
+
+                    //setting irqchips for the new VM
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &irqchip[0]);
+                    } while (ret == -EINTR);
+                    if(ret < 0) printf("master failed");
+                    
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &irqchip[1]);
+                    } while (ret == -EINTR);
+                    if(ret < 0) printf("slave failed ");
+
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &irqchip[2]);
+                    } while (ret == -EINTR);
+                    // if(ret < 0) printf("ioapic failed ");
                     // for(int i = 0; i < slot_size; i++){
                     //     slot = kvm_state->memory_listener.slots[i]; 
                     //     if(slot.memory_size == 0){
@@ -3110,6 +3275,8 @@ child_spawn:
                         printf("mmap failed!"); 
                         return 0;                  
                     }
+                    dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
+
 
                     ret = 0; 
                     break;

@@ -19,7 +19,6 @@ mov sp, bp     ;stack pointer
 
 mov bx, helloWorld
 call printString
-call readDisk
 
 
 ; mov eax, 65h
@@ -34,14 +33,15 @@ call readDisk
 mov eax, 63h
 mov dx, 301h
 out dx, eax
+call readDisk
 
 ; printing the first "h" we have written on disk
 ; mov ah, 0x0e
 ; mov al, [PROGRAM_SPACE]
 ; int 0x10
 
-; mov bx, helloWorld
-; call printString
+mov bx, helloWorld
+call printString
 
 mov ax, [PROGRAM_SPACE]
 mov dx, 300h
