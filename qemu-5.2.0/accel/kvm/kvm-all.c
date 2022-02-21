@@ -2396,6 +2396,7 @@ static void kvm_handle_io(uint16_t port, MemTxAttrs attrs, void *data, int direc
     int i;
     uint8_t *ptr = data;
 
+    
     for (i = 0; i < count; i++) {
         address_space_rw(&address_space_io, port, attrs,
                          ptr, size,
@@ -2913,6 +2914,8 @@ int kvm_cpu_exec(CPUState *cpu)
     struct kvm_run *run = cpu->kvm_run;
     struct kvm_userspace_memory_region mem; 
     struct fork_info info;
+	struct kvm_pit_config pit_config = { .flags = 0, };
+    struct kvm_clock_data clock_data;
     struct cpu_prefork_state state; 
     struct KVMState *s = KVM_STATE(current_accel());;
     struct KVMSlot slot;
@@ -2932,6 +2935,10 @@ int kvm_cpu_exec(CPUState *cpu)
     pid_t pid; 
     void *new_ram;
     struct kvm_irqchip irqchip[3];
+    struct kvm_pit_state2 pit2; 
+    struct qemu_opts *opts;
+    struct QDict *bs_opts;
+
     DPRINTF("kvm_cpu_exec()\n");
     
     gettimeofday(&t, NULL);
@@ -3016,7 +3023,22 @@ int kvm_cpu_exec(CPUState *cpu)
             DPRINTF("handle_io\n");
             /* Called outside BQL */
             fflush(stdout);
-            // printf("KVM_Exit_IO Called!\n");
+            // if(run->io.direction == KVM_EXIT_IO_IN){
+            //     printf("READ VALUE : %s\n",(((char *)run) + run->io.data_offset));
+            // }
+            if(run->io.direction == KVM_EXIT_IO_IN) 
+            {
+                // printf("KVM_EXIT - port: %d\n", run->io.port);
+            }
+            // if(run->io.port == 496)
+            // {
+                printf("KVM_Exit_IO Called!=== ");
+                printf("PID : %ld\t", (long)getpid());
+                if(run->io.direction == KVM_EXIT_IO_IN)
+                    printf(" KVM_EXIT_IO_IN--");
+                printf("port no. : %d, size: %d\n", run->io.port, run->io.size);
+            // }
+            
             // fflush(stdout);
             //use this to print a charachter
             if(run->io.port == 0x300){
@@ -3065,9 +3087,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 // /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
                 for(int i = 0; i < slot_size; i++){
                     slot = cpu->kvm_state->memory_listener.slots[i]; 
-                    if(slot.memory_size == 0){
-                        continue;
-                    }
+                    // if(slot.memory_size == 0){
+                    //     continue;
+                    // }
                     mprotect(slot.ram, slot.memory_size, PROT_READ | PROT_WRITE);
                         // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
                         //  | (kvm_state->memory_listener.as_id << 16)
@@ -3090,6 +3112,24 @@ int kvm_cpu_exec(CPUState *cpu)
                 fflush(stdout);
                 gettimeofday(&t, NULL);
                 
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_CLOCK, &clock_data);
+                } while (ret == -EINTR);
+                if(ret < 0) 
+                {
+                    perror("master failed");
+                }
+
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_PIT2, &pit2);
+                } while (ret == -EINTR);
+                if(ret < 0) 
+                {
+                    perror("master failed");
+                } 
+
                 irqchip[0].chip_id = KVM_IRQCHIP_PIC_MASTER;
                 do
                 {
@@ -3123,6 +3163,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 dumpKVMState(s, "./ParentKVMDump", "Parent VM");
 child_spawn: 
                 start_fork();
+                qemu_mutex_lock_iothread();
+                // qemu_cleanup();
+                printf("done with cleanup\n");
                 pid = fork();
                 if(pid < 0) {
                     printf("Failed to fork\n");
@@ -3155,7 +3198,7 @@ child_spawn:
                     //make a call for creating a vm 
                     vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
 
-                    
+                    cpu = kvm_init_vcpu(cpu, NULL);
                     
                     if (vmfd < 0) {
                     fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
@@ -3170,9 +3213,9 @@ child_spawn:
                         
                         slot = cpu->kvm_state->memory_listener.slots[i]; 
                         
-                        if(slot.memory_size == 0){
-                            continue;
-                        }
+                        // if(slot.memory_size == 0){
+                        //     continue;
+                        // }
                         // printf("slot Address : %ld", slot.ram);
 
                         // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
@@ -3194,6 +3237,27 @@ child_spawn:
                         trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
                                     mem.memory_size, mem.userspace_addr, ret);
                     }
+                    
+                    clock_data.flags = 0;
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_CLOCK, &clock_data);
+                    } while (ret == -EINTR);
+                    if(ret < 0) goto end_loop;
+                    
+
+
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_CREATE_PIT2, &pit_config);
+                    } while (ret == -EINTR);
+                    if(ret < 0) goto end_loop;
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_PIT2, &pit2);
+                    } while (ret == -EINTR);
+                    if(ret < 0) printf("KVM_SET_PIT2 failed");
+
                     //creating irqchip for new VM
                     do
                     {
@@ -3253,9 +3317,13 @@ child_spawn:
                         ret = ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
                     } while (ret == -EINTR);
 
+                    // x86_cpu_dump_local_apic_state
+                    // cpu_dump_state
+                    // cpu_dump_statistics
                     // kvm_irqchip_create(s);
                     kvm_set_vcpu_attrs(&state, vcpufd);
                     cpu->kvm_fd = vcpufd;
+
                     //set up the kvm_run for the vcpu --> update it in the vmstate
                     mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
                     if (mmap_size < 0) {
@@ -3275,6 +3343,27 @@ child_spawn:
                         printf("mmap failed!"); 
                         return 0;                  
                     }
+                    main_loop_tlg.tl[0]=NULL;
+                    main_loop_tlg.tl[1]=NULL;
+                    main_loop_tlg.tl[2]=NULL;
+                    main_loop_tlg.tl[3]=NULL;
+                    qemu_mutex_lock_iothread();
+                    kvm_cpus.create_vcpu_thread(cpu);
+                    aio_get_g_source(aio_context_new(NULL))->context = NULL;
+                    iohandler_get_g_source()->context = NULL;
+                    qemu_init_main_loop(NULL);
+                    qemu_main_loop();
+
+                    bs_opts = qdict_new();
+                    qemu_opts_to_qdict(opts, bs_opts);
+
+                    // blockdev_close_all_bdrv_states();
+                    printf("will create new drive for the child\n");
+                    
+                    opts = drive_add(IF_DEFAULT, 0, "./bootloader.qcow2", "media=disk");
+                    
+                    drive_new( opts, 1,  &error_fatal);
+                    printf("created new drive for the child\n");
                     dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
 
 
@@ -3375,6 +3464,9 @@ child_spawn:
                           run->io.direction,
                           run->io.size,
                           run->io.count);
+            if(run->io.direction == KVM_EXIT_IO_IN){
+                printf("READ VALUE : %s, io size: %d, io count: %d\n",(((char *)run) + run->io.data_offset), run->io.size, run->io.count);
+            }
             ret = 0;
             break;
         case KVM_EXIT_MMIO:

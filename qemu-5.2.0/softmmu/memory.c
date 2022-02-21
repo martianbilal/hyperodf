@@ -438,7 +438,6 @@ static MemTxResult  memory_region_read_accessor(MemoryRegion *mr,
                                                 MemTxAttrs attrs)
 {
     uint64_t tmp;
-
     tmp = mr->ops->read(mr->opaque, addr, size);
     if (mr->subpage) {
         trace_memory_region_subpage_read(get_cpu_index(), mr, addr, tmp, size);
@@ -446,6 +445,8 @@ static MemTxResult  memory_region_read_accessor(MemoryRegion *mr,
         hwaddr abs_addr = memory_region_to_absolute_addr(mr, addr);
         trace_memory_region_ops_read(get_cpu_index(), mr, abs_addr, tmp, size);
     }
+    printf(" MR: %lx, *MR :%lx, MR->addr : %lx, abs_adr: %lx\n", mr, *mr, mr->addr, addr);
+
     memory_region_shift_read_access(value, shift, mask, tmp);
     return MEMTX_OK;
 }
@@ -1171,7 +1172,10 @@ static void memory_region_do_init(MemoryRegion *mr,
         char *escaped_name = memory_region_escape_name(name);
         char *name_array = g_strdup_printf("%s[*]", escaped_name);
 
+       printf("Reached at this point for mr-> mr: %lx, name: %s", mr, name);    
         if (!owner) {
+           printf("NON OWNER :: Reached at this point for mr-> mr: %lx, name: %s", mr, name);    
+
             owner = container_get(qdev_get_machine(), "/unattached");
         }
 
@@ -1276,7 +1280,7 @@ static uint64_t unassigned_mem_read(void *opaque, hwaddr addr,
                                     unsigned size)
 {
 #ifdef DEBUG_UNASSIGNED
-    printf("Unassigned mem read " TARGET_FMT_plx "\n", addr);
+   printf("Unassigned mem read " TARGET_FMT_plx "\n", addr);
 #endif
     return 0;
 }
@@ -1285,7 +1289,7 @@ static void unassigned_mem_write(void *opaque, hwaddr addr,
                                  uint64_t val, unsigned size)
 {
 #ifdef DEBUG_UNASSIGNED
-    printf("Unassigned mem write " TARGET_FMT_plx " = 0x%"PRIx64"\n", addr, val);
+   printf("Unassigned mem write " TARGET_FMT_plx " = 0x%"PRIx64"\n", addr, val);
 #endif
 }
 
@@ -1439,7 +1443,7 @@ MemTxResult memory_region_dispatch_read(MemoryRegion *mr,
 {
     unsigned size = memop_size(op);
     MemTxResult r;
-
+    printf("mr : %lx,mr->addr: %lx, size: %lx  \n", mr, mr->addr, size);
     fuzz_dma_read_cb(addr, size, mr, false);
     if (!memory_region_access_valid(mr, addr, size, false, attrs)) {
         *pval = unassigned_mem_read(mr, addr, size);
@@ -1524,6 +1528,7 @@ void memory_region_init_io(MemoryRegion *mr,
     mr->ops = ops ? ops : &unassigned_mem_ops;
     mr->opaque = opaque;
     mr->terminates = true;
+   printf("Initialied MR :: mr: %lx, *mr: %lx, mr->addr: %lx, mr->name: %s\n", mr, *mr, mr->addr, mr->name);
 }
 
 void memory_region_init_ram_nomigrate(MemoryRegion *mr,

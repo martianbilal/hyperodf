@@ -209,6 +209,8 @@ QemuOpts *drive_add(BlockInterfaceType type, int index, const char *file,
 {
     QemuOpts *opts;
 
+    printf("Drive_add :: file : %s, optstr : %s, BLK INTERFACE TYPE : %d\n",file, optstr, type);
+
     opts = drive_def(optstr);
     if (!opts) {
         return NULL;
@@ -501,7 +503,11 @@ static BlockBackend *blockdev_init(const char *file, QDict *bs_opts,
     BlockdevDetectZeroesOptions detect_zeroes =
         BLOCKDEV_DETECT_ZEROES_OPTIONS_OFF;
     const char *throttling_group = NULL;
+    
 
+
+
+    printf("blockdev init is called w/ file %s\n", file);
     /* Check common options by copying from bs_opts to opts, all other options
      * stay in bs_opts for processing by bdrv_open(). */
     id = qdict_get_try_str(bs_opts, "id");
@@ -572,6 +578,7 @@ static BlockBackend *blockdev_init(const char *file, QDict *bs_opts,
 
     on_read_error = BLOCKDEV_ON_ERROR_REPORT;
     if ((buf = qemu_opt_get(opts, "rerror")) != NULL) {
+        printf("===> device read errror!\n");
         on_read_error = parse_block_error_action(buf, 1, &error);
         if (error) {
             error_propagate(errp, error);
@@ -600,7 +607,7 @@ static BlockBackend *blockdev_init(const char *file, QDict *bs_opts,
         if (file && !*file) {
             file = NULL;
         }
-
+        printf("we have a file in blockdev init\n");
         /* bdrv_open() defaults to the values in bdrv_flags (for compatibility
          * with other callers) rather than what we want as the real defaults.
          * Apply the defaults here instead. */
@@ -614,7 +621,7 @@ static BlockBackend *blockdev_init(const char *file, QDict *bs_opts,
         if (runstate_check(RUN_STATE_INMIGRATE)) {
             bdrv_flags |= BDRV_O_INACTIVE;
         }
-
+        printf("bdrv_flags before calling blk_new_open : %d\n", bdrv_flags);
         blk = blk_new_open(file, NULL, bs_opts, bdrv_flags, errp);
         if (!blk) {
             goto err_no_bs_opts;
@@ -832,6 +839,8 @@ DriveInfo *drive_new(QemuOpts *all_opts, BlockInterfaceType block_default_type,
     }
 
     value = qemu_opt_get(all_opts, "cache");
+
+    printf("In drive new :: value : %s, block def type: %d \n", value, block_default_type);
     if (value) {
         int flags = 0;
         bool writethrough;
@@ -980,6 +989,7 @@ DriveInfo *drive_new(QemuOpts *all_opts, BlockInterfaceType block_default_type,
     }
 
     filename = qemu_opt_get(legacy_opts, "file");
+    printf("file for new device : %s \n", filename);
 
     /* Check werror/rerror compatibility with if=... */
     werror = qemu_opt_get(legacy_opts, "werror");

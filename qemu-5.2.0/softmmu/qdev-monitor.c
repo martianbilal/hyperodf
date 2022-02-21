@@ -262,6 +262,8 @@ int qdev_device_help(QemuOpts *opts)
     GPtrArray *array;
     int i;
 
+    printf("qdev device help called \n");
+
     driver = qemu_opt_get(opts, "driver");
     if (driver && is_help_option(driver)) {
         qdev_print_devinfos(false);

@@ -998,7 +998,7 @@ static int cleanup_add_fd(void *opaque, QemuOpts *opts, Error **errp)
 static int drive_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     BlockInterfaceType *block_default_type = opaque;
-
+    printf("drive init called :: type: %d \n", *(int *)opaque);
     return drive_new(opts, *block_default_type, errp) == NULL;
 }
 
@@ -3003,6 +3003,7 @@ void qemu_init(int argc, char **argv, char **envp)
             break;
         if (argv[optind][0] != '-') {
             loc_set_cmdline(argv, optind, 1);
+
             drive_add(IF_DEFAULT, 0, argv[optind++], HD_OPTS);
         } else {
             const QEMUOption *popt;
@@ -3021,6 +3022,9 @@ void qemu_init(int argc, char **argv, char **envp)
             case QEMU_OPTION_hdb:
             case QEMU_OPTION_hdc:
             case QEMU_OPTION_hdd:
+                printf("we touched it \n");
+                printf("popt->index : %d, optarg : %s\n", popt->index, optarg);
+
                 drive_add(IF_DEFAULT, popt->index - QEMU_OPTION_hda, optarg,
                           HD_OPTS);
                 break;
