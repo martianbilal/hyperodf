@@ -29,6 +29,7 @@
 
 #define SIG_IPI SIGUSR1
 
+
 /**
  * qemu_init_main_loop: Set up the process so that it can run the main loop.
  *
@@ -329,5 +330,6 @@ typedef struct MainLoopPoll {
 
 void main_loop_poll_add_notifier(Notifier *notify);
 void main_loop_poll_remove_notifier(Notifier *notify);
+
 
 #endif

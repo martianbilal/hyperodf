@@ -63,6 +63,8 @@
 #include "qemu/bitmap.h"
 #include "net/announce.h"
 
+#define DBG
+
 const unsigned int postcopy_ram_discard_version;
 
 /* Subcommands for QEMU_VM_COMMAND */
@@ -144,6 +146,9 @@ static ssize_t block_writev_buffer(void *opaque, struct iovec *iov, int iovcnt,
 static ssize_t block_get_buffer(void *opaque, uint8_t *buf, int64_t pos,
                                 size_t size, Error **errp)
 {
+    #ifdef DBG
+    printf("%s is called\n", __func__); 
+    #endif
     return bdrv_load_vmstate(opaque, buf, pos, size);
 }
 
@@ -164,6 +169,9 @@ static const QEMUFileOps bdrv_write_ops = {
 
 static QEMUFile *qemu_fopen_bdrv(BlockDriverState *bs, int is_writable)
 {
+    #ifdef DBG
+    printf("%s function is called\n", __func__); 
+    #endif 
     if (is_writable) {
         return qemu_fopen_ops(bs, &bdrv_write_ops);
     }
@@ -2737,6 +2745,11 @@ int save_snapshot(const char *name, Error **errp)
     struct tm tm;
     AioContext *aio_context;
 
+
+    #ifdef DBG
+    printf("save_snapshot is called!\n");
+    #endif
+
     if (migration_is_blocked(errp)) {
         return ret;
     }
@@ -2947,6 +2960,11 @@ int load_snapshot(const char *name, Error **errp)
     int ret;
     AioContext *aio_context;
     MigrationIncomingState *mis = migration_incoming_get_current();
+   
+    #ifdef DBG
+    printf("load_snapshot is called ");
+    #endif
+
 
     if (!bdrv_all_can_snapshot(&bs)) {
         error_setg(errp,
@@ -2954,6 +2972,7 @@ int load_snapshot(const char *name, Error **errp)
                    bdrv_get_device_or_node_name(bs));
         return -ENOTSUP;
     }
+    printf("Finding the snapshot...\n");
     ret = bdrv_all_find_snapshot(name, &bs);
     if (ret < 0) {
         error_setg(errp,
@@ -2962,12 +2981,17 @@ int load_snapshot(const char *name, Error **errp)
         return ret;
     }
 
+    printf("Finding VM State ... \n");
+
     bs_vm_state = bdrv_all_find_vmstate_bs();
+    printf("pre aio progress... \n");
     if (!bs_vm_state) {
         error_setg(errp, "No block device supports snapshots");
         return -ENOTSUP;
     }
+    printf("aio progress...\n");
     aio_context = bdrv_get_aio_context(bs_vm_state);
+    printf("progress...\n");
 
     /* Don't even try to load empty VM states */
     aio_context_acquire(aio_context);

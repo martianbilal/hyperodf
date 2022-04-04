@@ -24,6 +24,7 @@
 
 #include "qemu/osdep.h"
 #include "qemu-common.h"
+#include "qemu/vmfork.h"
 #include "sysemu/sysemu.h"
 #include <sys/time.h>
 
@@ -52,7 +53,16 @@ int main(int argc, char **argv, char **envp)
     struct timeval t;
     printf("Starting QEMU === -_-\n");
     long long milliseconds;
+    int result; 
+    
+    // int forkvmfd[2];
     gettimeofday(&t, NULL);
+
+    // result = pipe(forkvmfd);
+    // if (result < 0) {
+	// 	perror("pipe ");
+	// 	exit(1);
+	// }
 
     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
 

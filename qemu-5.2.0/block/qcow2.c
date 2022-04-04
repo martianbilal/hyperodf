@@ -43,6 +43,8 @@
 #include "crypto.h"
 #include "block/aio_task.h"
 
+#define DEBUG_EXT
+
 /*
   Differences with QCOW:
 
@@ -1302,6 +1304,8 @@ static int coroutine_fn qcow2_do_open(BlockDriverState *bs, QDict *options,
     uint64_t l1_vm_state_index;
     bool update_header = false;
 
+
+    printf("**DO OPEN has been called **\n");
     ret = bdrv_pread(bs->file, 0, &header, sizeof(header));
     if (ret < 0) {
         error_setg_errno(errp, -ret, "Could not read qcow2 header");
@@ -1890,6 +1894,8 @@ static int qcow2_open(BlockDriverState *bs, QDict *options, int flags,
         .ret = -EINPROGRESS
     };
 
+
+    printf("** OPEN QCOW2 **\n");
     bs->file = bdrv_open_child(NULL, options, "file", bs, &child_of_bds,
                                BDRV_CHILD_IMAGE, false, errp);
     if (!bs->file) {

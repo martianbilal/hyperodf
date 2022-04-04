@@ -6,13 +6,13 @@ mov [BOOT_DISK], dl
 mov bp, 0x7c00 ;stack base pointer
 mov sp, bp     ;stack pointer
 
-s:
-    mov [0xfedc], dword 0xdeadbeef
-    ; jmp l
-; l:
-    mov eax, dword [0xfedc]
-    add eax, 1
-    mov [0xfedd], eax
+; s:
+;     mov [0xfedc], dword 0xdeadbeef
+;     ; jmp l
+; ; l:
+;     mov eax, dword [0xfedc]
+;     add eax, 1
+;     mov [0xfedd], eax
 
 
 
@@ -39,7 +39,7 @@ out dx, eax
 mov bx, helloWorld
 call printString
 
-; call readDisk
+call readDisk
 
 ; mov ax, 65h
 ; mov dx, 300h

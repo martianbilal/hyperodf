@@ -2873,11 +2873,9 @@ MemTxResult address_space_read_full(AddressSpace *as, hwaddr addr,
     if (len > 0) {
         RCU_READ_LOCK_GUARD();
         fv = address_space_to_flatview(as);
-        if(addr == 496) 
-        {
             printf("*AS :: %lx :: AS :: %lx :: AS ROOT :: %lx :: AS NAME :: %s :: KVM_EXIT_IN Read Called: %s\n", *as, as, as->root, as->name, (char*)(buf));
             // return result;
-        }
+        
         result = flatview_read(fv, addr, attrs, buf, len);
         
     }

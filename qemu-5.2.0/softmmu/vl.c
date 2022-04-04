@@ -116,6 +116,7 @@
 #include "qemu/guest-random.h"
 
 #define MAX_VIRTIO_CONSOLES 1
+#define DBG
 
 static const char *data_dir[16];
 static int data_dir_idx;
@@ -2899,6 +2900,7 @@ void qemu_init(int argc, char **argv, char **envp)
     BlockdevOptionsQueue bdo_queue = QSIMPLEQ_HEAD_INITIALIZER(bdo_queue);
     QemuPluginList plugin_list = QTAILQ_HEAD_INITIALIZER(plugin_list);
     int mem_prealloc = 0; /* force preallocation of physical target memory */
+    static AioContext *ctx;
 
     os_set_line_buffering();
 
@@ -3069,6 +3071,9 @@ void qemu_init(int argc, char **argv, char **envp)
             case QEMU_OPTION_snapshot:
                 {
                     Error *blocker = NULL;
+                    #ifdef DBG
+                    printf("reached the snapshot option! \n");
+                    #endif 
                     snapshot = 1;
                     error_setg(&blocker, QERR_REPLAY_NOT_SUPPORTED,
                                "-snapshot");
@@ -3895,6 +3900,8 @@ void qemu_init(int argc, char **argv, char **envp)
         error_report_err(main_loop_err);
         exit(1);
     }
+    ctx = qemu_get_aio_context(); 
+
 
 #ifdef CONFIG_SECCOMP
     olist = qemu_find_opts_err("sandbox", NULL);

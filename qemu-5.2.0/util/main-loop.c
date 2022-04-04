@@ -32,13 +32,15 @@
 #include "qemu/main-loop.h"
 #include "block/aio.h"
 #include "qemu/error-report.h"
-#include "qemu/queue.h"
+// #include "qemu/queue.h"
+#include "qemu/vmfork.h"
 
 #ifndef _WIN32
 #include <sys/wait.h>
 #endif
 
 #ifndef _WIN32
+
 
 /* If we have signalfd, we mask out the signals we want to handle and then
  * use signalfd to listen for them.  We rely on whatever the current signal
@@ -230,6 +232,8 @@ static int os_host_main_loop_wait(int64_t timeout)
 {
     GMainContext *context = g_main_context_default();
     int ret;
+
+    // printf("waiting in the main loop\n");
 
     g_main_context_acquire(context);
 
@@ -499,6 +503,12 @@ void main_loop_wait(int nonblocking)
     };
     int ret;
     int64_t timeout_ns;
+    char should_fork;
+    int oldflags; 
+
+    // oldflags = fcntl(forkvmfd[0], F_GETFL, 0); 
+    // fcntl(forkvmfd[0], F_SETFL, oldflags | O_NONBLOCK);
+
 
     if (nonblocking) {
         mlpoll.timeout = 0;
@@ -520,6 +530,11 @@ void main_loop_wait(int nonblocking)
                                           &main_loop_tlg));
 
     ret = os_host_main_loop_wait(timeout_ns);
+    // read(forkvmfd[0], &should_fork, 1);
+    if(should_fork == 1){ 
+        printf("we are ready for fork");
+    }
+    
     mlpoll.state = ret < 0 ? MAIN_LOOP_POLL_ERR : MAIN_LOOP_POLL_OK;
     notifier_list_notify(&main_loop_poll_notifiers, &mlpoll);
 

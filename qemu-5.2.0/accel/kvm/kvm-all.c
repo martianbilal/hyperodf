@@ -27,6 +27,7 @@
 #include "qemu/option.h"
 #include "qemu/config-file.h"
 #include "qemu/error-report.h"
+// #include "qemu/queue.h"
 #include "qapi/error.h"
 #include "hw/pci/msi.h"
 #include "hw/pci/msix.h"
@@ -52,8 +53,15 @@
 #include "qemu/guest-random.h"
 #include "sysemu/hw_accel.h"
 #include "kvm-cpus.h"
+#include "migration/snapshot.h"
+#include "migration/misc.h"
+#include "qemu/vmfork.h"
 
 #include "hw/boards.h"
+
+
+// int forkvmfd[2];
+
 
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
@@ -2920,6 +2928,8 @@ int kvm_cpu_exec(CPUState *cpu)
     struct KVMState *s = KVM_STATE(current_accel());;
     struct KVMSlot slot;
     struct timeval t;
+    char should_fork; 
+    Error *err = NULL;
     long long milliseconds;
     long long timestamps[4];
     int io_end = 0; 
@@ -3076,7 +3086,10 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
-                
+                should_fork = 1;
+                // pipe(forkvmfd);
+                // write(forkvmfd[1], &should_fork, 1);
+                continue;
                 //complete the I/O before copying state
                 vcpu_complete_io(cpu);
 
@@ -3158,12 +3171,15 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
                 timestamps[1] = milliseconds;
-
+                printf("Saving Snapshot====\n");
+                qemu_mutex_lock_iothread();
+                save_snapshot("fork-snap", &err);
+                qemu_mutex_unlock_iothread();
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
                 dumpKVMState(s, "./ParentKVMDump", "Parent VM");
 child_spawn: 
                 start_fork();
-                qemu_mutex_lock_iothread();
+                // qemu_mutex_lock_iothread();
                 // qemu_cleanup();
                 printf("done with cleanup\n");
                 pid = fork();
@@ -3198,7 +3214,7 @@ child_spawn:
                     //make a call for creating a vm 
                     vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
 
-                    cpu = kvm_init_vcpu(cpu, NULL);
+                    // cpu = kvm_init_vcpu(cpu, NULL);
                     
                     if (vmfd < 0) {
                     fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
@@ -3335,37 +3351,59 @@ child_spawn:
                                         cpu->kvm_fd, 0);
                     run = cpu->kvm_run;
                     // printf("Exiting child process!\n");
-                    // for(int i = 0 ; i < 2; i++) {
-                    //     printf("exit reason : %d", cpu->kvm_run->exit_reason);
-                    //     ret = ioctl(vcpufd, KVM_RUN, 0);
-                    // }
+                    
                     if (cpu->kvm_run == MAP_FAILED) {
                         printf("mmap failed!"); 
                         return 0;                  
                     }
-                    main_loop_tlg.tl[0]=NULL;
-                    main_loop_tlg.tl[1]=NULL;
-                    main_loop_tlg.tl[2]=NULL;
-                    main_loop_tlg.tl[3]=NULL;
-                    qemu_mutex_lock_iothread();
-                    kvm_cpus.create_vcpu_thread(cpu);
-                    aio_get_g_source(aio_context_new(NULL))->context = NULL;
-                    iohandler_get_g_source()->context = NULL;
-                    qemu_init_main_loop(NULL);
-                    qemu_main_loop();
+                    
+                    // for(int i = 0 ;; i++) {
+                    //     // printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                    //     ret = ioctl(vcpufd, KVM_RUN, 0);
+                    //     if(cpu->kvm_run->io.port!=496)
+                    //     {
+                    //         continue;
+                    //     } 
+                    //     else 
+                    //     {
+                    //         printf("port 496");
+                    //         break;
+                    //     }
+                    // }
 
-                    bs_opts = qdict_new();
-                    qemu_opts_to_qdict(opts, bs_opts);
+                    // main_loop_tlg.tl[0]=NULL;
+                    // main_loop_tlg.tl[1]=NULL;
+                    // main_loop_tlg.tl[2]=NULL;
+                    // main_loop_tlg.tl[3]=NULL;
+                    // qemu_mutex_unlock_iothread();
+                    // kvm_cpus.create_vcpu_thread(cpu);
+                    // fflush(stdout);
+                    // printf("Created VCPU Thread in Child\n");
+
+                    // qemu_mutex_lock_iothread();
+                    
+                    // aio_get_g_source(aio_context_new(NULL))->context = NULL;
+                    // iohandler_get_g_source()->context = NULL;
+                    // qemu_init_main_loop(NULL);
+                    // printf("initialized the qemu main loop");
+                    // qemu_main_loop();
+
+                    // bs_opts = qdict_new();
+                    // qemu_opts_to_qdict(opts, bs_opts);
 
                     // blockdev_close_all_bdrv_states();
                     printf("will create new drive for the child\n");
                     
-                    opts = drive_add(IF_DEFAULT, 0, "./bootloader.qcow2", "media=disk");
-                    
-                    drive_new( opts, 1,  &error_fatal);
+                    // opts = drive_add(IF_DEFAULT, 0, "./bootloader.qcow2", "media=disk");
+                    // 
+                    // drive_new( opts, 1,  &error_fatal);
                     printf("created new drive for the child\n");
                     dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
-
+                    printf("loading snapshot....\n");
+                    vm_stop(RUN_STATE_RESTORE_VM);
+                    err = NULL;
+                    load_snapshot("fork-snap", &err);
+                    vm_start();
 
                     ret = 0; 
                     break;

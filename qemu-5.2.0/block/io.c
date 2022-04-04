@@ -36,8 +36,48 @@
 #include "qemu/main-loop.h"
 #include "sysemu/replay.h"
 
+
+#define DBG
+
 /* Maximum bounce buffer for copy-on-read and write zeroes, in bytes */
 #define MAX_BOUNCE_BUFFER (32768 << BDRV_SECTOR_BITS)
+//function from stackoverflow 
+static void full_write(int fd, const char *buf, size_t len)
+{
+        while (len > 0) {
+                ssize_t ret = write(fd, buf, len);
+
+                if ((ret == -1) && (errno != EINTR))
+                        break;
+
+                buf += (size_t) ret;
+                len -= (size_t) ret;
+        }
+}
+
+//function from stackoverflow
+static void print_backtrace(void)
+{
+        static const char start[] = "BACKTRACE ------------\n";
+        static const char end[] = "----------------------\n";
+
+        void *bt[1024];
+        int bt_size;
+        char **bt_syms;
+        int i;
+
+        bt_size = backtrace(bt, 1024);
+        bt_syms = backtrace_symbols(bt, bt_size);
+        full_write(STDERR_FILENO, start, strlen(start));
+        for (i = 1; i < bt_size; i++) {
+                size_t len = strlen(bt_syms[i]);
+                full_write(STDERR_FILENO, bt_syms[i], len);
+                full_write(STDERR_FILENO, "\n", 1);
+        }
+        full_write(STDERR_FILENO, end, strlen(end));
+    free(bt_syms);
+}
+
 
 static void bdrv_parent_cb_resize(BlockDriverState *bs);
 static int coroutine_fn bdrv_co_do_pwrite_zeroes(BlockDriverState *bs,
@@ -957,6 +997,11 @@ int bdrv_pread(BdrvChild *child, int64_t offset, void *buf, int bytes)
     int ret;
     QEMUIOVector qiov = QEMU_IOVEC_INIT_BUF(qiov, buf, bytes);
 
+    #ifdef DBG 
+    printf("%s is called\n", __func__);
+    print_backtrace();
+    #endif 
+
     if (bytes < 0) {
         return -EINVAL;
     }
@@ -1628,6 +1673,10 @@ int coroutine_fn bdrv_co_preadv(BdrvChild *child,
     int64_t offset, unsigned int bytes, QEMUIOVector *qiov,
     BdrvRequestFlags flags)
 {
+    #ifdef DBG
+    printf("%s is called \n ", __func__);
+    // print_backtrace();
+    #endif
     return bdrv_co_preadv_part(child, offset, bytes, qiov, 0, flags);
 }
 
@@ -2610,6 +2659,10 @@ int bdrv_load_vmstate(BlockDriverState *bs, uint8_t *buf,
     QEMUIOVector qiov = QEMU_IOVEC_INIT_BUF(qiov, buf, size);
     int ret = bdrv_readv_vmstate(bs, &qiov, pos);
 
+    #ifdef DBG 
+    printf("%s is called\n", __func__);
+    #endif
+    
     return ret < 0 ? ret : size;
 }
 

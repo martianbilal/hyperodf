@@ -758,6 +758,8 @@ static void address_space_add_del_ioeventfds(AddressSpace *as,
     MemoryRegionIoeventfd *fd;
     MemoryRegionSection section;
 
+    printf("Add/del ioeventfd for address space\n");
+    printf("*AS :: %lx :: AS :: %lx :: AS ROOT :: %lx :: AS NAME :: %s\n", *as, as, as->root, as->name);
     /* Generate a symmetric difference of the old and new fd sets, adding
      * and deleting as necessary.
      */
@@ -2351,6 +2353,8 @@ void memory_region_add_eventfd(MemoryRegion *mr,
         .e = e,
     };
     unsigned i;
+    printf("eventfd\n");
+    // printf("add_eventfd=MR: %lx, *MR :%lx, MR->addr : %lx, abs_adr: %lx\n", mr, *mr, mr->addr, addr);
 
     if (kvm_enabled() && (!(kvm_eventfds_enabled() ||
                             userspace_eventfd_warning))) {
