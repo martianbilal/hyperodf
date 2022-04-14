@@ -2916,7 +2916,6 @@ void end_fork()
 }
 
 
-
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -2948,9 +2947,18 @@ int kvm_cpu_exec(CPUState *cpu)
     struct kvm_pit_state2 pit2; 
     struct qemu_opts *opts;
     struct QDict *bs_opts;
-
+    int result; 
     DPRINTF("kvm_cpu_exec()\n");
+
+
+
     
+    
+
+
+    //register the piped fd with qemu main loop 
+
+
     gettimeofday(&t, NULL);
 
     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
@@ -3086,11 +3094,24 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
-                should_fork = 1;
+                //magic number
+                // should_fork = 'a';
+                // cpu->nr_fork_vms = 1;
+                printf("CPUFORK :: Event RFD : %d\n", cpu->fork_event.rfd);
+                printf("CPUFORK :: Event WFD : %d\n", cpu->fork_event.wfd);
                 // pipe(forkvmfd);
-                // write(forkvmfd[1], &should_fork, 1);
-                continue;
+                printf("fork_fd[0] : %d -- fork_fd[1] : %d\n", cpu->fork_fd[0], cpu->fork_fd[1]);
+                printf("writing to the fork pipe ------ \n");
+                // do {
+                //     ret = write(cpu->fork_event.wfd, &should_fork, sizeof(should_fork));
+                // } while (ret < 0 && errno == EINTR);
+                // printf("result for write : %d\n", result);
                 //complete the I/O before copying state
+                event_notifier_test_and_clear(&(cpu->fork_event));
+                event_notifier_set(&(cpu->fork_event));
+                ret = 0; 
+                break;
+                // continue;
                 vcpu_complete_io(cpu);
 
                 //get the values of the attributes before the fork

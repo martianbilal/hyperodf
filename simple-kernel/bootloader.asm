@@ -17,8 +17,8 @@ mov sp, bp     ;stack pointer
 
 
 
-; mov bx, helloWorld
-; call printString
+mov bx, helloWorld
+call printString
 
 
 ; mov eax, 65h
@@ -30,6 +30,7 @@ mov sp, bp     ;stack pointer
 ; out dx, eax
 
 
+call readDisk
 
 ; this is the hypercall for FORK
 mov eax, 63h

@@ -2864,6 +2864,35 @@ static char *find_datadir(void)
     return get_relocated_path(CONFIG_QEMU_DATADIR);
 }
 
+
+
+void handle_fork(void *opaque){
+    CPUState *cpu = (CPUState*)opaque; 
+    char buf;
+    int result; 
+
+    #ifdef DBG
+    printf("We are reading for the fork\n");
+    #endif
+
+    result = event_notifier_test_and_clear(&(cpu->fork_event));
+
+    #ifdef DBG
+    printf("result for read : %d\n", result);
+    printf("buf :: %c\n", buf);    
+    #endif
+
+    //if the result is 1, we are ready for the fork 
+    if(result == 1){
+        #ifdef DBG
+        printf("we can fork the main thread now\n");
+        #endif
+    }
+
+    return; 
+}
+
+
 void qemu_init(int argc, char **argv, char **envp)
 {
     int i;
@@ -2900,7 +2929,11 @@ void qemu_init(int argc, char **argv, char **envp)
     BlockdevOptionsQueue bdo_queue = QSIMPLEQ_HEAD_INITIALIZER(bdo_queue);
     QemuPluginList plugin_list = QTAILQ_HEAD_INITIALIZER(plugin_list);
     int mem_prealloc = 0; /* force preallocation of physical target memory */
+    EventNotifier notifier;
     static AioContext *ctx;
+    int result; 
+    int forkvmfd[2];
+    CPUState *cpu;
 
     os_set_line_buffering();
 
@@ -3886,7 +3919,7 @@ void qemu_init(int argc, char **argv, char **envp)
                                               machine_class);
 
     os_daemonize();
-    rcu_disable_atfork();
+    // rcu_disable_atfork();
 
     if (pid_file && !qemu_write_pidfile(pid_file, &err)) {
         error_reportf_err(err, "cannot create PID file: ");
@@ -3901,6 +3934,7 @@ void qemu_init(int argc, char **argv, char **envp)
         exit(1);
     }
     ctx = qemu_get_aio_context(); 
+    event_notifier_init(&notifier, true);
 
 
 #ifdef CONFIG_SECCOMP
@@ -4511,6 +4545,30 @@ void qemu_init(int argc, char **argv, char **envp)
     } else if (autostart) {
         vm_start();
     }
+
+    cpu = qemu_get_cpu(0); 
+    printf("Before :: Event RFD : %d\n", cpu->fork_event.rfd);
+    printf("Before :: Event WFD : %d\n", cpu->fork_event.wfd);
+    result = event_notifier_init(&(cpu->fork_event), 0); 
+    if(result < 0) {
+        printf("Failed to init notifier\n");
+    }
+    printf("Event RFD : %d\n", cpu->fork_event.rfd);
+    printf("Event WFD : %d\n", cpu->fork_event.wfd);
+
+    //qemu_pipe and pipe both fail here 
+    // result = qemu_pipe(forkvmfd);
+    // if(result < 0){
+    //     printf("failed to make the pipe system call \n");
+    //     // return -1;
+    // }
+    // current_cpu->fork_fd[0] = forkvmfd[0];
+    // current_cpu->fork_fd[1] = forkvmfd[1];
+    
+    // printf("fork_fd[0] : %d -- fork_fd[1] : %d\n", current_cpu->fork_fd[0], current_cpu->fork_fd[1]);
+
+    // printf("success :: make the pipe system call \n");
+    qemu_set_fd_handler(cpu->fork_event.rfd, handle_fork, NULL, cpu);
 
     accel_setup_post(current_machine);
     os_setup_post();

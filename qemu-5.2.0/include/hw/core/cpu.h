@@ -29,6 +29,7 @@
 #include "qemu/rcu_queue.h"
 #include "qemu/queue.h"
 #include "qemu/thread.h"
+#include "qemu/event_notifier.h"
 #include "qemu/plugin.h"
 #include "qom/object.h"
 
@@ -393,6 +394,7 @@ struct CPUState {
     int singlestep_enabled;
     int64_t icount_budget;
     int64_t icount_extra;
+    int64_t nr_fork_vms;
     uint64_t random_seed;
     sigjmp_buf jmp_env;
 
@@ -443,7 +445,9 @@ struct CPUState {
     /* saved iotlb data from io_writex */
     SavedIOTLB saved_iotlb;
 #endif
-
+    
+    EventNotifier fork_event; 
+    
     /* TODO Move common fields from CPUArchState here. */
     int cpu_index;
     int cluster_index;
@@ -464,7 +468,8 @@ struct CPUState {
     struct hax_vcpu_state *hax_vcpu;
 
     int hvf_fd;
-
+    /* Used to send fork signals */
+    int fork_fd[2]; 
     /* track IOMMUs whose translations we've cached in the TCG TLB */
     GArray *iommu_notifiers;
 };

@@ -28,6 +28,8 @@
 #include "qemu/timer.h"
 #include "sysemu/qtest.h"
 #include "sysemu/cpu-timers.h"
+#include "sysemu/cpus.h"
+// #include "include/hw/core/cpu.h"
 #include "sysemu/replay.h"
 #include "qemu/main-loop.h"
 #include "block/aio.h"
@@ -505,9 +507,19 @@ void main_loop_wait(int nonblocking)
     int64_t timeout_ns;
     char should_fork;
     int oldflags; 
+    void *cpu;
+    int index = 0; //testing for single VCPU user case 
 
     // oldflags = fcntl(forkvmfd[0], F_GETFL, 0); 
     // fcntl(forkvmfd[0], F_SETFL, oldflags | O_NONBLOCK);
+    // GSList *list, *elt;
+
+    // list = object_class_get_list("device", true);
+    //     elt->
+    // for (elt = list; elt; elt = elt->next) {
+    // }
+    // g_slist_free(list);
+    // cpu = qemu_get_cpu(0);
 
 
     if (nonblocking) {
@@ -530,10 +542,13 @@ void main_loop_wait(int nonblocking)
                                           &main_loop_tlg));
 
     ret = os_host_main_loop_wait(timeout_ns);
+    // if(cpu->nr_fork_vms > 0) {
+    //     printf("We have to fork at this point\n");
+    // }
     // read(forkvmfd[0], &should_fork, 1);
-    if(should_fork == 1){ 
-        printf("we are ready for fork");
-    }
+    // if(should_fork == 1){ 
+    //     printf("we are ready for fork");
+    // }
     
     mlpoll.state = ret < 0 ? MAIN_LOOP_POLL_ERR : MAIN_LOOP_POLL_OK;
     notifier_list_notify(&main_loop_poll_notifiers, &mlpoll);
@@ -546,6 +561,7 @@ void main_loop_wait(int nonblocking)
         icount_start_warp_timer();
     }
     qemu_clock_run_all_timers();
+
 }
 
 /* Functions to operate on the main QEMU AioContext.  */

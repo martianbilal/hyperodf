@@ -600,6 +600,8 @@ void cpus_register_accel(const CpusAccel *ca)
     cpus_accel = ca;
 }
 
+
+// TODO : Add pipe FD over here; 
 void qemu_init_vcpu(CPUState *cpu)
 {
     MachineState *ms = MACHINE(qdev_get_machine());
@@ -608,6 +610,7 @@ void qemu_init_vcpu(CPUState *cpu)
     cpu->nr_threads =  ms->smp.threads;
     cpu->stopped = true;
     cpu->random_seed = qemu_guest_random_seed_thread_part1();
+    cpu->nr_fork_vms = 0;
 
     if (!cpu->as) {
         /* If the target cpu hasn't set up any address spaces itself,
