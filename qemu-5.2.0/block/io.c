@@ -37,7 +37,7 @@
 #include "sysemu/replay.h"
 
 
-#define DBG
+// #define DBG
 
 /* Maximum bounce buffer for copy-on-read and write zeroes, in bytes */
 #define MAX_BOUNCE_BUFFER (32768 << BDRV_SECTOR_BITS)

@@ -2869,7 +2869,10 @@ static char *find_datadir(void)
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
     char buf;
-    int result; 
+    int result;
+    int ret;
+    int status;
+    Error *local_err = NULL;
 
     #ifdef DBG
     printf("We are reading for the fork\n");
@@ -2886,7 +2889,54 @@ void handle_fork(void *opaque){
     if(result == 1){
         #ifdef DBG
         printf("we can fork the main thread now\n");
+        printf("Saving the snapshot! \n");
         #endif
+
+        save_snapshot("prefork_state", NULL);
+        
+        // close(9);
+
+        #ifdef DBG
+        printf("PID : %ld, Parent PID : %ld", (long)getpid(), (long)getppid());
+        printf("Done with the save snapshot!");
+        #endif
+
+        ret = fork(); 
+        
+        if (ret < 0){
+            printf("Failed to fork\n");
+        } else if (ret == 0) {
+            /*child process*/
+            // load_snapshot("prefork_state", NULL); 
+            
+            #ifdef DBG 
+            printf("Loading the snapshot with pid : %ld\n", (long)getpid()); 
+            #endif 
+
+            // close(9);
+            qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+            register_global_state();
+            if (load_snapshot("prefork_state", &local_err) < 0) {
+                error_report_err(local_err);
+                #ifdef DBG 
+                    printf("Failed to load snapshot\n"); 
+                #endif 
+                autostart = 0;
+                exit(1);
+            }
+
+            
+            #ifdef DBG 
+                printf("We have loaded the snapshot!\n"); 
+            #endif 
+            return; 
+        } else {
+            // exit(0);
+            waitpid(ret, &status, 0);
+
+        }
+    
+        // load_snapshot("prefork_state", NULL); 
     }
 
     return; 

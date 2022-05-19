@@ -2962,7 +2962,7 @@ int load_snapshot(const char *name, Error **errp)
     MigrationIncomingState *mis = migration_incoming_get_current();
    
     #ifdef DBG
-    printf("load_snapshot is called ");
+    printf("load_snapshot is called \n");
     #endif
 
 
@@ -3034,6 +3034,7 @@ int load_snapshot(const char *name, Error **errp)
 
     aio_context_acquire(aio_context);
     ret = qemu_loadvm_state(f);
+
     migration_incoming_state_destroy();
     aio_context_release(aio_context);
 
@@ -3043,6 +3044,7 @@ int load_snapshot(const char *name, Error **errp)
         error_setg(errp, "Error %d while loading VM state", ret);
         return ret;
     }
+    printf("progress...\n");
 
     return 0;
 

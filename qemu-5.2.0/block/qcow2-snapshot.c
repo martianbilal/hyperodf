@@ -31,6 +31,8 @@
 #include "qemu/cutils.h"
 
 
+#define DBG
+
 /* Obtain a backtrace and print it to stdout. */
 void
 print_trace (void)
@@ -850,6 +852,9 @@ int qcow2_snapshot_goto(BlockDriverState *bs, const char *snapshot_id)
         goto fail;
     }
 
+    #ifdef DBG 
+        printf("Trying to read this file from qcow2_snapshot_goto : %s \n", bs->file->name); 
+    #endif
     ret = bdrv_pread(bs->file, sn->l1_table_offset,
                      sn_l1_table, sn_l1_bytes);
     if (ret < 0) {
