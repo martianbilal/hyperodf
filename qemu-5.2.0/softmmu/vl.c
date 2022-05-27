@@ -78,6 +78,7 @@
 #include "migration/colo.h"
 #include "migration/postcopy-ram.h"
 #include "sysemu/kvm.h"
+#include "sysemu/kvm_int.h"
 #include "sysemu/hax.h"
 #include "qapi/qobject-input-visitor.h"
 #include "qemu/option.h"
@@ -653,6 +654,70 @@ static const RunStateTransition runstate_transitions_def[] = {
 
     { RUN_STATE__MAX, RUN_STATE__MAX },
 };
+
+
+#define KVM_MSI_HASHTAB_SIZE    256
+
+struct KVMParkedVcpu {
+    unsigned long vcpu_id;
+    int kvm_fd;
+    QLIST_ENTRY(KVMParkedVcpu) node;
+};
+
+struct KVMState
+{
+    AccelState parent_obj;
+
+    int nr_slots;
+    int fd;
+    int vmfd;
+    int coalesced_mmio;
+    int coalesced_pio;
+    struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
+    bool coalesced_flush_in_progress;
+    int vcpu_events;
+    int robust_singlestep;
+    int debugregs;
+#ifdef KVM_CAP_SET_GUEST_DEBUG
+    QTAILQ_HEAD(, kvm_sw_breakpoint) kvm_sw_breakpoints;
+#endif
+    int max_nested_state_len;
+    int many_ioeventfds;
+    int intx_set_mask;
+    int kvm_shadow_mem;
+    bool kernel_irqchip_allowed;
+    bool kernel_irqchip_required;
+    OnOffAuto kernel_irqchip_split;
+    bool sync_mmu;
+    uint64_t manual_dirty_log_protect;
+    /* The man page (and posix) say ioctl numbers are signed int, but
+     * they're not.  Linux, glibc and *BSD all treat ioctl numbers as
+     * unsigned, and treating them as signed here can break things */
+    unsigned irq_set_ioctl;
+    unsigned int sigmask_len;
+    GHashTable *gsimap;
+#ifdef KVM_CAP_IRQ_ROUTING
+    struct kvm_irq_routing *irq_routes;
+    int nr_allocated_irq_routes;
+    unsigned long *used_gsi_bitmap;
+    unsigned int gsi_count;
+    QTAILQ_HEAD(, KVMMSIRoute) msi_hashtab[KVM_MSI_HASHTAB_SIZE];
+#endif
+    KVMMemoryListener memory_listener;
+    QLIST_HEAD(, KVMParkedVcpu) kvm_parked_vcpus;
+
+    /* memory encryption */
+    void *memcrypt_handle;
+    int (*memcrypt_encrypt_data)(void *handle, uint8_t *ptr, uint64_t len);
+
+    /* For "info mtree -f" to tell if an MR is registered in KVM */
+    int nr_as;
+    struct KVMAs {
+        KVMMemoryListener *ml;
+        AddressSpace *as;
+    } *as;
+};
+
 
 static bool runstate_valid_transitions[RUN_STATE__MAX][RUN_STATE__MAX];
 
@@ -2865,15 +2930,34 @@ static char *find_datadir(void)
 }
 
 
+/*
+* saves the kvm state before starting the child process 
+*   Args: CPUState
+*   Return: 0 on success, -1 on error 
+*/
+static void save_kvm_state(CPUState *cpu){
+    //call the cpu_get_prefork
+    //get the slots info from the kvm_state
+    //get kvm_clock
+    //get pit2
+    //get kvm_irqchip_pic_master
+    //get kvm_irqchip_pic_slave
+    //get kvm_irqchip_pic_ioapic
+    return;
+}
+
 
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
+    struct KVMState* s = cpu->kvm_state;
+    struct KVMSlot slot;
     char buf;
     int result;
     int ret;
     int status;
+    int slot_size; 
     Error *local_err = NULL;
-
+    
     #ifdef DBG
     printf("We are reading for the fork\n");
     #endif
@@ -2895,7 +2979,9 @@ void handle_fork(void *opaque){
         save_snapshot("prefork_state", NULL);
         
         // close(9);
+        save_kvm_state(cpu); 
 
+        
         #ifdef DBG
         printf("PID : %ld, Parent PID : %ld", (long)getpid(), (long)getppid());
         printf("Done with the save snapshot!");
@@ -2907,23 +2993,80 @@ void handle_fork(void *opaque){
             printf("Failed to fork\n");
         } else if (ret == 0) {
             /*child process*/
+            // TODO : Create a new KVM VM and VCPU and
+            // update bookkeeping 
+            // 1. close the previous kvm related FDs 
+            // 2. save the prefork VM and VCPU state
+            // 3. open the new kvm fds 
+            // 4. set them up using the prefork status
+            // 5. let the QEMU main loop run for the new VM
+
+            //close kvm fds 
+            close(cpu->kvm_fd);
+            close(s->vmfd);
+
+            //open the new kvm fds
+            cpu->kvm_fd = open("/dev/kvm", 2); 
+            s->fd = cpu->kvm_fd;
+            s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+            if (s->vmfd < 0) {
+            fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
+                strerror(-ret));
+            }
+
+            slot_size = cpu->kvm_state->nr_slots;
+            //set up the shared memory for the child vm 
+            /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+            for(int i = 0; i < slot_size; i++){
+                
+                slot = cpu->kvm_state->memory_listener.slots[i]; 
+                
+                // if(slot.memory_size == 0){
+                //     continue;
+                // }
+                // printf("slot Address : %ld", slot.ram);
+
+                // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+                // if(new_ram == MAP_FAILED) { 
+                //     printf("Failed to allocated memory!");
+                //     exit(0);
+                // }
+                // memmove(new_ram, slot.ram, slot.memory_size);
+
+                    // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                    //  | (kvm_state->memory_listener.as_id << 16)
+                mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                mem.guest_phys_addr = slot.start_addr;
+                mem.userspace_addr = (unsigned long)slot.ram;
+                mem.flags = slot.flags;
+                mem.memory_size = slot.memory_size;
+
+                ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                            mem.memory_size, mem.userspace_addr, ret);
+            }
+
+            //set kvm VM according to the prefork state
+            
+
+
             // load_snapshot("prefork_state", NULL); 
             
             #ifdef DBG 
             printf("Loading the snapshot with pid : %ld\n", (long)getpid()); 
             #endif 
 
-            // close(9);
-            qemu_system_reset(SHUTDOWN_CAUSE_NONE);
-            register_global_state();
-            if (load_snapshot("prefork_state", &local_err) < 0) {
-                error_report_err(local_err);
-                #ifdef DBG 
-                    printf("Failed to load snapshot\n"); 
-                #endif 
-                autostart = 0;
-                exit(1);
-            }
+            // // close(9);
+            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+            // register_global_state();
+            // if (load_snapshot("prefork_state", &local_err) < 0) {
+            //     error_report_err(local_err);
+            //     #ifdef DBG 
+            //         printf("Failed to load snapshot\n"); 
+            //     #endif 
+            //     autostart = 0;
+            //     exit(1);
+            // }
 
             
             #ifdef DBG 
