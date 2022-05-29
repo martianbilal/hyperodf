@@ -3095,10 +3095,29 @@ err:
 
 }
 
+/**
+ * @brief 
+ * 
+ * @param cpu 
+ * @param state 
+ * @return ** int 
+ */
+int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
+    int ret; 
+    ret = 0; 
+    return ret; 
+}
 
-
-int fork_save_vm_state(CPUState *cpu){
-    struct cpu_prefork_state state;
+/**
+ * @brief saves the vm and vcpu state of the KVM 
+ * VM and VCPU identified by identifiers in 
+ * cpu->kvm_state->vmfd and vcpufd respectively in state
+ * 
+ * @param cpu 
+ * @param state 
+ * @return ** int 
+ */
+int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     struct KVMSlot slot;
     struct KVMState *s = cpu->kvm_state;
     struct kvm_run *run = cpu->kvm_run;
@@ -3276,7 +3295,7 @@ void handle_fork(void *opaque){
             fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
                 strerror(-ret));
             }
-
+            
             slot_size = cpu->kvm_state->nr_slots;
             //set up the shared memory for the child vm 
             /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
@@ -3310,10 +3329,12 @@ void handle_fork(void *opaque){
             }
 
             //set kvm VM according to the prefork state
+            fork_set_vm_state(cpu);
+
+            //open the KVM VCPU 
             
-
-
-            // load_snapshot("prefork_state", NULL); 
+            //set prefork vcpu values 
+            //create KVM_RUN region for child VCPU
             
             #ifdef DBG 
             printf("Loading the snapshot with pid : %ld\n", (long)getpid()); 
