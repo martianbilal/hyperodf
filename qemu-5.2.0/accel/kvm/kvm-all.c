@@ -3109,6 +3109,8 @@ int kvm_cpu_exec(CPUState *cpu)
                 //complete the I/O before copying state
                 event_notifier_test_and_clear(&(cpu->fork_event));
                 event_notifier_set(&(cpu->fork_event));
+                // event_notifier_test_and_clear(&(cpu->fork_event));
+                sleep(60);
                 ret = 0; 
                 break;
                 // continue;
