@@ -61,7 +61,7 @@
 
 
 // int forkvmfd[2];
-
+#define DBG
 
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
@@ -2658,6 +2658,10 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     // get_attr(KVM_GET_REGS, vcpufd, regs);
     // get_attr(KVM_GET_SREGS, vcpufd, sregs);
 
+
+    #ifdef DBG
+    printf("[debug] calling %s", __func__);
+    #endif
     
 
     do
@@ -2779,12 +2783,10 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
 {
     int ret = 0;
     char *attr; 
-
     
     printf("starting set attrs\n");
     //set regs
     /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
-
     do 
     {
         ret = ioctl(vcpufd, KVM_SET_REGS, &(state->regs));
@@ -3113,7 +3115,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 event_notifier_test_and_clear(&(cpu->fork_event));
                 event_notifier_set(&(cpu->fork_event));
                 // event_notifier_test_and_clear(&(cpu->fork_event));
-                sleep(60);
+                // sleep(60);
                 ret = 0; 
                 break;
                 // continue;

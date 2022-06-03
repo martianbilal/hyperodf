@@ -3168,6 +3168,7 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     {
         ret = ioctl(s->vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
     } while (ret == -EINTR);
+    cpu->kvm_fd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
 
     //set up the kvm_run for the vcpu --> update it in the vmstate
     mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
@@ -3180,7 +3181,7 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
                         cpu->kvm_fd, 0);
                     
 
-    kvm_set_vcpu_attrs(&state, cpu->kvm_fd);
+    kvm_set_vcpu_attrs(state, cpu->kvm_fd);
 
     
     
@@ -3231,7 +3232,7 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     #endif 
 
     //get the values of the attributes before the fork
-    ret = cpu_get_pre_fork_state(&state, cpu->kvm_fd);
+    cpu_get_pre_fork_state(state, cpu->kvm_fd);
     #ifdef DBG
         printf("[debug] Done with getting cpu state! \n");
         fflush(stdout);
@@ -3258,27 +3259,25 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
         //             mem.memory_size, mem.userspace_addr, ret);
     // }
 
-    #ifdef DBG
-        printf("[debug] protected the memory! \n");
-        fflush(stdout);
-    #endif
-
     //printing a value from the first slot before fork 
 
     // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
     printf("Parent PID : %ld\n", (long)getpid());
     
-    fflush(stdout);
+    // fflush(stdout);
     
     do
     {
+        #ifdef DBG
+        printf("[debug] kvm_get_clock` \n");
+        fflush(stdout);
+        #endif
         ret = ioctl(s->vmfd, KVM_GET_CLOCK, &(state->clock_data));
     } while (ret == -EINTR);
     if(ret < 0) 
     {
         perror("master failed");
     }
-
     do
     {
         ret = ioctl(s->vmfd, KVM_GET_PIT2, &(state->pit2));
@@ -3305,7 +3304,10 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
         ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &(state->irqchip[1]));
     } while (ret == -EINTR);
     if(ret < 0) printf("slave failed ");
-
+    #ifdef DBG
+        printf("[debug] protected the memory! \n");
+        fflush(stdout);
+    #endif
     state->irqchip[2].chip_id = KVM_IRQCHIP_IOAPIC;
     do
     {
@@ -3315,7 +3317,7 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     
     #ifdef DBG
         printf("[debug] saved vm state \n");
-        fflush(stdout);
+        // fflush(stdout);
     #endif
 
 
@@ -3336,7 +3338,9 @@ void handle_fork(void *opaque){
     int slot_size; 
     Error *local_err = NULL;
     // AioContext *ctx;
-    
+
+
+    memset(&prefork_state, 0, sizeof(prefork_state));
     #ifdef DBG
     printf("We are reading for the fork\n");
     #endif
@@ -3365,6 +3369,30 @@ void handle_fork(void *opaque){
         
         assert(qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()); 
         
+        if (migration_is_blocked(NULL)) {
+            return false;
+        }
+
+        if (!replay_can_snapshot()) {
+            return false;
+        }
+
+        vm_stop(RUN_STATE_SAVE_VM);
+
+        #ifdef DBG
+        printf("[debug] stopped the vm\n");
+        #endif
+        
+        runstate_is_running();
+
+        bdrv_drain_all_begin();
+        cpu_synchronize_all_states();
+        cpu_stop_current();
+        // if (!bdrv_all_can_snapshot(has_devices, devices, errp)) {
+        //     return false;
+        // }
+
+
         aio_context_acquire(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
         fork_save_vm_state(cpu, &prefork_state);
