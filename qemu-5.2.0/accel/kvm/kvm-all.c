@@ -3094,6 +3094,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
+                if (qemu_mutex_iothread_locked()){
+                    printf("[debug] This is the main thread!\n");
+                }
                 //magic number
                 // should_fork = 'a';
                 // cpu->nr_fork_vms = 1;

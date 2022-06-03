@@ -3355,12 +3355,21 @@ void handle_fork(void *opaque){
         printf("Saving the snapshot! \n");
         #endif
         
+        #ifdef DBG
+        if (qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()){
+            printf("[debug] This is the main thread!\n");
+        } else {
+            printf("[debug] This is not the main thread");
+        }
+        #endif 
+        
+        assert(qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()); 
+        
         aio_context_acquire(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
         fork_save_vm_state(cpu, &prefork_state);
         // close(9);
         // save_kvm_state(cpu); 
-        aio_context_release(qemu_get_aio_context());
 
         
         #ifdef DBG
@@ -3371,6 +3380,7 @@ void handle_fork(void *opaque){
         // TODO : save the state of the VM before the fork 
         // This includes : 
         // - 
+        aio_context_release(qemu_get_aio_context());
 
         ret = fork(); 
         
