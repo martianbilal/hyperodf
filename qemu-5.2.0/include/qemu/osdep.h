@@ -687,4 +687,7 @@ size_t qemu_get_host_physmem(void);
 
 #endif
 
+#ifndef DBG
+#define DBG
+#endif
 

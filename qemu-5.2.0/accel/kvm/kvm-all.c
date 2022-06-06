@@ -2878,7 +2878,7 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
     //set pit2
     //set mp_state
     //set debuggers
-
+    printf("[debug] done with set attrs\n");
     return ret; 
   
 err:
@@ -3099,6 +3099,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 if (qemu_mutex_iothread_locked()){
                     printf("[debug] This is the main thread!\n");
                 }
+                // qemu_mutex_unlock_iothread();
                 //magic number
                 // should_fork = 'a';
                 // cpu->nr_fork_vms = 1;

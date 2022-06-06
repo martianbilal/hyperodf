@@ -79,6 +79,7 @@
 #include "migration/postcopy-ram.h"
 #include "sysemu/kvm.h"
 #include "sysemu/kvm_int.h"
+#include "../accel/kvm/kvm-cpus.h"
 #include "sysemu/hax.h"
 #include "qapi/qobject-input-visitor.h"
 #include "qemu/option.h"
@@ -3183,7 +3184,12 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
 
     kvm_set_vcpu_attrs(state, cpu->kvm_fd);
 
-    
+    #ifdef DBG 
+    printf("[debug] done with set attrs");
+    fflush(stdout);
+    #endif 
+
+    // cpu_synchronize_all_post_init();    
     
     ret = 0; 
 end_loop: 
@@ -3404,12 +3410,8 @@ void handle_fork(void *opaque){
         printf("PID : %ld, Parent PID : %ld", (long)getpid(), (long)getppid());
         printf("Done with the save snapshot!");
         #endif  
-
-        // TODO : save the state of the VM before the fork 
-        // This includes : 
-        // - 
+        
         aio_context_release(qemu_get_aio_context());
-
         ret = fork(); 
         
         if (ret < 0){
@@ -3423,7 +3425,6 @@ void handle_fork(void *opaque){
             // 3. open the new kvm fds 
             // 4. set them up using the prefork status
             // 5. let the QEMU main loop run for the new VM
-
             //close kvm fds 
             close(cpu->kvm_fd);
             close(s->vmfd);
@@ -3473,11 +3474,10 @@ void handle_fork(void *opaque){
 
             //set kvm VM according to the prefork state
             fork_set_vm_state(cpu, &prefork_state);
+            kvm_start_vcpu_thread(cpu);
 
-            //open the KVM VCPU 
-            
-            //set prefork vcpu values 
-            //create KVM_RUN region for child VCPU
+            //recreate the driver thread
+            //recreate vcpu thread
             
             #ifdef DBG 
             printf("Loading the snapshot with pid : %ld\n", (long)getpid()); 
@@ -3501,6 +3501,7 @@ void handle_fork(void *opaque){
             #endif 
             return; 
         } else {
+            qemu_mutex_unlock_iothread();
             // exit(0);
             waitpid(ret, &status, 0);
 
