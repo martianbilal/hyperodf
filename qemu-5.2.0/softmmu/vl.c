@@ -3315,10 +3315,10 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
 
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
-    CPUState *new_cpu;
+    // CPUState *new_cpu;
     struct KVMState* s = cpu->kvm_state;
     struct kvm_userspace_memory_region mem; 
-    struct cpu_prefork_state prefork_state; 
+    struct cpu_prefork_state* prefork_state = g_new0(struct cpu_prefork_state, 1); 
     struct KVMSlot slot;
     char buf;
     int result;
@@ -3329,7 +3329,7 @@ void handle_fork(void *opaque){
     // AioContext *ctx;
 
 
-    memset(&prefork_state, 0, sizeof(prefork_state));
+    // memset(&prefork_state, 0, sizeof(prefork_state));
     #ifdef DBG
     printf("We are reading for the fork\n");
     #endif
@@ -3384,7 +3384,7 @@ void handle_fork(void *opaque){
 
         aio_context_acquire(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
-        fork_save_vm_state(cpu, &prefork_state);
+        fork_save_vm_state(cpu, prefork_state);
         // close(9);
         // save_kvm_state(cpu); 
 
@@ -3422,9 +3422,9 @@ void handle_fork(void *opaque){
             fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
                 strerror(-ret));
             }
-            new_cpu->kvm_fd = cpu->kvm_fd;
-            new_cpu->kvm_state->fd = cpu->kvm_state->fd;
-            new_cpu->kvm_state->vmfd = cpu->kvm_state->vmfd;
+            // new_cpu->kvm_fd = cpu->kvm_fd;
+            // new_cpu->kvm_state->fd = cpu->kvm_state->fd;
+            // new_cpu->kvm_state->vmfd = cpu->kvm_state->vmfd;
             
             slot_size = cpu->kvm_state->nr_slots;
             //set up the shared memory for the child vm 
@@ -3458,9 +3458,9 @@ void handle_fork(void *opaque){
                             // mem.memory_size, mem.userspace_addr, ret);
             }            
             //set kvm VM according to the prefork state
-            fork_set_vm_state(cpu, &prefork_state);
-            new_cpu->prefork_state = &prefork_state;
-            new_cpu->child_cpu = 1;
+            fork_set_vm_state(cpu, prefork_state);
+            // new_cpu->prefork_state = prefork_state;
+            // new_cpu->child_cpu = 1;
             kvm_start_vcpu_thread(cpu);
 
             //recreate the driver thread
@@ -3488,7 +3488,7 @@ void handle_fork(void *opaque){
             #endif 
             return; 
         } else {
-            qemu_mutex_unlock_iothread();
+            // qemu_mutex_unlock_iothread();
             // exit(0);
             waitpid(ret, &status, 0);
 

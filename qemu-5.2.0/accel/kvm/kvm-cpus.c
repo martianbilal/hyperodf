@@ -36,7 +36,9 @@ static void *kvm_vcpu_thread_fn(void *arg)
 {
     CPUState *cpu = arg;
     int r;
-
+    #ifdef DBG
+    printf("[debug] entered vcpu thread function! \n");
+    #endif
     rcu_register_thread();
 
     qemu_mutex_lock_iothread();
@@ -44,7 +46,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu->thread_id = qemu_get_thread_id();
     cpu->can_do_io = 1;
     current_cpu = cpu;
-    
+
     // will have to set up the copying mechanism over here.
     if(cpu->child_cpu){
         #ifdef DBG 
