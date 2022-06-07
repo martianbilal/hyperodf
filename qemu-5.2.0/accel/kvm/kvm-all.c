@@ -2573,25 +2573,6 @@ static void kvm_eat_signals(CPUState *cpu)
     } while (sigismember(&chkset, SIG_IPI));
 }
 
-struct cpu_prefork_state 
-{ 
-    struct kvm_regs regs; 
-    struct kvm_sregs sregs; 
-    struct kvm_fpu fpu;
-    struct kvm_msrs msrs;
-    struct kvm_xsave xsave;
-    struct kvm_lapic_state lapic;
-    struct kvm_xcrs xcrs; 
-    struct kvm_irqchip irqchip[3];
-    struct kvm_clock_data clock_data;
-    struct kvm_pit_state2 pit2;
-    struct kvm_mp_state mp_state;
-    struct kvm_debugregs debugregs;
-    struct kvm_cpuid2 cpuid2; 
-    struct kvm_vcpu_events vcpu_events;
-    int *tsc_khz;
-};
-
 //union to be used in the get_attr() ioctl call 
 union get_structure 
 {
@@ -2713,6 +2694,9 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     attr = "tsc_khz";
     if(ret < 0) goto err;
     state->tsc_khz = tsc_khz;
+    #ifdef DBG
+        printf("[debug] prefork-tsc : %d", tsc_khz);    
+    #endif
 
     do
     {

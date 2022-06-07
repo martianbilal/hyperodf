@@ -309,6 +309,11 @@ struct qemu_work_item;
 
 #define CPU_UNSET_NUMA_NODE_ID -1
 #define CPU_TRACE_DSTATE_MAX_EVENTS 32
+/*
+ * These values are obtained from the parent KVM vcpu before the
+ * fork syscall in the parent process.   
+ */
+struct cpu_prefork_state;
 
 /**
  * CPUState:
@@ -368,6 +373,7 @@ struct CPUState {
 
     int nr_cores;
     int nr_threads;
+    bool child_cpu; 
 
     struct QemuThread *thread;
 #ifdef _WIN32
@@ -472,6 +478,7 @@ struct CPUState {
     int fork_fd[2]; 
     /* track IOMMUs whose translations we've cached in the TCG TLB */
     GArray *iommu_notifiers;
+    struct cpu_prefork_state *prefork_state;
 };
 
 typedef QTAILQ_HEAD(CPUTailQ, CPUState) CPUTailQ;

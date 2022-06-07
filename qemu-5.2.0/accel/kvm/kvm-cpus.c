@@ -24,6 +24,14 @@
 
 #include "kvm-cpus.h"
 
+static int post_fork_setup(struct cpu_prefork_state *prefork_state){
+    #ifdef DBG
+    printf("[debug] tsc_khz : %p\n", prefork_state->tsc_khz);
+    #endif
+    // printf("[debug] post fork setup! %d\n", prefork_state->);
+    return 0; 
+}
+
 static void *kvm_vcpu_thread_fn(void *arg)
 {
     CPUState *cpu = arg;
@@ -36,9 +44,19 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu->thread_id = qemu_get_thread_id();
     cpu->can_do_io = 1;
     current_cpu = cpu;
-
+    
+    // will have to set up the copying mechanism over here.
+    if(cpu->child_cpu){
+        #ifdef DBG 
+        printf("[debug] starting postfork!\n");
+        #endif
+        post_fork_setup(cpu->prefork_state);
+    }
+    
     r = kvm_init_vcpu(cpu, &error_fatal);
     kvm_init_cpu_signals(cpu);
+    
+
 
     /* signal CPU creation */
     cpu_thread_signal_created(cpu);

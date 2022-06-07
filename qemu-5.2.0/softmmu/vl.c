@@ -719,24 +719,6 @@ struct KVMState
     } *as;
 };
 
-struct cpu_prefork_state 
-{ 
-    struct kvm_regs regs; 
-    struct kvm_sregs sregs; 
-    struct kvm_fpu fpu;
-    struct kvm_msrs msrs;
-    struct kvm_xsave xsave;
-    struct kvm_lapic_state lapic;
-    struct kvm_xcrs xcrs; 
-    struct kvm_irqchip irqchip[3];
-    struct kvm_clock_data clock_data;
-    struct kvm_pit_state2 pit2;
-    struct kvm_mp_state mp_state;
-    struct kvm_debugregs debugregs;
-    struct kvm_cpuid2 cpuid2; 
-    struct kvm_vcpu_events vcpu_events;
-    int *tsc_khz;
-};
 
 
 static bool runstate_valid_transitions[RUN_STATE__MAX][RUN_STATE__MAX];
@@ -3182,7 +3164,7 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
                         cpu->kvm_fd, 0);
                     
 
-    kvm_set_vcpu_attrs(state, cpu->kvm_fd);
+    // kvm_set_vcpu_attrs(state, cpu->kvm_fd);
 
     #ifdef DBG 
     printf("[debug] done with set attrs");
@@ -3333,6 +3315,7 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
 
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
+    CPUState *new_cpu;
     struct KVMState* s = cpu->kvm_state;
     struct kvm_userspace_memory_region mem; 
     struct cpu_prefork_state prefork_state; 
@@ -3439,6 +3422,9 @@ void handle_fork(void *opaque){
             fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
                 strerror(-ret));
             }
+            new_cpu->kvm_fd = cpu->kvm_fd;
+            new_cpu->kvm_state->fd = cpu->kvm_state->fd;
+            new_cpu->kvm_state->vmfd = cpu->kvm_state->vmfd;
             
             slot_size = cpu->kvm_state->nr_slots;
             //set up the shared memory for the child vm 
@@ -3470,10 +3456,11 @@ void handle_fork(void *opaque){
                 ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
                 // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
                             // mem.memory_size, mem.userspace_addr, ret);
-            }
-
+            }            
             //set kvm VM according to the prefork state
             fork_set_vm_state(cpu, &prefork_state);
+            new_cpu->prefork_state = &prefork_state;
+            new_cpu->child_cpu = 1;
             kvm_start_vcpu_thread(cpu);
 
             //recreate the driver thread
