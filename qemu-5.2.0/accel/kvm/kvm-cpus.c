@@ -65,6 +65,12 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu_thread_signal_created(cpu);
     qemu_guest_random_seed_thread_part2(cpu->random_seed);
 
+    if(cpu->child_cpu){
+        // dirty flag causes the register values to be overwritten
+        cpu->vcpu_dirty = false;
+    }
+
+
     do {
         if (cpu_can_run(cpu)) {
             r = kvm_cpu_exec(cpu);
