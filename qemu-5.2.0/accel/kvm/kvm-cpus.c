@@ -53,6 +53,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
         printf("[debug] starting postfork!\n");
         #endif
         post_fork_setup(cpu->prefork_state);
+        cpu->stopped = 0;
     }
     
     r = kvm_init_vcpu(cpu, &error_fatal);
