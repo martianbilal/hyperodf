@@ -119,6 +119,7 @@
 
 #define MAX_VIRTIO_CONSOLES 1
 #define DBG
+#define SET_VCPU_IN_MAIN
 
 static const char *data_dir[16];
 static int data_dir_idx;
@@ -3079,6 +3080,20 @@ static char *find_datadir(void)
 // }
 
 /**
+ * @brief VCPU Thread init function fails if some of the CPUState fields 
+ * have already been set, this functions handles resetting those fields. 
+ * It is mainly for use in the handle_fork in the child process. 
+ * 
+ * @param cpu 
+ * @return ** void 
+ */
+static void cpu_reset_state(CPUState *cpu){
+    
+    return; 
+}
+
+
+/**
  * @brief 
  * 
  * @param cpu 
@@ -3151,17 +3166,20 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     {
         ret = ioctl(s->vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
     } while (ret == -EINTR);
+    
+    #ifdef SET_VCPU_IN_MAIN
     cpu->kvm_fd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
-
+    
     //set up the kvm_run for the vcpu --> update it in the vmstate
     mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
     if (mmap_size < 0) {
         ret = mmap_size;
         return -1;
     }
-
-    cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        cpu->kvm_fd, 0);
+    runstate_set(RUN_STATE_RUNNING);
+    qemu_notify_event();
+    // cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+    //                     cpu->kvm_fd, 0);
                     
 
     // kvm_set_vcpu_attrs(state, cpu->kvm_fd);
@@ -3171,7 +3189,8 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     fflush(stdout);
     #endif 
 
-    // cpu_synchronize_all_post_init();    
+    // cpu_synchronize_all_post_init();
+    #endif    
     
     ret = 0; 
 end_loop: 
@@ -3461,6 +3480,8 @@ void handle_fork(void *opaque){
             fork_set_vm_state(cpu, prefork_state);
             // new_cpu->prefork_state = prefork_state;
             // new_cpu->child_cpu = 1;
+            cpu->prefork_state = prefork_state;
+            cpu->child_cpu = 1; 
             kvm_start_vcpu_thread(cpu);
 
             //recreate the driver thread
@@ -3488,8 +3509,8 @@ void handle_fork(void *opaque){
             #endif 
             return; 
         } else {
-            // qemu_mutex_unlock_iothread();
             // exit(0);
+            qemu_mutex_unlock_iothread();
             waitpid(ret, &status, 0);
 
         }

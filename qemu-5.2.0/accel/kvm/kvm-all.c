@@ -570,9 +570,24 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
     long mmap_size;
     int ret;
 
+    if(cpu->child_cpu){
+        kvm_state = cpu->kvm_state;
+        s = kvm_state;
+    }
+
+    #ifdef DBG 
+    printf("[debug] kvm_init_vcpu started!");
+    fflush(stdout);
+    #endif
+
     trace_kvm_init_vcpu(cpu->cpu_index, kvm_arch_vcpu_id(cpu));
 
-    ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu));
+    if(cpu->child_cpu){
+        ret = cpu->kvm_fd;
+    } else {
+        ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu));
+    }
+
     if (ret < 0) {
         error_setg_errno(errp, -ret, "kvm_init_vcpu: kvm_get_vcpu failed (%lu)",
                          kvm_arch_vcpu_id(cpu));

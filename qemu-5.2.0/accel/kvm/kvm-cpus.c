@@ -26,7 +26,7 @@
 
 static int post_fork_setup(struct cpu_prefork_state *prefork_state){
     #ifdef DBG
-    printf("[debug] tsc_khz : %p\n", prefork_state->tsc_khz);
+    printf("[debug] tsc_khz : %p\n", -1);
     #endif
     // printf("[debug] post fork setup! %d\n", prefork_state->);
     return 0; 
