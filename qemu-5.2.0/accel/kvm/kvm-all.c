@@ -61,7 +61,7 @@
 
 
 // int forkvmfd[2];
-#define DBG
+// #define DBG
 
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
@@ -502,6 +502,7 @@ err:
                      (uint64_t)mem.memory_size, strerror(errno));
     }
     return ret;
+    // return 0;
 }
 
 static int do_kvm_destroy_vcpu(CPUState *cpu)
@@ -1313,8 +1314,8 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
             mem->flags = 0;
             err = kvm_set_user_memory_region(kml, mem, false);
             if (err) {
-                fprintf(stderr, "%s: error unregistering slot: %s\n",
-                        __func__, strerror(-err));
+                fprintf(stderr, "%s: error unregistering slot: %s, with pid %d\n",
+                        __func__, strerror(-err), getpid());
                 abort();
             }
             start_addr += slot_size;
@@ -3051,11 +3052,13 @@ int kvm_cpu_exec(CPUState *cpu)
             }
             // if(run->io.port == 496)
             // {
+                #ifdef DBG
                 printf("KVM_Exit_IO Called!=== ");
                 printf("PID : %ld\t", (long)getpid());
                 if(run->io.direction == KVM_EXIT_IO_IN)
                     printf(" KVM_EXIT_IO_IN--");
                 printf("port no. : %d, size: %d\n", run->io.port, run->io.size);
+                #endif
             // }
             
             // fflush(stdout);
@@ -3530,9 +3533,11 @@ child_spawn:
                           run->io.direction,
                           run->io.size,
                           run->io.count);
+            #ifdef DBG
             if(run->io.direction == KVM_EXIT_IO_IN){
                 printf("READ VALUE : %s, io size: %d, io count: %d\n",(((char *)run) + run->io.data_offset), run->io.size, run->io.count);
             }
+            #endif
             ret = 0;
             break;
         case KVM_EXIT_MMIO:

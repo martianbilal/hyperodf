@@ -91,6 +91,9 @@
 #endif
 #include "sysemu/qtest.h"
 
+#include "block/snapshot.h"
+#include "block/block_int.h"
+
 #include "disas/disas.h"
 
 #include "trace.h"
@@ -121,6 +124,7 @@
 #define DBG
 #define SET_VCPU_IN_MAIN
 
+static const char *SNAPSHOT_DISK_NAME = "prefork_state";
 static const char *data_dir[16];
 static int data_dir_idx;
 const char *bios_name = NULL;
@@ -3331,6 +3335,58 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     return ret; 
 }
 
+static void setup_parent_snapshot_drive(Error **errp){
+    
+    return; 
+}
+
+static void setup_child_snapshot_drive(Error **errp){
+    BlockDriverState *bs, *bs_vm_state;
+    char *name = SNAPSHOT_DISK_NAME;
+    BdrvNextIterator it;
+    int ret = 0;
+    if (!bdrv_all_can_snapshot(&bs)) {
+        error_setg(errp,
+                   "Device '%s' is writable but does not support snapshots",
+                   bdrv_get_device_or_node_name(bs));
+        return -ENOTSUP;
+    }
+    
+    replay_flush_events();
+
+    /* Flush all IO requests so they don't interfere with the new state.  */
+    bdrv_drain_all_begin();
+
+    // ret = bdrv_all_goto_snapshot(name, &bs, errp);
+    
+for (bs = bdrv_first(&it); bs; bs = bdrv_next(&it)) {
+        AioContext *ctx = bdrv_get_aio_context(bs);
+
+        aio_context_acquire(ctx);
+        // if (bdrv_all_snapshots_includes_bs(bs)) {
+        //     ret = bdrv_snapshot_goto(bs, name, errp);
+        // }
+        blockdev_init("./snapshot.qcow2", bs->options, NULL);
+        aio_context_release(ctx);
+        if (ret < 0) {
+            bdrv_next_cleanup(&it);
+            goto err_drain;
+        }
+    }
+
+
+    
+    if (ret < 0) {
+        error_prepend(errp, "Could not load snapshot '%s' on '%s': ",
+                      name, bdrv_get_device_or_node_name(bs));
+        goto err_drain;
+    }
+    bdrv_drain_all_end();
+    return 0; 
+err_drain: 
+    return ret;
+
+}
 
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
@@ -3366,8 +3422,11 @@ void handle_fork(void *opaque){
         printf("we can fork the main thread now\n");
         printf("Saving the snapshot! \n");
         #endif
+            qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+
         
         #ifdef DBG
+        set_address_space(1);
         if (qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()){
             printf("[debug] This is the main thread!\n");
         } else {
@@ -3396,6 +3455,7 @@ void handle_fork(void *opaque){
         bdrv_drain_all_begin();
         cpu_synchronize_all_states();
         cpu_stop_current();
+        bdrv_drain_all_end();
         // if (!bdrv_all_can_snapshot(has_devices, devices, errp)) {
         //     return false;
         // }
@@ -3431,7 +3491,7 @@ void handle_fork(void *opaque){
             close(cpu->kvm_fd);
             close(s->vmfd);
             #ifdef DBG 
-                printf("[debug] creating child VM "); 
+                printf("[debug] creating child VM \n"); 
             #endif
             //open the new kvm fds
             cpu->kvm_fd = open("/dev/kvm", 2); 
@@ -3448,41 +3508,65 @@ void handle_fork(void *opaque){
             slot_size = cpu->kvm_state->nr_slots;
             //set up the shared memory for the child vm 
             /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
-            for(int i = 0; i < slot_size; i++){
-                
-                slot = cpu->kvm_state->memory_listener.slots[i]; 
-                
-                // if(slot.memory_size == 0){
-                //     continue;
-                // }
-                // printf("slot Address : %ld", slot.ram);
+            for(int j = 0; j < cpu->kvm_state->nr_as; j++){
+                for(int i = 0; i < slot_size; i++){
+                    
+                    slot = cpu->kvm_state->as[j].ml->slots[i]; 
+                    
+                    // if(slot.memory_size == 0){
+                    //     continue;
+                    // }
+                    // printf("slot Address : %ld", slot.ram);
 
-                // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-                // if(new_ram == MAP_FAILED) { 
-                //     printf("Failed to allocated memory!");
-                //     exit(0);
-                // }
-                // memmove(new_ram, slot.ram, slot.memory_size);
+                    // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+                    // if(new_ram == MAP_FAILED) { 
+                    //     printf("Failed to allocated memory!");
+                    //     exit(0);
+                    // }
+                    // memmove(new_ram, slot.ram, slot.memory_size);
 
-                    // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
-                    //  | (kvm_state->memory_listener.as_id << 16)
-                mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
-                mem.guest_phys_addr = slot.start_addr;
-                mem.userspace_addr = (unsigned long)slot.ram;
-                mem.flags = slot.flags;
-                mem.memory_size = slot.memory_size;
+                        // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                        //  | (kvm_state->memory_listener.as_id << 16)
+                    mem.slot = slot.slot | (kvm_state->as[j].ml->as_id << 16);
+                    mem.guest_phys_addr = slot.start_addr;
+                    mem.userspace_addr = (unsigned long)slot.ram;
+                    // #ifdef DBG
+                    // printf("[debug] kvm nr as : %d\n", cpu->kvm_state->nr_as);
+                    // printf("[debug] kvm 0 : %s\n", cpu->kvm_state->as[0].as->name);
+                    // printf("[debug] kvm 1 : %s\n", cpu->kvm_state->as[1].as->name);
+                    // #endif
+                    mem.flags = slot.flags;
+                    mem.memory_size = slot.memory_size;
 
-                ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
-                // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
-                            // mem.memory_size, mem.userspace_addr, ret);
-            }            
+                    #ifdef DBG
+                    if(mem.userspace_addr){
+                        printf("[debug] mem.ram: %p\n", mem.userspace_addr);
+                        printf("[debug] mem.slot: %p\n", mem.slot);
+                        fflush(stdout);
+                        ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                    
+                    }
+                    #endif
+                    // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                                // mem.memory_size, mem.userspace_addr, ret);
+                    #ifdef DBG
+                    // if(ret == 0) printf("[debug] ret: %d\n", ret);
+                    #endif
+                }
+            }               
             //set kvm VM according to the prefork state
             fork_set_vm_state(cpu, prefork_state);
             // new_cpu->prefork_state = prefork_state;
             // new_cpu->child_cpu = 1;
+            // setup_child_snapshot_drive(&local_err);
             cpu->prefork_state = prefork_state;
             cpu->child_cpu = 1; 
+            
             kvm_start_vcpu_thread(cpu);
+
+            qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+            register_global_state();
+
 
             //recreate the driver thread
             //recreate vcpu thread

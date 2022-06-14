@@ -16,6 +16,8 @@
 
 #ifndef CONFIG_USER_ONLY
 
+#define DBG_MEM
+
 #include "exec/cpu-common.h"
 #include "exec/hwaddr.h"
 #include "exec/memattrs.h"
@@ -1194,6 +1196,23 @@ void memory_region_init_rom(MemoryRegion *mr,
                             const char *name,
                             uint64_t size,
                             Error **errp);
+
+/**
+ * @brief Get the address spaces object
+ * 
+ */
+void* get_address_spaces();
+
+/**
+ * @brief Set up the address space using the KVM IOCTL API
+ * Returns 
+ *      0 on success
+ *      -1 on failure
+ * 
+ * @param cpufd 
+ * @return int 
+ */
+int set_address_space(int cpufd);
 
 /**
  * memory_region_init_rom_device:  Initialize a ROM memory region.

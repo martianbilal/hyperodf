@@ -2819,7 +2819,9 @@ MemTxResult flatview_read_continue(FlatView *fv, hwaddr addr,
             /* I/O case */
             release_lock |= prepare_mmio_access(mr);
             l = memory_access_size(mr, l, addr1);
+            #ifdef DBG_MEMORY
             printf("memory_region_dispatch_read called: %ul, *mr: %lx, mr: %lx, mr->addr: %lx \n", addr1, *mr, mr, mr->addr);
+            #endif
             result |= memory_region_dispatch_read(mr, addr1, &val,
                                                   size_memop(l), attrs);
             stn_he_p(buf, l, val);
@@ -2873,7 +2875,9 @@ MemTxResult address_space_read_full(AddressSpace *as, hwaddr addr,
     if (len > 0) {
         RCU_READ_LOCK_GUARD();
         fv = address_space_to_flatview(as);
+            #ifdef DBG_MEMORY
             printf("*AS :: %lx :: AS :: %lx :: AS ROOT :: %lx :: AS NAME :: %s :: KVM_EXIT_IN Read Called: %s\n", *as, as, as->root, as->name, (char*)(buf));
+            #endif
             // return result;
         
         result = flatview_read(fv, addr, attrs, buf, len);
@@ -2881,7 +2885,9 @@ MemTxResult address_space_read_full(AddressSpace *as, hwaddr addr,
     }
     // if(addr == 496)
     // {
+        #ifdef DBG_MEMORY
         printf("First DATA Val : %s\n", (char *)buf);
+        #endif
     // }
 
     return result;
