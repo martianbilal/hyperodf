@@ -3161,6 +3161,8 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     {
         ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &(state->irqchip[2]));
     } while (ret == -EINTR);
+    if(ret < 0) printf("3 failed ");
+    
     do 
     {
         ret = ioctl(s->vmfd, KVM_SET_IDENTITY_MAP_ADDR, &identity_base);
@@ -3359,7 +3361,7 @@ static void setup_child_snapshot_drive(Error **errp){
 
     // ret = bdrv_all_goto_snapshot(name, &bs, errp);
     
-for (bs = bdrv_first(&it); bs; bs = bdrv_next(&it)) {
+    for (bs = bdrv_first(&it); bs; bs = bdrv_next(&it)) {
         AioContext *ctx = bdrv_get_aio_context(bs);
 
         aio_context_acquire(ctx);
@@ -3422,7 +3424,7 @@ void handle_fork(void *opaque){
         printf("we can fork the main thread now\n");
         printf("Saving the snapshot! \n");
         #endif
-            qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
         
         #ifdef DBG
@@ -3444,7 +3446,7 @@ void handle_fork(void *opaque){
             return false;
         }
 
-        vm_stop(RUN_STATE_SAVE_VM);
+        // vm_stop(RUN_STATE_SAVE_VM);
 
         #ifdef DBG
         printf("[debug] stopped the vm\n");
@@ -3453,7 +3455,7 @@ void handle_fork(void *opaque){
         runstate_is_running();
 
         bdrv_drain_all_begin();
-        cpu_synchronize_all_states();
+        // cpu_synchronize_all_states();
         cpu_stop_current();
         bdrv_drain_all_end();
         // if (!bdrv_all_can_snapshot(has_devices, devices, errp)) {
@@ -3474,6 +3476,8 @@ void handle_fork(void *opaque){
         #endif  
         
         aio_context_release(qemu_get_aio_context());
+        // save_snapshot("prefork_state", NULL);
+        close("snapshot.qcow2");
         ret = fork(); 
         
         if (ret < 0){
@@ -3558,19 +3562,24 @@ void handle_fork(void *opaque){
             fork_set_vm_state(cpu, prefork_state);
             // new_cpu->prefork_state = prefork_state;
             // new_cpu->child_cpu = 1;
-            // setup_child_snapshot_drive(&local_err);
+            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+            
+
+            
+            register_global_state();
             cpu->prefork_state = prefork_state;
             cpu->child_cpu = 1; 
             
+            // setup_child_snapshot_drive(&local_err);
+            // load_snapshot("prefork_state",NULL);
             kvm_start_vcpu_thread(cpu);
 
-            qemu_system_reset(SHUTDOWN_CAUSE_NONE);
-            register_global_state();
 
 
             //recreate the driver thread
             //recreate vcpu thread
             
+            // sleep(60);
             #ifdef DBG 
             printf("Loading the snapshot with pid : %ld\n", (long)getpid()); 
             #endif 

@@ -60,6 +60,8 @@
 #include "hw/boards.h"
 
 
+#define DBG_IO
+
 // int forkvmfd[2];
 // #define DBG
 
@@ -2419,7 +2421,6 @@ static void kvm_handle_io(uint16_t port, MemTxAttrs attrs, void *data, int direc
 {
     int i;
     uint8_t *ptr = data;
-
     
     for (i = 0; i < count; i++) {
         address_space_rw(&address_space_io, port, attrs,
@@ -3046,10 +3047,7 @@ int kvm_cpu_exec(CPUState *cpu)
             // if(run->io.direction == KVM_EXIT_IO_IN){
             //     printf("READ VALUE : %s\n",(((char *)run) + run->io.data_offset));
             // }
-            if(run->io.direction == KVM_EXIT_IO_IN) 
-            {
-                // printf("KVM_EXIT - port: %d\n", run->io.port);
-            }
+            
             // if(run->io.port == 496)
             // {
                 #ifdef DBG
@@ -3528,16 +3526,20 @@ child_spawn:
                 break;
             
             }
+            if(run->io.direction == KVM_EXIT_IO_IN){
+                // printf("Port: %d", run->io.port);
+                // printf("READ VALUE Before handle : %s ",(((char *)run) + run->io.data_offset));
+            }
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,
                           run->io.direction,
                           run->io.size,
                           run->io.count);
-            #ifdef DBG
+            // #ifdef DBG
             if(run->io.direction == KVM_EXIT_IO_IN){
-                printf("READ VALUE : %s, io size: %d, io count: %d\n",(((char *)run) + run->io.data_offset), run->io.size, run->io.count);
+                // printf("READ VALUE : %s, io size: %d, io count: %d\n",(((char *)run) + run->io.data_offset), run->io.size, run->io.count);
             }
-            #endif
+            // #endif
             ret = 0;
             break;
         case KVM_EXIT_MMIO:

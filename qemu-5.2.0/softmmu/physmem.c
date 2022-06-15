@@ -71,6 +71,8 @@
 
 #include "monitor/monitor.h"
 
+#define DBG_IO
+
 #ifdef CONFIG_LIBDAXCTL
 #include <daxctl/libdaxctl.h>
 #endif
@@ -2859,6 +2861,11 @@ static MemTxResult flatview_read(FlatView *fv, hwaddr addr,
     hwaddr l;
     hwaddr addr1;
     MemoryRegion *mr;
+
+    #ifdef DBG_IO 
+    
+        // printf("[debug] Handle IO is called\n");
+    #endif
 
     l = len;
     mr = flatview_translate(fv, addr, &addr1, &l, false, attrs);
