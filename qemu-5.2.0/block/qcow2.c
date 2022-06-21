@@ -1305,8 +1305,8 @@ static int coroutine_fn qcow2_do_open(BlockDriverState *bs, QDict *options,
     bool update_header = false;
 
 
-    printf("**DO OPEN has been called **\n");
     ret = bdrv_pread(bs->file, 0, &header, sizeof(header));
+    printf("**DO OPEN has been called **\n");
     if (ret < 0) {
         error_setg_errno(errp, -ret, "Could not read qcow2 header");
         goto fail;

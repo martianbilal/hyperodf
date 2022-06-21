@@ -12,10 +12,13 @@
   # -blockdev driver=qcow2,file.filename=./bootloader.qcow2,file.locking=off,file.driver=file,node-name=hd \
   # -L ../qemu-5.2.0/pc-bios \
 /usr/local/bin/qemu-system-x86_64 \
+  -L /root/kvm-samples/qemu-5.2.0/roms/seabios/out \
+  -bios bios.bin \
   -cpu host,vmx=on \
   -snapshot \
   -drive file=./snapshot.qcow2,format=qcow2 \
   -enable-kvm \
   -nographic \
   -pidfile vm.pid \
+  -monitor unix:qemu-monitor-socket,server,nowait \
   2>&1 | tee vm.log

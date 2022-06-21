@@ -21,5 +21,6 @@ void kvm_cpu_synchronize_post_reset(CPUState *cpu);
 void kvm_cpu_synchronize_post_init(CPUState *cpu);
 void kvm_cpu_synchronize_pre_loadvm(CPUState *cpu);
 void kvm_start_vcpu_thread(CPUState *cpu);
+void kvm_irqchip_create(KVMState *s);
 
 #endif /* KVM_CPUS_H */
