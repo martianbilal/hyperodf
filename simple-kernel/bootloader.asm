@@ -52,8 +52,8 @@ call readDisk
 ; mov al, [PROGRAM_SPACE]
 ; int 0x10
 
-; mov bx, helloWorld
-; call printString
+mov bx, [PROGRAM_SPACE]
+call printString
 
 ; mov ax, [PROGRAM_SPACE]
 ; mov dx, 300h

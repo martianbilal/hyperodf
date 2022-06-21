@@ -1900,6 +1900,10 @@ static void select_vgahw(const MachineClass *machine_class, const char *p)
         exit(0);
     }
 
+    // #ifdef DBG
+    // printf("[debug] vga_interface_type : %d", vga_interface_type);
+    // #endif
+    vga_interface_type = VGA_NONE; 
     assert(vga_interface_type == VGA_NONE);
     for (t = 0; t < VGA_TYPE_MAX; t++) {
         const VGAInterfaceInfo *ti = &vga_interfaces[t];
@@ -3194,7 +3198,7 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     //                     cpu->kvm_fd, 0);
                     
 
-    // kvm_set_vcpu_attrs(state, cpu->kvm_fd);
+    kvm_set_vcpu_attrs(state, cpu->kvm_fd);
 
     #ifdef DBG 
     printf("[debug] done with set attrs");
@@ -3440,25 +3444,29 @@ void handle_fork(void *opaque){
         printf("Saving the snapshot! \n");
         #endif
 
-        save_snapshot("testsnp", NULL);
-        // load_snapshot("testsnp", NULL);
-        // return;
-        // sleep(1);
-        qemu_cleanup();
+        // save_snapshot("testsnp", NULL);
+        // // load_snapshot("testsnp", NULL);
+        // // return;
+        // // sleep(1);
+        // // qemu_cleanup_child();
+        // // qemu_cleanup();
+        // // qemu_cleanup_child();
+        //     qemu_mutex_unlock_iothread();
 
-        ret = fork();
-        if (ret == 0) {
-            qemu_cleanup();
-            qemu_mutex_unlock_iothread();
-            qemu_init_child(ARGC, ARGV, ENVP); 
-            load_snapshot("testsnp", NULL);
-            printf("[debug] we have loaded the snapshot!");
-        }
-        else {
-            // qemu_cleanup();
-            exit(0);
-        }
-        return;
+        // ret = fork();
+        // if (ret == 0) {
+        // // qemu_cleanup_child();
+        //     qemu_init_child(ARGC, ARGV, ENVP); 
+
+        //     printf("[debug] Done with init child\n");
+        //     load_snapshot("testsnp", NULL);
+        //     printf("[debug] we have loaded the snapshot!");
+        // }
+        // else {
+        //     // qemu_cleanup();
+        //     exit(0);
+        // }
+        // return;
             // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
         
@@ -3605,9 +3613,11 @@ void handle_fork(void *opaque){
             cpu->prefork_state = prefork_state;
             cpu->child_cpu = 1; 
             
-            // setup_child_snapshot_drive(&local_err);
+            setup_child_snapshot_drive(&local_err);
             // load_snapshot("prefork_state",NULL);
+
             kvm_start_vcpu_thread(cpu);
+            // qemu_mutex_lock_iothread();
 
 
 
@@ -3638,7 +3648,7 @@ void handle_fork(void *opaque){
             return; 
         } else {
             // exit(0);
-            qemu_mutex_unlock_iothread();
+            // qemu_mutex_unlock_iothread();
             waitpid(ret, &status, 0);
 
         }
@@ -5377,6 +5387,45 @@ void qemu_cleanup(void)
     /* TODO: unref root container, check all devices are ok */
 }
 
+void qemu_cleanup_child(){
+     gdbserver_cleanup();
+
+    /*
+     * cleaning up the migration object cancels any existing migration
+     * try to do this early so that it also stops using devices.
+     */
+    migration_shutdown();
+
+    /*
+     * We must cancel all block jobs while the block layer is drained,
+     * or cancelling will be affected by throttling and thus may block
+     * for an extended period of time.
+     * vm_shutdown() will bdrv_drain_all(), so we may as well include
+     * it in the drained section.
+     * We do not need to end this section, because we do not want any
+     * requests happening from here on anyway.
+     */
+    bdrv_drain_all_begin();
+
+    /* No more vcpu or device emulation activity beyond this point */
+    vm_shutdown();
+    replay_finish();
+
+    job_cancel_sync_all();
+    bdrv_close_all();
+
+    res_free();
+
+    /* vhost-user must be cleaned up before chardevs.  */
+    tpm_cleanup();
+    net_cleanup();
+    audio_cleanup();
+    monitor_cleanup();
+    qemu_chr_cleanup();
+
+    return; 
+}
+
 void qemu_init_child(int argc, char **argv, char **envp)
 {
     int i;
@@ -5423,13 +5472,13 @@ void qemu_init_child(int argc, char **argv, char **envp)
     ENVP = envp; 
     ARGC = argc;
 
-    os_set_line_buffering();
+    // os_set_line_buffering();
 
     error_init(argv[0]);
     module_call_init(MODULE_INIT_TRACE);
 
-    qemu_init_cpu_list();
-    qemu_init_cpu_loop();
+    // qemu_init_cpu_list();
+    // qemu_init_cpu_loop();
 
     qemu_mutex_lock_iothread();
 
@@ -6678,8 +6727,8 @@ void qemu_init_child(int argc, char **argv, char **envp)
     /* spice must initialize before chardevs (for spicevmc and spiceport) */
     qemu_spice.init();
 
-    qemu_opts_foreach(qemu_find_opts("chardev"),
-                      chardev_init_func, NULL, &error_fatal);
+    // qemu_opts_foreach(qemu_find_opts("chardev"),
+                    //   chardev_init_func, NULL, &error_fatal);
 
 #ifdef CONFIG_VIRTFS
     qemu_opts_foreach(qemu_find_opts("fsdev"),
@@ -6692,7 +6741,7 @@ void qemu_init_child(int argc, char **argv, char **envp)
      * them.
      */
     configure_blockdev(&bdo_queue, machine_class, snapshot);
-    audio_init_audiodevs();
+    // audio_init_audiodevs();
 
     machine_opts = qemu_get_machine_opts();
     qemu_opt_foreach(machine_opts, machine_set_property, current_machine,
@@ -6705,7 +6754,7 @@ void qemu_init_child(int argc, char **argv, char **envp)
      * Note: uses machine properties such as kernel-irqchip, must run
      * after machine_set_property().
      */
-    configure_accelerators(argv[0]);
+    // configure_accelerators(argv[0]);
 
     /*
      * Beware, QOM objects created before this point miss global and
@@ -6732,10 +6781,10 @@ void qemu_init_child(int argc, char **argv, char **envp)
      * Note: creates a QOM object, must run only after global and
      * compat properties have been set up.
      */
-    migration_object_init();
+    // migration_object_init();
 
     if (qtest_chrdev) {
-        qtest_server_init(qtest_chrdev, qtest_log, &error_fatal);
+        // qtest_server_init(qtest_chrdev, qtest_log, &error_fatal);
     }
 
     machine_opts = qemu_get_machine_opts();
@@ -6868,11 +6917,13 @@ void qemu_init_child(int argc, char **argv, char **envp)
             exit(EXIT_FAILURE);
         }
         backend_size = object_property_get_uint(backend, "size",  &error_abort);
-        if (have_custom_ram_size && backend_size != ram_size) {
-                error_report("Size specified by -m option must match size of "
-                             "explicitly specified 'memory-backend' property");
-                exit(EXIT_FAILURE);
-        }
+        // if (have_custom_ram_size && backend_size != ram_size) {
+        //         printf("[debug] backend_size : %d, ram_size: %d", backend_size, ram_size);
+        //         fflush(stdout);
+        //         error_report("Size specified by -m option must match size of "
+        //                      "explicitly specified 'memory-backend' property");
+        //         exit(EXIT_FAILURE);
+        // }
         if (mem_path) {
             error_report("'-mem-path' can't be used together with"
                          "'-machine memory-backend'");

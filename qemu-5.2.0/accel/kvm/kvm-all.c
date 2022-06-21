@@ -2804,12 +2804,12 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
     attr="sregs";
     if(ret<0) goto err;
 
-    do 
-    {
-        ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
-    } while (ret == -EINTR);
-    attr="tsc_khz";
-    if(ret<0) goto err;
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
+    // } while (ret == -EINTR);
+    // attr="tsc_khz";
+    // if(ret<0) goto err;
     
     do
     {
