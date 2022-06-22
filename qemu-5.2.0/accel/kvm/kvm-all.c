@@ -3527,7 +3527,7 @@ child_spawn:
             
             }
             if(run->io.direction == KVM_EXIT_IO_IN){
-                // printf("Port: %d", run->io.port);
+                // printf("Port: %d\n", run->io.port);
                 // printf("READ VALUE Before handle : %s ",(((char *)run) + run->io.data_offset));
             }
             kvm_handle_io(run->io.port, attrs,

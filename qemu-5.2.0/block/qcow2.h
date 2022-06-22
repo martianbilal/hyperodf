@@ -572,6 +572,15 @@ typedef enum QCow2MetadataOverlap {
     QCOW2_OL_BITMAP_DIRECTORY = (1 << QCOW2_OL_BITMAP_DIRECTORY_BITNR),
 } QCow2MetadataOverlap;
 
+
+typedef struct QCow2OpenCo {
+    BlockDriverState *bs;
+    QDict *options;
+    int flags;
+    Error **errp;
+    int ret;
+} QCow2OpenCo;
+
 /* Perform all overlap checks which can be done in constant time */
 #define QCOW2_OL_CONSTANT \
     (QCOW2_OL_MAIN_HEADER | QCOW2_OL_ACTIVE_L1 | QCOW2_OL_REFCOUNT_TABLE | \
@@ -963,6 +972,7 @@ int qcow2_cache_set_dependency(BlockDriverState *bs, Qcow2Cache *c,
     Qcow2Cache *dependency);
 void qcow2_cache_depends_on_flush(Qcow2Cache *c);
 
+
 void qcow2_cache_clean_unused(Qcow2Cache *c);
 int qcow2_cache_empty(BlockDriverState *bs, Qcow2Cache *c);
 
@@ -1009,5 +1019,6 @@ qcow2_co_encrypt(BlockDriverState *bs, uint64_t host_offset,
 int coroutine_fn
 qcow2_co_decrypt(BlockDriverState *bs, uint64_t host_offset,
                  uint64_t guest_offset, void *buf, size_t len);
+void coroutine_fn qcow2_open_entry(void *opaque);
 
 #endif

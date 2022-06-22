@@ -18,6 +18,9 @@ BOOT_DISK:
 DiskReadErrorString:
     db 'Disk read failed',0
 
+DiskSuccessString:
+    db 'Disk read passed',0
+
 DiskReadFailed:
     mov bx, DiskReadErrorString
     call printString
