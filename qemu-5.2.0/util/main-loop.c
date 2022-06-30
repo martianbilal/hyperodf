@@ -35,7 +35,6 @@
 #include "block/aio.h"
 #include "qemu/error-report.h"
 // #include "qemu/queue.h"
-#include "qemu/vmfork.h"
 
 #ifndef _WIN32
 #include <sys/wait.h>

@@ -55,7 +55,6 @@
 #include "kvm-cpus.h"
 #include "migration/snapshot.h"
 #include "migration/misc.h"
-#include "qemu/vmfork.h"
 
 #include "hw/boards.h"
 
