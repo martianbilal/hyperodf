@@ -313,7 +313,7 @@ void* ski_forkall_thread_restore(void *param){
 		"mov    %2,%%rdi;"
 		"mov    %3,%%rsi;"
 	    "mov    %4,%%rdx;"
-		"callq  %P5;"     /* Call memcpy to restore the original stack (from the backup up stack containing the TLS)*/
+		"callq  *%P5;"     /* Call memcpy to restore the original stack (from the backup up stack containing the TLS)*/
 		/* memcpy(stack_min, stack, FORKALL_THREAD_STACK_SIZE); */
 
 
@@ -321,7 +321,7 @@ void* ski_forkall_thread_restore(void *param){
 		"callq  %P6;"     /* Call forkall_thread_restore2() which does the actual restore of the registers (including stack pointer) */
 		/* forkall_thread_restore2((forkall_thread*) param); */
 			: 
-			: "m" (tmp_stack_addr), "m" (param), "m" (stack_min), "m" (stack), "i" (FORKALL_THREAD_STACK_SIZE), "i" (memcpy), "i" (ski_forkall_thread_restore_registers)
+			: "m" (tmp_stack_addr), "m" (param), "m" (stack_min), "m" (stack), "i" (FORKALL_THREAD_STACK_SIZE), "ic"(memcpy), "g"(ski_forkall_thread_restore_registers)
 			: "%esp");	  /* No need to clobber becasuse we don't return */
 
 

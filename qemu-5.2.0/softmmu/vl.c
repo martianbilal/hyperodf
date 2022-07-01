@@ -3485,32 +3485,6 @@ void handle_fork(void *opaque){
         printf("Saving the snapshot! \n");
         #endif
 
-        // save_snapshot("testsnp", NULL);
-        // // load_snapshot("testsnp", NULL);
-        // // return;
-        // // sleep(1);
-        // // qemu_cleanup_child();
-        // // qemu_cleanup();
-        // // qemu_cleanup_child();
-        //     qemu_mutex_unlock_iothread();
-
-        // ret = fork();
-        // if (ret == 0) {
-        // // qemu_cleanup_child();
-        //     qemu_init_child(ARGC, ARGV, ENVP); 
-
-        //     printf("[debug] Done with init child\n");
-        //     load_snapshot("testsnp", NULL);
-        //     printf("[debug] we have loaded the snapshot!");
-        // }
-        // else {
-        //     // qemu_cleanup();
-        //     exit(0);
-        // }
-        // return;
-            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
-        // sleep(60);
-        
         #ifdef DBG
         set_address_space(1);
         if (qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()){
@@ -3566,7 +3540,11 @@ void handle_fork(void *opaque){
         // save_snapshot("prefork_state", NULL);
         // close("snapshot.qcow2");
         // sleep(30);
-        ret = fork(); 
+        
+
+        // Bilal : Adding this call to the forkall master for testing
+        ret = ski_forkall_master();
+        // ret = fork(); 
         
         if (ret < 0){
             printf("Failed to fork\n");
