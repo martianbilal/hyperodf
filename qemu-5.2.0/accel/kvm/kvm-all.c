@@ -3118,6 +3118,21 @@ int kvm_cpu_exec(CPUState *cpu)
                 // event_notifier_test_and_clear(&(cpu->fork_event));
                 // sleep(60);
                 ret = 0; 
+                while(1) {
+                    int did_fork;
+                    int is_child; 
+
+                    ski_forkall_slave(&did_fork, &is_child);
+                    if(did_fork){
+                        qemu_thread_get_self(cpu->thread);
+                        cpu->thread_id = qemu_get_thread_id();
+                        current_cpu = cpu;
+                        
+                        break;
+                    }
+                    sleep(0);
+
+                }
                 break;
                 // continue;
                 vcpu_complete_io(cpu);

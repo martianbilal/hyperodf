@@ -91,7 +91,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
         if(cpu->should_wait){
             qemu_mutex_unlock_iothread();
             while(1) {
-                int did_fork=1;
+                int did_fork;
                 int is_child; 
 
                 ski_forkall_slave(&did_fork, &is_child);
