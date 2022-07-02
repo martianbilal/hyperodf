@@ -471,6 +471,9 @@ struct CPUState {
 
     bool ignore_memory_transaction_failures;
 
+    // the VCPU thread should only wait for the fork, if the VCPU has received the call for fork
+    bool should_wait; 
+
     struct hax_vcpu_state *hax_vcpu;
 
     int hvf_fd;

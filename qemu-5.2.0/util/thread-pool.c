@@ -21,6 +21,7 @@
 #include "trace.h"
 #include "block/thread-pool.h"
 #include "qemu/main-loop.h"
+#include "forkall-coop.h"
 
 static void do_spawn_thread(ThreadPool *pool);
 
@@ -83,7 +84,7 @@ static void *worker_thread(void *opaque)
     pool->pending_threads--;
     do_spawn_thread(pool);  
 
-    int did_fork = 0;
+    int did_fork = 1;
 	int is_child = 0;
 
     while (!pool->stopping) {

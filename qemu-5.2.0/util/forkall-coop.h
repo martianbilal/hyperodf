@@ -80,7 +80,7 @@ typedef struct struct_fork_thread {
 pid_t ski_gettid(void);
 
 void ski_forkall_initialize(void);
-pid_t ski_forkall_master(void(*wake_cb)(void));
+pid_t ski_forkall_master();
 void ski_forkall_slave(int *did_fork, int *is_child);
 void ski_forkall_thread_add_self_tid(void);
 

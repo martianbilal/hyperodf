@@ -21,6 +21,7 @@
 #include "sysemu/cpus.h"
 #include "qemu/guest-random.h"
 #include "qapi/error.h"
+#include "util/forkall-coop.h"
 
 #include "kvm-cpus.h"
 
@@ -39,7 +40,12 @@ static void *kvm_vcpu_thread_fn(void *arg)
     #ifdef DBG
     printf("[debug] entered vcpu thread function! \n");
     #endif
+
+    cpu->should_wait = false;
+    
     rcu_register_thread();
+    ski_forkall_thread_add_self_tid();
+
 
     qemu_mutex_lock_iothread();
     qemu_thread_get_self(cpu->thread);
@@ -47,6 +53,9 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu->can_do_io = 1;
     current_cpu = cpu;
 
+
+
+    
     // will have to set up the copying mechanism over here.
     if(cpu->child_cpu){
         #ifdef DBG 
@@ -78,6 +87,28 @@ static void *kvm_vcpu_thread_fn(void *arg)
                 cpu_handle_guest_debug(cpu);
             }
         }
+        
+        if(cpu->should_wait){
+            qemu_mutex_unlock_iothread();
+            while(1) {
+                int did_fork=1;
+                int is_child; 
+
+                ski_forkall_slave(&did_fork, &is_child);
+                if(did_fork){
+                    qemu_thread_get_self(cpu->thread);
+                    cpu->thread_id = qemu_get_thread_id();
+                    current_cpu = cpu;
+                    
+                    break;
+                }
+                sleep(0);
+
+            }
+            qemu_mutex_lock_iothread();
+        }
+
+
         qemu_wait_io_event(cpu);
     } while (!cpu->unplug || cpu_can_run(cpu));
 

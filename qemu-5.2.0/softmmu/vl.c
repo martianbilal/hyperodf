@@ -3545,6 +3545,8 @@ void handle_fork(void *opaque){
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
         // ret = fork(); 
+        printf("[DEBUG] [SKI] ret value : %d", ret );
+        fflush(stdout);
         
         if (ret < 0){
             printf("Failed to fork\n");

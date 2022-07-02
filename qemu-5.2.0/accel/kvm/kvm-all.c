@@ -3098,6 +3098,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 if (qemu_mutex_iothread_locked()){
                     printf("[debug] This is the main thread!\n");
                 }
+                cpu->should_wait = true;
                 // qemu_mutex_unlock_iothread();
                 //magic number
                 // should_fork = 'a';

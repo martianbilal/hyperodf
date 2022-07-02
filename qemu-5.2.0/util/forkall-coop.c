@@ -345,7 +345,7 @@ void ski_forkall_patch_thread_references(void){
 
 }
 
-pid_t ski_forkall_master(void(*wake_cb)(void)){
+pid_t ski_forkall_master(){
 	ski_log_forkall("[MASTER] Requesting forkall (forkall_master())\n");
 
 	pthread_mutex_lock(&forkall_mutex);
@@ -369,7 +369,7 @@ pid_t ski_forkall_master(void(*wake_cb)(void)){
 		ski_log_forkall("[MASTER] Waiting for all threads to be ready (%d/%d)\n", threads_done, nthreads);
 		
 		//XXX: QEMU Specific!! Tries to wake up the first cpu when it's waiting for the initial kick (cpus.c)
-		(*wake_cb)();
+		// (*wake_cb)();
 
 		ski_log_forkall("[MASTER] Waiting for all threads to be ready (%d/%d)\n", threads_done, nthreads);
 		struct timespec ts;
