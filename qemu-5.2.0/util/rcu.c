@@ -240,14 +240,14 @@ static void *call_rcu_thread(void *opaque)
 	int is_child = 0;
 
     rcu_register_thread();
-    ski_forkall_thread_add_self_tid();
+    // ski_forkall_thread_add_self_tid();
 
-    while(1){
-        ski_forkall_slave(&did_fork, &is_child);
-        if(did_fork){
-            break;
-        }
-    }
+    // while(1){
+    //     ski_forkall_slave(&did_fork, &is_child);
+    //     if(did_fork || is_child){
+    //         break;
+    //     }
+    // }
 
     for (;;) {
         int tries = 0;

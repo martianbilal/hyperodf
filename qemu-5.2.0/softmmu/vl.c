@@ -3127,6 +3127,9 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     int mmap_size; 
 
     
+    #ifdef DBG
+    printf("[debug] setting vm state\n");
+    #endif
     /**
      * @brief set KVM VM state using ioctls 
      * Also create chips, etc as necessary 
@@ -3137,7 +3140,6 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
         ret = ioctl(s->vmfd, KVM_SET_CLOCK, &(state->clock_data));
     } while (ret == -EINTR);
     if(ret < 0) goto end_loop;
-    
 
 
     do
@@ -3192,6 +3194,7 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     
     #ifdef SET_VCPU_IN_MAIN
     cpu->kvm_fd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
+    
     
     //set up the kvm_run for the vcpu --> update it in the vmstate
     mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
@@ -3545,7 +3548,7 @@ void handle_fork(void *opaque){
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
         // ret = fork(); 
-        printf("[DEBUG] [SKI] ret value : %d", ret );
+        printf("[DEBUG] [SKI] ret value : %d\n", ret );
         fflush(stdout);
         
         if (ret < 0){
@@ -3562,6 +3565,7 @@ void handle_fork(void *opaque){
             // 4. set them up using the prefork status
             // 5. let the QEMU main loop run for the new VM
             //close kvm fds 
+            // return;
             close(cpu->kvm_fd);
             close(s->fd);
             close(s->vmfd);
@@ -3577,7 +3581,7 @@ void handle_fork(void *opaque){
             }
 
             if (s->fd < 0) {
-            fprintf(stderr, "ioctl(DEV KVM) failed: %d %s\n", -ret,
+                fprintf(stderr, "ioctl(DEV KVM) failed: %d %s\n", -ret,
                 strerror(-ret));
             }
             // new_cpu->kvm_fd = cpu->kvm_fd;
@@ -3623,7 +3627,10 @@ void handle_fork(void *opaque){
                         printf("[debug] mem.slot: %p\n", mem.slot);
                         fflush(stdout);
                         ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
-                    
+                        if(ret < 0){
+                            printf("KVM SET MEMORY FAILED!! \n");
+                            fflush(stdout);
+                        }
                     }
                     #endif
                     // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
@@ -3644,8 +3651,9 @@ void handle_fork(void *opaque){
             // register_global_state();
             cpu->prefork_state = prefork_state;
             cpu->child_cpu = 1; 
+            
             qemu_mutex_unlock_iothread();
-            qemu_init_child(ARGC, ARGV, ENVP); 
+            // qemu_init_child(ARGC, ARGV, ENVP 
 
             // qemu_opts_foreach(qemu_find_opts("drive"), drive_init_func,
                         //   &MACHINE_CLASS->block_default_type, &error_fatal)
@@ -3685,9 +3693,10 @@ void handle_fork(void *opaque){
             #endif 
             return; 
         } else {
-            // waitpid(ret, &status, 0);
+            waitpid(ret, &status, 0);
             // qemu_cleanup();
             exit(0);
+            // return;
             // qemu_mutex_unlock_iothread();
 
         }

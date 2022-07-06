@@ -561,7 +561,7 @@ void qemu_thread_create(QemuThread *thread, const char *name,
     printf("This is the name of the name of the thread: %s\n", qemu_thread_args->name);
 
 
-    if(USE_HYPERODF){
+    if(USE_HYPERODF && strcmp(qemu_thread_args->name, "call_rcu") != 0 ){
         ski_forkall_pthread_create(&thread->thread, &attr,
                          qemu_thread_start, qemu_thread_args);
     }
