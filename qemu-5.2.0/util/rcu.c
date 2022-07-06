@@ -32,6 +32,7 @@
 #include "qemu/thread.h"
 #include "qemu/main-loop.h"
 #include "qemu/lockable.h"
+#include "util/forkall-coop.h"
 #if defined(CONFIG_MALLOC_TRIM)
 #include <malloc.h>
 #endif
@@ -235,8 +236,18 @@ retry:
 static void *call_rcu_thread(void *opaque)
 {
     struct rcu_head *node;
+    int did_fork = 0;
+	int is_child = 0;
 
     rcu_register_thread();
+    ski_forkall_thread_add_self_tid();
+
+    while(1){
+        ski_forkall_slave(&did_fork, &is_child);
+        if(did_fork){
+            break;
+        }
+    }
 
     for (;;) {
         int tries = 0;
@@ -259,10 +270,12 @@ static void *call_rcu_thread(void *opaque)
                 }
             }
             n = qatomic_read(&rcu_call_count);
+
         }
 
         qatomic_sub(&rcu_call_count, n);
         synchronize_rcu();
+
         qemu_mutex_lock_iothread();
         while (n > 0) {
             node = try_dequeue();
@@ -279,6 +292,7 @@ static void *call_rcu_thread(void *opaque)
 
             n--;
             node->func(node);
+
         }
         qemu_mutex_unlock_iothread();
     }
