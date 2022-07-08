@@ -86,6 +86,14 @@ static void *worker_thread(void *opaque)
 
     int did_fork = 0;
 	int is_child = 0;
+    
+    // while(1){
+	// 	ski_forkall_slave(&did_fork, &is_child);
+    //     if(did_fork){
+    //         break;
+    //     }
+    //     sleep(0);
+    // }
 
     while (!pool->stopping) {
         ThreadPoolElement *req;
@@ -115,9 +123,9 @@ static void *worker_thread(void *opaque)
 					}
 					*/
 
-					for(j=0;j<500;j++){
-						k=k*k+j;
-					}
+					// for(j=0;j<500;j++){
+					// 	k=k*k+j;
+					// }
                 qemu_mutex_lock(&pool->lock);
             }
 

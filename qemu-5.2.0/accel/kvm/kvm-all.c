@@ -61,6 +61,8 @@
 
 #define DBG_IO
 
+// static int FORK_COUNTER = 0; 
+
 // int forkvmfd[2];
 // #define DBG
 
@@ -3095,6 +3097,11 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
+                // FORK_COUNTER = FORK_COUNTER++;
+                // if(FORK_COUNTER > 1){
+                //     ret = 0; 
+                //     break;
+                // }
                 if (qemu_mutex_iothread_locked()){
                     printf("[debug] This is the main thread!\n");
                 }

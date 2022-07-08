@@ -168,7 +168,9 @@ forkall_thread * ski_forkall_thread_new(void){
 
     ski_log_forkall("Adding new thread_seq %d\n", thread_seq);
 
+    // forkall_thread* t = (forkall_thread*)malloc(sizeof(forkall_thread));
     forkall_thread* t = &forkall_threads[thread_seq];
+	// forkall_threads[thread_seq] = *t;
 
     // Clear the struture
     memset(t, 0, sizeof(forkall_thread));
@@ -285,7 +287,7 @@ void ski_forkall_slave(int *did_fork, int *is_child){
 void ski_forkall_thread_restore_registers(forkall_thread * t) __attribute__((optimize(0)));
 
 void ski_forkall_thread_restore_registers(forkall_thread * t) {
-
+	// ski_log_forkall("[debug] thread restore registers! \n");
 	longjmp(t->forkall_env, 1);
 	ski_log_forkall("SHOULD NOT HAVE REACHED HERE\n");
 	
@@ -305,8 +307,15 @@ void* ski_forkall_thread_restore(void *param){
 	ski_get_fsgs_addr();
 
 	ski_log_forkall("Thread restoring the thread tid: %d (dummy_stack: %p)\n", t->tid_original, &dummy_stack);
-
-	asm("mov %0, %%esp;"  /* Use temporary stack */
+	__asm__ __volatile__ ("mov %0, %%rsp;"
+		"push %1" ::"m"(tmp_stack_addr), "m"(param): /* Use temporary stack */);
+	
+	memcpy(stack_min, stack, FORKALL_THREAD_STACK_SIZE);
+	__asm__ __volatile__ ("pop %%rdi;"
+		"callq %P0"::"g"(ski_forkall_thread_restore_registers):);
+	ski_forkall_thread_restore_registers((forkall_thread*) param);
+	//following code would not be called 
+	__asm__ __volatile__ ("mov %0, %%rsp;"  /* Use temporary stack */
 
 	    "push %1;"        /* Push the parameter that is going to be used because of the env on to the temporary stack */
 
@@ -318,11 +327,27 @@ void* ski_forkall_thread_restore(void *param){
 
 
 		"pop %%rdi;"
-		"callq  %P6;"     /* Call forkall_thread_restore2() which does the actual restore of the registers (including stack pointer) */
+		"callq  *%P6;"     /* Call forkall_thread_restore2() which does the actual restore of the registers (including stack pointer) */
 		/* forkall_thread_restore2((forkall_thread*) param); */
 			: 
-			: "m" (tmp_stack_addr), "m" (param), "m" (stack_min), "m" (stack), "i" (FORKALL_THREAD_STACK_SIZE), "ic"(memcpy), "g"(ski_forkall_thread_restore_registers)
-			: "%esp");	  /* No need to clobber becasuse we don't return */
+			: "m" (tmp_stack_addr), "m" (param), "m" (stack_min), "m" (stack), "i" (0x1e000LL), "ic"(memcpy), "g"(ski_forkall_thread_restore_registers)
+			: "%rsp");	  /* No need to clobber becasuse we don't return */
+
+	// __asm__ __volatile__ (  /* Use temporary stack */
+    // /* Push the parameter that is going to be used because of the env on to the temporary stack */
+
+	// 	"mov    %0,%%rdi;"
+	// 	"mov    %1,%%rsi;"
+	//     "mov    %2,%%rdx;"
+	// 	"callq  *%P3;"     /* Call memcpy to restore the original stack (from the backup up stack containing the TLS)*/
+	// 	/* memcpy(stack_min, stack, FORKALL_THREAD_STACK_SIZE); */
+
+	// 	/* Call forkall_thread_restore2() which does the actual restore of the registers (including stack pointer) */
+	// 	/* forkall_thread_restore2((forkall_thread*) param); */
+	// 		: 
+	// 		: "m" (stack_min), "m" (stack), "i" (0x1e000LL), "g"(memcpy)
+	// 		: "%rsp", "memory", "rdi", "rsi", "rdx");	  /* No need to clobber becasuse we don't return */
+	
 
 
 	// DOES NOT RETURN
@@ -493,6 +518,7 @@ static int ski_create_thread_custom_stack(forkall_thread *t, pthread_t *thread, 
 	ski_log_forkall("Launching new thread\n");
 	/* address and size specified */
 	ret = pthread_create(thread, attr, start_routine, arg);
+	// ski_log_forkall("returned from pthread! with ret = %d\n", ret);
 	assert(ret == 0);
 	
 	if(attr_arg == 0){

@@ -120,7 +120,7 @@
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
 #include "block/qcow2.h"
-
+#include <signal.h>
 
 #define MAX_VIRTIO_CONSOLES 1
 #define DBG
@@ -3572,6 +3572,7 @@ void handle_fork(void *opaque){
             #ifdef DBG 
                 printf("[debug] creating child VM \n"); 
             #endif
+            // raise(SIGSTOP);
             //open the new kvm fds
             s->fd = open("/dev/kvm", 2); 
             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
@@ -3591,6 +3592,9 @@ void handle_fork(void *opaque){
             slot_size = cpu->kvm_state->nr_slots;
             //set up the shared memory for the child vm 
             /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+            #ifdef DBG 
+                printf("[debug] setting mem \n"); 
+            #endif
             for(int j = 0; j < cpu->kvm_state->nr_as; j++){
                 for(int i = 0; i < slot_size; i++){
                     
@@ -3691,6 +3695,7 @@ void handle_fork(void *opaque){
             #ifdef DBG 
                 printf("We have loaded the snapshot!\n"); 
             #endif 
+            qemu_mutex_lock_iothread();
             return; 
         } else {
             waitpid(ret, &status, 0);
