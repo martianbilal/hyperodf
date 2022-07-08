@@ -474,6 +474,12 @@ struct CPUState {
     // the VCPU thread should only wait for the fork, if the VCPU has received the call for fork
     bool should_wait; 
 
+    // an indicator to run the post fork routine 
+    bool vm_forked; 
+
+    // true if the cpu is part of the FORK-ed process
+    bool is_child; 
+
     struct hax_vcpu_state *hax_vcpu;
 
     int hvf_fd;

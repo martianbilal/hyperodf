@@ -3666,7 +3666,7 @@ void handle_fork(void *opaque){
             // setup_worker_thread(NULL);
             // configure_blockdev(&BDO_Q, MACHINE_CLASS, 1);
             // setup_worker_thread(NULL);
-            kvm_start_vcpu_thread(cpu);
+            // kvm_start_vcpu_thread(cpu);
             // qemu_mutex_lock_iothread();
 
 

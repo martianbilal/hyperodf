@@ -33,6 +33,29 @@ static int post_fork_setup(struct cpu_prefork_state *prefork_state){
     return 0; 
 }
 
+
+/**
+ * @brief helper function to call all functions related to saving the 
+ * KVM state pre fork
+ * 
+ *      return: 0 on succes
+ *              -1 or obtained error otherwise    
+ */
+static int kvm_vcpu_pre_fork(){
+
+}
+
+/**
+ * @brief helper function to call all functions related to loading the 
+ * KVM state post fork
+ * 
+ *      return: 0 on succes
+ *              -1 or obtained error otherwise    
+ */
+static void kvm_vcpu_post_fork(){
+
+}
+
 static void *kvm_vcpu_thread_fn(void *arg)
 {
     CPUState *cpu = arg;
@@ -42,6 +65,8 @@ static void *kvm_vcpu_thread_fn(void *arg)
     #endif
 
     cpu->should_wait = false;
+    cpu->vm_forked = false;
+    cpu->is_child = false; 
     
     rcu_register_thread();
     ski_forkall_thread_add_self_tid();
@@ -90,6 +115,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
         
         if(cpu->should_wait){
             qemu_mutex_unlock_iothread();
+            // [TODO] [Bilal] run the routine for saving the pre fork CPU state  
             while(1) {
                 int did_fork;
                 int is_child; 
@@ -99,6 +125,12 @@ static void *kvm_vcpu_thread_fn(void *arg)
                     qemu_thread_get_self(cpu->thread);
                     cpu->thread_id = qemu_get_thread_id();
                     current_cpu = cpu;
+                    cpu->vm_forked = true; 
+                    if (is_child){
+                        cpu->is_child = true;
+                        // [TODO] [Bilal] run the pre fork CPU routine
+
+                    }
                     
                     break;
                 }
