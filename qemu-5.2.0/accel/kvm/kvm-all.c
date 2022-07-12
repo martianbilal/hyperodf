@@ -2781,10 +2781,11 @@ err:
  * set the attrs for vcpu id vcpufd same as that 
  * of the vcpu id cpu->fd
  * */
-int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
+int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpufd)
 {
     int ret = 0;
     char *attr; 
+    X86CPU *cpu_x86 = X86_CPU(cpu);
     
     printf("starting set attrs\n");
     //set regs
@@ -2805,12 +2806,12 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
     attr="sregs";
     if(ret<0) goto err;
 
-    // do 
-    // {
-    //     ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
-    // } while (ret == -EINTR);
-    // attr="tsc_khz";
-    // if(ret<0) goto err;
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
+    } while (ret == -EINTR);
+    attr="tsc_khz";
+    if(ret<0) goto err;
     
     do
     {
@@ -2821,7 +2822,7 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
 
     do 
     {
-        ret = ioctl(vcpufd, KVM_SET_MSRS, &(state->msrs));
+        ret = ioctl(vcpufd, KVM_SET_MSRS, cpu_x86->kvm_msr_buf);
     } while (ret == -EINTR);
     attr="msrs";
     if(ret<0) goto err;
@@ -2878,7 +2879,7 @@ int  kvm_set_vcpu_attrs(struct cpu_prefork_state *state, int vcpufd)
     //set irqchip[3]
     //set clock data
     //set pit2
-    //set mp_state
+    //set mp_state0x7ffff7ff2000
     //set debuggers
     printf("[debug] done with set attrs\n");
     return ret; 
@@ -2919,6 +2920,135 @@ void end_fork()
     return; 
 }
 
+void prefork_logging(CPUState *cpu){
+    X86CPU *cpu_x86 = X86_CPU(cpu);
+    return; 
+}
+
+/**
+ * @brief helper function to call all functions related to saving the 
+ * KVM state pre fork
+ * 
+ *      return: 0 on succes
+ *              -1 or obtained error otherwise    
+ */
+int kvm_vcpu_pre_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
+    int ret = 0;
+    
+    prefork_logging(cpu);
+
+    ret = fork_save_vm_state(cpu, prefork_state);
+    return ret; 
+}
+
+/**
+ * @brief helper function to call all functions related to loading the 
+ * KVM state post fork
+ * 
+ *      return: 0 on succes
+ *              -1 or obtained error otherwise    
+ */
+int kvm_vcpu_post_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
+    struct KVMState *s = cpu->kvm_state;
+    struct KVMSlot slot;
+    struct kvm_userspace_memory_region mem; 
+    int slot_size = 0;
+    int ret = 0;
+    char buf;
+    int result;
+    int status;
+    Error *local_err = NULL;
+
+    close(cpu->kvm_fd);
+    close(s->fd);
+    close(s->vmfd);
+
+    #ifdef DBG 
+        printf("[debug] creating child VM \n"); 
+    #endif
+    // raise(SIGSTOP);
+    //open the new kvm fds
+    s->fd = open("/dev/kvm", 2); 
+    s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+    if (s->vmfd < 0) {
+    fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
+        strerror(-ret));
+    }
+    if (s->fd < 0) {
+        fprintf(stderr, "ioctl(DEV KVM) failed: %d %s\n", -ret,
+        strerror(-ret));
+    }
+
+    slot_size = cpu->kvm_state->nr_slots;
+    //set up the shared memory for the child vm 
+    /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+    #ifdef DBG 
+        printf("[debug] setting mem \n"); 
+    #endif
+    for(int j = 0; j < cpu->kvm_state->nr_as; j++){
+        for(int i = 0; i < slot_size; i++){
+            
+            slot = cpu->kvm_state->as[j].ml->slots[i]; 
+            
+            // if(slot.memory_size == 0){
+            //     continue;
+            // }
+            // printf("slot Address : %ld", slot.ram);
+
+            // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+            // if(new_ram == MAP_FAILED) { 
+            //     printf("Failed to allocated memory!");
+            //     exit(0);
+            // }
+            // memmove(new_ram, slot.ram, slot.memory_size);
+
+                // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                //  | (kvm_state->memory_listener.as_id << 16)
+            mem.slot = slot.slot | (kvm_state->as[j].ml->as_id << 16);
+            mem.guest_phys_addr = slot.start_addr;
+            mem.userspace_addr = (unsigned long)slot.ram;
+            // #ifdef DBG
+            // printf("[debug] kvm nr as : %d\n", cpu->kvm_state->nr_as);
+            // printf("[debug] kvm 0 : %s\n", cpu->kvm_state->as[0].as->name);
+            // printf("[debug] kvm 1 : %s\n", cpu->kvm_state->as[1].as->name);
+            // #endif
+            mem.flags = slot.flags;
+            mem.memory_size = slot.memory_size;
+
+            #ifdef DBG
+            if(mem.userspace_addr){
+                printf("[debug] mem.ram: %p\n", mem.userspace_addr);
+                printf("[debug] mem.slot: %p\n", mem.slot);
+                fflush(stdout);
+                ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                if(ret < 0){
+                    printf("KVM SET MEMORY FAILED!! \n");
+                    fflush(stdout);
+                }
+            }
+            #endif
+            // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                        // mem.memory_size, mem.userspace_addr, ret);
+            #ifdef DBG
+            // if(ret == 0) printf("[debug] ret: %d\n", ret);
+            #endif
+        }
+    }               
+    //set kvm VM according to the prefork state
+    fork_set_vm_state(cpu, prefork_state);
+    // new_cpu->prefork_state = prefork_state;
+    // new_cpu->child_cpu = 1;
+    // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+    
+
+    
+    register_global_state();
+    cpu->prefork_state = prefork_state;
+    cpu->child_cpu = 1; 
+    
+
+}
+
 
 int kvm_cpu_exec(CPUState *cpu)
 {
@@ -2931,6 +3061,8 @@ int kvm_cpu_exec(CPUState *cpu)
     struct KVMState *s = KVM_STATE(current_accel());;
     struct KVMSlot slot;
     struct timeval t;
+    struct cpu_prefork_state* prefork_state = g_new0(struct cpu_prefork_state, 1); 
+
     char should_fork; 
     Error *err = NULL;
     long long milliseconds;
@@ -3102,6 +3234,14 @@ int kvm_cpu_exec(CPUState *cpu)
                 //     ret = 0; 
                 //     break;
                 // }
+
+                // [TEST] [VERIFY] 
+                // if(cpu->should_wait){
+                //     ret = 0; 
+                //     break;
+                // }
+
+                kvm_vcpu_pre_fork(cpu, prefork_state);
                 if (qemu_mutex_iothread_locked()){
                     printf("[debug] This is the main thread!\n");
                 }
@@ -3123,6 +3263,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 event_notifier_test_and_clear(&(cpu->fork_event));
                 event_notifier_set(&(cpu->fork_event));
                 // event_notifier_test_and_clear(&(cpu->fork_event));
+                // cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
                 ret = 0; 
                 while(1) {
@@ -3134,6 +3275,18 @@ int kvm_cpu_exec(CPUState *cpu)
                         qemu_thread_get_self(cpu->thread);
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
+                        if(is_child){
+                            kvm_vcpu_post_fork(cpu, prefork_state);
+                            assert(kvm_buf_set_msrs(X86_CPU(cpu)) == 0);
+
+                            run = cpu->kvm_run;
+                            s = cpu->kvm_state;
+                            // cpu->vcpu_dirty = false;
+                            // qemu_mutex_lock_iothread();
+                            // return ret;
+                            // cpu_synchronize_post_reset(cpu);
+                            
+                        }
                         
                         break;
                     }
@@ -3388,7 +3541,7 @@ child_spawn:
                     // cpu_dump_state
                     // cpu_dump_statistics
                     // kvm_irqchip_create(s);
-                    kvm_set_vcpu_attrs(&state, vcpufd);
+                    kvm_set_vcpu_attrs(cpu, &state, vcpufd);
                     cpu->kvm_fd = vcpufd;
 
                     //set up the kvm_run for the vcpu --> update it in the vmstate

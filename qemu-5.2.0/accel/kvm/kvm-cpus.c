@@ -33,29 +33,6 @@ static int post_fork_setup(struct cpu_prefork_state *prefork_state){
     return 0; 
 }
 
-
-/**
- * @brief helper function to call all functions related to saving the 
- * KVM state pre fork
- * 
- *      return: 0 on succes
- *              -1 or obtained error otherwise    
- */
-static int kvm_vcpu_pre_fork(){
-
-}
-
-/**
- * @brief helper function to call all functions related to loading the 
- * KVM state post fork
- * 
- *      return: 0 on succes
- *              -1 or obtained error otherwise    
- */
-static void kvm_vcpu_post_fork(){
-
-}
-
 static void *kvm_vcpu_thread_fn(void *arg)
 {
     CPUState *cpu = arg;

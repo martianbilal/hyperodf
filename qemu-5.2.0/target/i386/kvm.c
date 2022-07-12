@@ -2535,7 +2535,7 @@ static int kvm_put_msr_feature_control(X86CPU *cpu)
         return ret;
     }
 
-    assert(ret == 1);
+    // assert(ret == 1);
     return 0;
 }
 
@@ -2685,7 +2685,7 @@ static void kvm_msr_entry_add_perf(X86CPU *cpu, FeatureWordArray f)
     }
 }
 
-static int kvm_buf_set_msrs(X86CPU *cpu)
+int kvm_buf_set_msrs(X86CPU *cpu)
 {
     int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MSRS, cpu->kvm_msr_buf);
     if (ret < 0) {
