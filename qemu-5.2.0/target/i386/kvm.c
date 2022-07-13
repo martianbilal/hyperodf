@@ -2535,7 +2535,7 @@ static int kvm_put_msr_feature_control(X86CPU *cpu)
         return ret;
     }
 
-    // assert(ret == 1);
+    assert(ret == 1);
     return 0;
 }
 

@@ -313,6 +313,8 @@ void* ski_forkall_thread_restore(void *param){
 	memcpy(stack_min, stack, FORKALL_THREAD_STACK_SIZE);
 	__asm__ __volatile__ ("pop %%rdi;"
 		"callq %P0"::"g"(ski_forkall_thread_restore_registers):);
+
+	// Do not return;
 	ski_forkall_thread_restore_registers((forkall_thread*) param);
 	//following code would not be called 
 	__asm__ __volatile__ ("mov %0, %%rsp;"  /* Use temporary stack */

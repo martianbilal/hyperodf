@@ -2788,6 +2788,7 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     X86CPU *cpu_x86 = X86_CPU(cpu);
     
     printf("starting set attrs\n");
+    state->regs.rip = 0xacdc;
     //set regs
     /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
     do 
@@ -3015,18 +3016,18 @@ int kvm_vcpu_post_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
             mem.flags = slot.flags;
             mem.memory_size = slot.memory_size;
 
-            #ifdef DBG
+            // #ifdef DBG
             if(mem.userspace_addr){
                 printf("[debug] mem.ram: %p\n", mem.userspace_addr);
                 printf("[debug] mem.slot: %p\n", mem.slot);
                 fflush(stdout);
+            // #endif
                 ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
                 if(ret < 0){
                     printf("KVM SET MEMORY FAILED!! \n");
                     fflush(stdout);
                 }
             }
-            #endif
             // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
                         // mem.memory_size, mem.userspace_addr, ret);
             #ifdef DBG
