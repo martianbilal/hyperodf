@@ -61,7 +61,7 @@
 
 #define DBG_IO
 
-// static int FORK_COUNTER = 0; 
+static int FORK_COUNTER = 0; 
 
 // int forkvmfd[2];
 // #define DBG
@@ -2788,7 +2788,7 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     X86CPU *cpu_x86 = X86_CPU(cpu);
     
     printf("starting set attrs\n");
-    state->regs.rip = 0xacdc;
+    // state->regs.rip = 0xacdc;
     //set regs
     /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
     do 
@@ -3043,7 +3043,7 @@ int kvm_vcpu_post_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
     
 
     
-    register_global_state();
+    // register_global_state();
     cpu->prefork_state = prefork_state;
     cpu->child_cpu = 1; 
     
@@ -3230,11 +3230,11 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
-                // FORK_COUNTER = FORK_COUNTER++;
-                // if(FORK_COUNTER > 1){
-                //     ret = 0; 
-                //     break;
-                // }
+                FORK_COUNTER = FORK_COUNTER++;
+                if(FORK_COUNTER > 1){
+                    ret = 0; 
+                    break;
+                }
 
                 // [TEST] [VERIFY] 
                 // if(cpu->should_wait){
@@ -3288,6 +3288,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             // cpu_synchronize_post_reset(cpu);
                             
                         }
+                        cpu->should_wait = false;
                         
                         break;
                     }

@@ -562,7 +562,7 @@ void qemu_thread_create(QemuThread *thread, const char *name,
 
 
     if(USE_HYPERODF && strcmp(qemu_thread_args->name, "call_rcu") != 0 ){
-        ski_forkall_pthread_create(&thread->thread, &attr,
+        err = ski_forkall_pthread_create(&thread->thread, &attr,
                          qemu_thread_start, qemu_thread_args);
     }
     else{

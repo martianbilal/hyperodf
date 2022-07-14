@@ -306,6 +306,7 @@ void* ski_forkall_thread_restore(void *param){
 
 	ski_get_fsgs_addr();
 
+	// MODIFIED:
 	ski_log_forkall("Thread restoring the thread tid: %d (dummy_stack: %p)\n", t->tid_original, &dummy_stack);
 	__asm__ __volatile__ ("mov %0, %%rsp;"
 		"push %1" ::"m"(tmp_stack_addr), "m"(param): /* Use temporary stack */);
@@ -315,25 +316,28 @@ void* ski_forkall_thread_restore(void *param){
 		"callq %P0"::"g"(ski_forkall_thread_restore_registers):);
 
 	// Do not return;
-	ski_forkall_thread_restore_registers((forkall_thread*) param);
-	//following code would not be called 
-	__asm__ __volatile__ ("mov %0, %%rsp;"  /* Use temporary stack */
+	//
+	// ORIGINAL : 
+	//
+	// ski_forkall_thread_restore_registers((forkall_thread*) param);
+	// //following code would not be called 
+	// __asm__ __volatile__ ("mov %0, %%rsp;"  /* Use temporary stack */
 
-	    "push %1;"        /* Push the parameter that is going to be used because of the env on to the temporary stack */
+	//     "push %1;"        /* Push the parameter that is going to be used because of the env on to the temporary stack */
 
-		"mov    %2,%%rdi;"
-		"mov    %3,%%rsi;"
-	    "mov    %4,%%rdx;"
-		"callq  *%P5;"     /* Call memcpy to restore the original stack (from the backup up stack containing the TLS)*/
-		/* memcpy(stack_min, stack, FORKALL_THREAD_STACK_SIZE); */
+	// 	"mov    %2,%%rdi;"
+	// 	"mov    %3,%%rsi;"
+	//     "mov    %4,%%rdx;"
+	// 	"callq  *%P5;"     /* Call memcpy to restore the original stack (from the backup up stack containing the TLS)*/
+	// 	/* memcpy(stack_min, stack, FORKALL_THREAD_STACK_SIZE); */
 
 
-		"pop %%rdi;"
-		"callq  *%P6;"     /* Call forkall_thread_restore2() which does the actual restore of the registers (including stack pointer) */
-		/* forkall_thread_restore2((forkall_thread*) param); */
-			: 
-			: "m" (tmp_stack_addr), "m" (param), "m" (stack_min), "m" (stack), "i" (0x1e000LL), "ic"(memcpy), "g"(ski_forkall_thread_restore_registers)
-			: "%rsp");	  /* No need to clobber becasuse we don't return */
+	// 	"pop %%rdi;"
+	// 	"callq  *%P6;"     /* Call forkall_thread_restore2() which does the actual restore of the registers (including stack pointer) */
+	// 	/* forkall_thread_restore2((forkall_thread*) param); */
+	// 		: 
+	// 		: "m" (tmp_stack_addr), "m" (param), "m" (stack_min), "m" (stack), "i" (0x1e000LL), "ic"(memcpy), "g"(ski_forkall_thread_restore_registers)
+	// 		: "%rsp");	  /* No need to clobber becasuse we don't return */
 
 	// __asm__ __volatile__ (  /* Use temporary stack */
     // /* Push the parameter that is going to be used because of the env on to the temporary stack */

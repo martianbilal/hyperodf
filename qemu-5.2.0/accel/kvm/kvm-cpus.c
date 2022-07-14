@@ -90,32 +90,32 @@ static void *kvm_vcpu_thread_fn(void *arg)
             }
         }
         
-        if(cpu->should_wait){
-            qemu_mutex_unlock_iothread();
-            // [TODO] [Bilal] run the routine for saving the pre fork CPU state  
-            while(1) {
-                int did_fork;
-                int is_child; 
+        // if(cpu->should_wait){
+        //     qemu_mutex_unlock_iothread();
+        //     // [TODO] [Bilal] run the routine for saving the pre fork CPU state  
+        //     while(1) {
+        //         int did_fork;
+        //         int is_child; 
 
-                ski_forkall_slave(&did_fork, &is_child);
-                if(did_fork || is_child){
+        //         ski_forkall_slave(&did_fork, &is_child);
+        //         if(did_fork || is_child){
                     qemu_thread_get_self(cpu->thread);
                     cpu->thread_id = qemu_get_thread_id();
                     current_cpu = cpu;
                     cpu->vm_forked = true; 
-                    if (is_child){
-                        cpu->is_child = true;
-                        // [TODO] [Bilal] run the pre fork CPU routine
+        //             if (is_child){
+        //                 cpu->is_child = true;
+        //                 // [TODO] [Bilal] run the pre fork CPU routine
 
-                    }
+        //             }
                     
-                    break;
-                }
-                sleep(0);
+        //             break;
+        //         }
+        //         sleep(0);
 
-            }
-            qemu_mutex_lock_iothread();
-        }
+        //     }
+        //     qemu_mutex_lock_iothread();
+        // }
 
 
         qemu_wait_io_event(cpu);

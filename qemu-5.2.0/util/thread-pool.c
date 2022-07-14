@@ -86,6 +86,7 @@ static void *worker_thread(void *opaque)
 
     int did_fork = 0;
 	int is_child = 0;
+    int count = 0;
     
     // while(1){
 	// 	ski_forkall_slave(&did_fork, &is_child);
@@ -102,21 +103,32 @@ static void *worker_thread(void *opaque)
         do {
             pool->idle_threads++;
             if(did_fork){
+                forked:
 				// After forking resort to the original code
 				qemu_mutex_unlock(&pool->lock);
-                ret = qemu_sem_timedwait(&pool->sem, 10000);
+                ret = qemu_sem_timedwait(&pool->sem, 1000000);
                 qemu_mutex_lock(&pool->lock);
             }
             else {
                 qemu_mutex_unlock(&pool->lock);
                 int j,k;
 					k=2;
-					asm volatile("rep; nop");
+					// asm volatile("rep; nop");
 					// while(!did_fork){
                     ret = qemu_sem_timedwait(&pool->sem, 10000);
+                    // qemu_sem_destroy(&pool->sem);
 
                     ski_forkall_slave(&did_fork, &is_child);
                     // }
+                    if(did_fork){
+                        ski_log_forkall("Did fork");
+                        count = &pool->sem.count;
+
+                        // qemu_sem_init(&pool->sem, count);
+                        // pool->idle_threads --;
+                        ski_log_forkall("Did fork");
+                        goto forked;
+                    }
 					
 					// Sishuai: comment to see if it could speed up
 					/*
@@ -140,7 +152,7 @@ static void *worker_thread(void *opaque)
         } while (ret == -1 && !QTAILQ_EMPTY(&pool->request_list));
         if (ret == -1 || pool->stopping) {
 
-            continue;
+            break;
         }
 
         req = QTAILQ_FIRST(&pool->request_list);
