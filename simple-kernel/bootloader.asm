@@ -30,7 +30,7 @@ call printString
 ; out dx, eax
 
 
-call readDisk
+; call readDisk
 
 ; this is the hypercall for FORK
 mov eax, 63h
@@ -46,11 +46,17 @@ call readDisk
 ; mov dx, 300h
 ; out dx, ax
 
+mov bx, helloWorld
+call printString
 
 ; printing the first "h" we have written on disk
-; mov ah, 0x0e
-; mov al, [PROGRAM_SPACE]
-; int 0x10
+mov ah, 0x0e
+mov al, [PROGRAM_SPACE]
+int 0x10
+
+
+mov bx, [PROGRAM_SPACE]
+call printString
 
 mov bx, [PROGRAM_SPACE]
 call printString
@@ -59,9 +65,9 @@ call printString
 ; mov dx, 300h
 ; out dx, ax
 
-mov ax, 63h
-mov dx, 300h
-out dx, ax
+; mov ax, 63h
+; mov dx, 300h
+; out dx, ax
 
 
 jmp $

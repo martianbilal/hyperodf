@@ -1,6 +1,8 @@
 PROGRAM_SPACE equ 0x7e00
 
 readDisk:
+    ; pusha
+    ; push dx
     mov ah, 0x02
     mov bx, PROGRAM_SPACE
     mov al, 2 ;4 sectors, about 4000b bytes
@@ -10,6 +12,10 @@ readDisk:
     mov cl, 0x02 ;describing the sector that we will be reading
     int 0x13
     jc DiskReadFailed
+    ; pop dx
+    ; cmp al, dh
+    ; jne DiskReadFailed
+    ; popa
     ret
 
 BOOT_DISK: 

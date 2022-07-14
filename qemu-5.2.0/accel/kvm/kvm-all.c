@@ -3230,7 +3230,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 //
                 //get the locks being used by the rest of the threads 
                 printf("Received the call for fork\n");
-                FORK_COUNTER = FORK_COUNTER++;
+                FORK_COUNTER = FORK_COUNTER + 1;
                 if(FORK_COUNTER > 1){
                     ret = 0; 
                     break;
