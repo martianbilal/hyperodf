@@ -65,9 +65,9 @@ static void print_backtrace(void)
 
 static inline void qemu_futex_wait(void *f, unsigned val)
 {   
-    if (val == 4294967295){
-    printf("[debug] waiting for futex, value : %u\n", val);
-    }
+    // if (val == 4294967295){
+    // printf("[debug] waiting for futex, value : %u\n", val);
+    // }
     // print_backtrace();
     // return;
 

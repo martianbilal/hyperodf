@@ -20,8 +20,13 @@ static int forkall_nthreads = -1;
 
 static int global_thread_seq = 0;
 
+// this is for aio thread pool
+static int thread_pool_read = 0; 
+
 int ski_forkall_enabled = 0;
 int ski_forkall_round = 0;
+int ski_forkall_hypercall_done = 0;
+int ski_forkall_thread_pool_ready_fork = 0; 
 
 
 #pragma GCC push_options
@@ -49,6 +54,31 @@ pid_t ski_gettid(void){
     return own_tid;
 }
 
+int ski_forkall_thread_pool_ready_check(){
+	int ret = 0; 
+	pthread_mutex_lock(&forkall_mutex);
+	ret = ski_forkall_thread_pool_ready_fork;
+	pthread_mutex_unlock(&forkall_mutex);
+	return ret;
+}
+
+void ski_forkall_thread_pool_ready(){
+	pthread_mutex_lock(&forkall_mutex);
+	ski_forkall_thread_pool_ready_fork = 1;
+	pthread_mutex_unlock(&forkall_mutex);
+}
+
+void ski_forkall_thread_pool_not_ready(){
+	pthread_mutex_lock(&forkall_mutex);
+	ski_forkall_thread_pool_ready_fork = 0;
+	pthread_mutex_unlock(&forkall_mutex);
+}
+
+void ski_forkall_hypercall_ready(){
+	pthread_mutex_lock(&forkall_mutex);
+	ski_forkall_hypercall_done = 1;
+	pthread_mutex_unlock(&forkall_mutex);
+}
 
 int ski_forkall_timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
 {
@@ -378,7 +408,7 @@ void ski_forkall_patch_thread_references(void){
 
 pid_t ski_forkall_master(){
 	ski_log_forkall("[MASTER] Requesting forkall (forkall_master())\n");
-
+	ski_forkall_hypercall_done = 1;
 	pthread_mutex_lock(&forkall_mutex);
 	forkall_forking = 1;
 	pthread_mutex_unlock(&forkall_mutex);

@@ -3295,8 +3295,10 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     //printing a value from the first slot before fork 
 
     // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
-    printf("Parent PID : %ld\n", (long)getpid());
     
+    #ifdef DBG
+    printf("Parent PID : %ld\n", (long)getpid());
+    #endif
     // fflush(stdout);
     
     do
@@ -3543,7 +3545,12 @@ void handle_fork(void *opaque){
         // save_snapshot("prefork_state", NULL);
         // close("snapshot.qcow2");
         // sleep(30);
-        
+        // ski_forkall_hypercall_ready();
+        // while(1){
+        //     if(ski_forkall_thread_pool_ready_check()){
+        //         break;
+        //     }
+        // }
 
         // [Bilal] [Measure] clock time when making the forkall_master call 
         if( clock_gettime( CLOCK_REALTIME, &(cpu->start_forkall_master)) == -1 ) {
@@ -3558,9 +3565,10 @@ void handle_fork(void *opaque){
             exit( EXIT_FAILURE );
         }
         // ret = fork(); 
+        #ifdef DBG
         printf("[DEBUG] [SKI] ret value : %d\n", ret );
         fflush(stdout);
-        
+        #endif
         if (ret < 0){
             printf("Failed to fork\n");
         } else if (ret == 0) {

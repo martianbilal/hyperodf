@@ -58,6 +58,7 @@
 #include "migration/misc.h"
 
 #include "hw/boards.h"
+#include "util/forkall-coop.h"
 
 
 // #define DBG_IO
@@ -2930,21 +2931,21 @@ void kvm_vcpu_print_times(CPUState *cpu){
     printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E3);
     printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E3);
     printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E3);
-    printf("-------------------------------------------------------------------------\n");
+    printf("----------------------------------------------------------------------------\n");
 
     printf("\n\n");
     printf("----------------------[Measurements in micro seconds]----------------------\n");
     printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E6);
     printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E6);
     printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E6);
-    printf("-------------------------------------------------------------------------\n");
+    printf("----------------------------------------------------------------------------\n");
 
     printf("\n\n");
     printf("----------------------[Measurements in nano seconds]----------------------\n");
     printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E9);
     printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E9);
     printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E9);
-    printf("-------------------------------------------------------------------------\n");
+    printf("----------------------------------------------------------------------------\n");
 
 
     printf("\n\n");
@@ -3290,7 +3291,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 
+                #ifndef DBG_MEASURE
                 printf("Received the call for fork\n");
+                #endif
                 FORK_COUNTER = FORK_COUNTER + 1;
                 if(FORK_COUNTER > 1){
                     ret = 0; 
@@ -3340,7 +3343,17 @@ int kvm_cpu_exec(CPUState *cpu)
                 while(1) {
                     int did_fork;
                     int is_child; 
-
+                    ski_forkall_hypercall_done = 1;
+                    while(1){
+                        if(ski_forkall_thread_pool_ready_check()){
+                            break;
+                        }
+                    }
+                    // [Bilal] [Measure] clock time when cpu thread is restored
+                    if( clock_gettime( CLOCK_REALTIME, &(cpu->start_forkall_master)) == -1 ) {
+                        perror( "clock gettime" );
+                        exit( EXIT_FAILURE );
+                    }
                     ski_forkall_slave(&did_fork, &is_child);
                     if(did_fork){
                         // [Bilal] [Measure] clock time when cpu thread is restored
