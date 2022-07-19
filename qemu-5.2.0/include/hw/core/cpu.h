@@ -482,6 +482,9 @@ struct CPUState {
 
     struct hax_vcpu_state *hax_vcpu;
 
+    // [Bilal] [Measure] variables to measure full and partial vm fork time 
+    struct timespec start_universal, stop_universal, start_forkall_master, end_forkall_master, cpu_thread_forked, end_cpu_restore;
+    
     int hvf_fd;
     /* Used to send fork signals */
     int fork_fd[2]; 

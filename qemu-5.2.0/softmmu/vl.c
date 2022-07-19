@@ -123,7 +123,7 @@
 #include <signal.h>
 
 #define MAX_VIRTIO_CONSOLES 1
-#define DBG
+// #define DBG
 #define SET_VCPU_IN_MAIN
 
 static const char *SNAPSHOT_DISK_NAME = "prefork_state";
@@ -3545,8 +3545,18 @@ void handle_fork(void *opaque){
         // sleep(30);
         
 
+        // [Bilal] [Measure] clock time when making the forkall_master call 
+        if( clock_gettime( CLOCK_REALTIME, &(cpu->start_forkall_master)) == -1 ) {
+            perror( "clock gettime" );
+            exit( EXIT_FAILURE );
+        }
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
+        // [Bilal] [Measure] clock time on return from forkall master
+        if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
+            perror( "clock gettime" );
+            exit( EXIT_FAILURE );
+        }
         // ret = fork(); 
         printf("[DEBUG] [SKI] ret value : %d\n", ret );
         fflush(stdout);
@@ -3554,7 +3564,11 @@ void handle_fork(void *opaque){
         if (ret < 0){
             printf("Failed to fork\n");
         } else if (ret == 0) {
-          
+            // [Bilal] [Measure] clock time on hypercall
+            if( clock_gettime( CLOCK_REALTIME, &(cpu->stop_universal)) == -1 ) {
+                perror( "clock gettime" );
+                exit( EXIT_FAILURE );
+            } 
             // sleep(30);
             /*child process*/
             // TODO : Create a new KVM VM and VCPU and

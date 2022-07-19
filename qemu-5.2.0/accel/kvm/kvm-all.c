@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <linux/kvm.h>
 
@@ -59,7 +60,10 @@
 #include "hw/boards.h"
 
 
-#define DBG_IO
+// #define DBG_IO
+#define DBG_MEASURE
+
+#define BILLION  1E9
 
 static int FORK_COUNTER = 0; 
 
@@ -2787,7 +2791,9 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     char *attr; 
     X86CPU *cpu_x86 = X86_CPU(cpu);
     
+    #ifdef DBG
     printf("starting set attrs\n");
+    #endif
     // state->regs.rip = 0xacdc;
     //set regs
     /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
@@ -2807,12 +2813,12 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     attr="sregs";
     if(ret<0) goto err;
 
-    do 
-    {
-        ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
-    } while (ret == -EINTR);
-    attr="tsc_khz";
-    if(ret<0) goto err;
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
+    // } while (ret == -EINTR);
+    // attr="tsc_khz";
+    // if(ret<0) goto err;
     
     do
     {
@@ -2882,13 +2888,68 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     //set pit2
     //set mp_state0x7ffff7ff2000
     //set debuggers
+    #ifdef DBG
     printf("[debug] done with set attrs\n");
+    #endif
     return ret; 
   
 err:
     printf("Failed to set attributes for %s, returned with reason: %d", attr, ret);
     perror("FAILED TO SET VCPU ATTRIBUTES");
     return -1; 
+}
+
+void kvm_vcpu_print_times(CPUState *cpu){
+    double strt_uni, stp_uni, strt_frkl, end_frkl, end_crstr, cthr_frkd; 
+    strt_uni =  cpu->start_universal.tv_sec + cpu->start_universal.tv_nsec / 1E9;
+    stp_uni = cpu->stop_universal.tv_sec + cpu->stop_universal.tv_nsec / 1E9;
+    strt_frkl = cpu->start_forkall_master.tv_sec + cpu->start_forkall_master.tv_nsec / 1E9;
+    end_frkl = cpu->end_forkall_master.tv_sec + cpu->end_forkall_master.tv_nsec / 1E9;
+    cthr_frkd = cpu->cpu_thread_forked.tv_sec + cpu->cpu_thread_forked.tv_nsec / 1E9;
+    end_crstr = cpu->end_cpu_restore.tv_sec + cpu->end_cpu_restore.tv_nsec / 1E9;
+
+    printf("\n\n");
+    printf("----------------------[Measurements in seconds]----------------------\n");
+    printf("[DEBUG] [TIME] start_universal : %lf \n", strt_uni);
+    printf("[DEBUG] [TIME] stop_universal : %lf \n", stp_uni);
+    printf("[DEBUG] [TIME] start_forkall_master : %lf \n", strt_frkl);
+    printf("[DEBUG] [TIME] end_forkall_master : %lf \n", end_frkl);
+    printf("[DEBUG] [TIME] cpu_thread_forked : %lf \n", cthr_frkd);
+    printf("[DEBUG] [TIME] end_cpu_restore : %lf \n", end_crstr);
+    printf("-------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  stp_uni - strt_uni);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", end_frkl - strt_frkl);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", end_crstr - cthr_frkd);
+    printf("-------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in milli seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E3);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E3);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E3);
+    printf("-------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in micro seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E6);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E6);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E6);
+    printf("-------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in nano seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E9);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E9);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E9);
+    printf("-------------------------------------------------------------------------\n");
+
+
+    printf("\n\n");
+
+    return;
 }
 
 int vcpu_complete_io(CPUState *cpu) 
@@ -3018,8 +3079,8 @@ int kvm_vcpu_post_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
 
             // #ifdef DBG
             if(mem.userspace_addr){
-                printf("[debug] mem.ram: %p\n", mem.userspace_addr);
-                printf("[debug] mem.slot: %p\n", mem.slot);
+                // printf("[debug] mem.ram: %p\n", mem.userspace_addr);
+                // printf("[debug] mem.slot: %p\n", mem.slot);
                 fflush(stdout);
             // #endif
                 ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
@@ -3242,6 +3303,13 @@ int kvm_cpu_exec(CPUState *cpu)
                 //     break;
                 // }
 
+                // [Bilal] [Measure] clock time on hypercall
+                if( clock_gettime( CLOCK_REALTIME, &(cpu->start_universal)) == -1 ) {
+                    perror( "clock gettime" );
+                    exit( EXIT_FAILURE );
+                }
+
+
                 kvm_vcpu_pre_fork(cpu, prefork_state);
                 if (qemu_mutex_iothread_locked()){
                     printf("[debug] This is the main thread!\n");
@@ -3251,11 +3319,13 @@ int kvm_cpu_exec(CPUState *cpu)
                 //magic number
                 // should_fork = 'a';
                 // cpu->nr_fork_vms = 1;
+                #ifdef DBG
                 printf("CPUFORK :: Event RFD : %d\n", cpu->fork_event.rfd);
                 printf("CPUFORK :: Event WFD : %d\n", cpu->fork_event.wfd);
                 // pipe(forkvmfd);
                 printf("fork_fd[0] : %d -- fork_fd[1] : %d\n", cpu->fork_fd[0], cpu->fork_fd[1]);
                 printf("writing to the fork pipe ------ \n");
+                #endif 
                 // do {
                 //     ret = write(cpu->fork_event.wfd, &should_fork, sizeof(should_fork));
                 // } while (ret < 0 && errno == EINTR);
@@ -3273,6 +3343,11 @@ int kvm_cpu_exec(CPUState *cpu)
 
                     ski_forkall_slave(&did_fork, &is_child);
                     if(did_fork){
+                        // [Bilal] [Measure] clock time when cpu thread is restored
+                        if( clock_gettime( CLOCK_REALTIME, &(cpu->cpu_thread_forked)) == -1 ) {
+                            perror( "clock gettime" );
+                            exit( EXIT_FAILURE );
+                        }
                         qemu_thread_get_self(cpu->thread);
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
@@ -3282,11 +3357,18 @@ int kvm_cpu_exec(CPUState *cpu)
 
                             run = cpu->kvm_run;
                             s = cpu->kvm_state;
+                            // [Bilal] [Measure] clock time on complete CPU restore
+                            if( clock_gettime( CLOCK_REALTIME, &(cpu->end_cpu_restore)) == -1 ) {
+                                perror( "clock gettime" );
+                                exit( EXIT_FAILURE );
+                            } 
                             // cpu->vcpu_dirty = false;
                             // qemu_mutex_lock_iothread();
                             // return ret;
                             // cpu_synchronize_post_reset(cpu);
-                            
+                            #ifdef DBG_MEASURE
+                            kvm_vcpu_print_times(cpu);
+                            #endif
                         }
                         cpu->should_wait = false;
                         
@@ -3326,8 +3408,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 //printing a value from the first slot before fork 
 
                 // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
+                #ifdef DBG
                 printf("Parent PID : %ld\n", (long)getpid());
-                
+                #endif
                 fflush(stdout);
                 gettimeofday(&t, NULL);
                 

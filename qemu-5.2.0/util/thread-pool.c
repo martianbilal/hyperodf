@@ -106,7 +106,8 @@ static void *worker_thread(void *opaque)
                 forked:
 				// After forking resort to the original code
 				qemu_mutex_unlock(&pool->lock);
-                ret = qemu_sem_timedwait(&pool->sem, 1000000);
+                qemu_sem_wait(&pool->sem);
+                ret = 0;
                 qemu_mutex_lock(&pool->lock);
             }
             else {

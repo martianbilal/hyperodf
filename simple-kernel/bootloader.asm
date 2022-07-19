@@ -50,16 +50,7 @@ mov bx, helloWorld
 call printString
 
 ; printing the first "h" we have written on disk
-mov ah, 0x0e
-mov al, [PROGRAM_SPACE]
-int 0x10
 
-
-mov bx, [PROGRAM_SPACE]
-call printString
-
-mov bx, [PROGRAM_SPACE]
-call printString
 
 ; mov ax, [PROGRAM_SPACE]
 ; mov dx, 300h

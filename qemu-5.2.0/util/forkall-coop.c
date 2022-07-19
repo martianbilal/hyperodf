@@ -42,7 +42,7 @@ static int ski_create_thread_custom_stack(forkall_thread *t, pthread_t *thread, 
 */
 
 // Uncomment to enable debugging
-#define FORKALL_DEBUGGING
+// #define FORKALL_DEBUGGING
 
 pid_t ski_gettid(void){
     pid_t own_tid = syscall(SYS_gettid);
@@ -410,7 +410,6 @@ pid_t ski_forkall_master(){
 	}
 
 	// Now that we got the state of all threads 
-
 	int pid = -1;
 	while(pid != 0)
 	if((pid = fork())){
