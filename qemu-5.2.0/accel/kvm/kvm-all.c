@@ -3287,7 +3287,6 @@ int kvm_cpu_exec(CPUState *cpu)
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
                 
-                      
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 

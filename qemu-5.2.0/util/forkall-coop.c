@@ -302,15 +302,15 @@ void ski_forkall_slave(int *did_fork, int *is_child){
 	// XXX: This implementation always hangs the secondary threads of the parent process that issued the fork
 
 	ski_log_forkall("[SECUNDARY] Done saving own state. Hanging.\n");
-	while(1){
-		sleep(1);
-		if(ski_forkall_parent_simulate_child){
-			// Debugging: used by SKI_DEBUG_PARENT_EXECUTES_ENABLED
-			*did_fork = 1;
-			*is_child = 1;
-			return;
-		}
-	}
+	// while(1){
+	// 	sleep(1);
+	// 	if(ski_forkall_parent_simulate_child){
+	// 		// Debugging: used by SKI_DEBUG_PARENT_EXECUTES_ENABLED
+	// 		*did_fork = 1;
+	// 		*is_child = 1;
+	// 		return;
+	// 	}
+	// }
 
 	// TODO: Get out of the barrier
 }

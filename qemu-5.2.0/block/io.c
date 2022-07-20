@@ -999,7 +999,7 @@ int bdrv_pread(BdrvChild *child, int64_t offset, void *buf, int bytes)
 
     #ifdef DBG 
     printf("%s is called\n", __func__);
-    print_backtrace();
+    // print_backtrace();
     #endif 
 
     if (bytes < 0) {

@@ -30,7 +30,15 @@ call printString
 ; out dx, eax
 
 
+call readDisk
+call printString
+
+; call writeDisk
+
 ; call readDisk
+; call printString
+
+
 
 ; this is the hypercall for FORK
 mov eax, 63h
@@ -41,6 +49,16 @@ mov bx, helloWorld
 call printString
 
 call readDisk
+call printString
+
+call writeDisk
+
+mov bx, helloWorld
+call printString
+
+call readDisk
+call printString
+
 
 ; mov ax, 65h
 ; mov dx, 300h
@@ -56,9 +74,9 @@ call printString
 ; mov dx, 300h
 ; out dx, ax
 
-; mov ax, 63h
-; mov dx, 300h
-; out dx, ax
+mov ax, 63h
+mov dx, 300h
+out dx, ax
 
 
 jmp $

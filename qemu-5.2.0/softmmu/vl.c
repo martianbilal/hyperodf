@@ -3485,6 +3485,7 @@ void handle_fork(void *opaque){
 
     //if the result is 1, we are ready for the fork 
     if(result == 1){
+        // return;
         #ifdef DBG
         printf("we can fork the main thread now\n");
         printf("Saving the snapshot! \n");
@@ -3519,7 +3520,7 @@ void handle_fork(void *opaque){
 
         bdrv_drain_all_begin();
         // cpu_synchronize_all_states();
-        cpu_stop_current();
+        // cpu_stop_current();
         // // job_cancel_sync_all();
         // bdrv_close_all();
         bdrv_drain_all_end();
@@ -3721,10 +3722,10 @@ void handle_fork(void *opaque){
             qemu_mutex_lock_iothread();
             return; 
         } else {
-            // waitpid(ret, &status, 0);
+            waitpid(ret, &status, 0);
             // qemu_cleanup();
-            exit(0);
-            // return;
+            // exit(0);
+            return;
             // qemu_mutex_unlock_iothread();
 
         }

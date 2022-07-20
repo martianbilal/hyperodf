@@ -2893,7 +2893,7 @@ MemTxResult address_space_read_full(AddressSpace *as, hwaddr addr,
     // if(addr == 496)
     // {
         #ifdef DBG_MEMORY
-        printf("First DATA Val : %s\n", (char *)buf);
+        printf("[debug] [PID : %ld] First DATA Val : %s\n", (long)getpid(), (char *)buf);
         #endif
     // }
 
