@@ -120,7 +120,7 @@ static void *worker_thread(void *opaque)
                     // printf("ret value : %d\n", ski_forkall_hypercall_done);
                     if(!ski_forkall_hypercall_done){
                         ski_forkall_thread_pool_not_ready();
-                        ret = qemu_sem_timedwait(&pool->sem, 1000);
+                        ret = qemu_sem_timedwait(&pool->sem, 10000);
                         ski_forkall_thread_pool_ready();
                     }
                     // printf("[debug] [aio-thread] lock : %d \n", ret);

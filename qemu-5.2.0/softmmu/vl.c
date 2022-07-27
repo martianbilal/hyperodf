@@ -3098,6 +3098,50 @@ static char *find_datadir(void)
 
 // }
 
+int read_cpu_state(CPUState *cpu, char *filename){
+    FILE *infile; 
+    infile = fopen(filename, "r");
+    if (infile == NULL)
+	{
+		fprintf(stderr, "\nError opening CPU dump file\n");
+		exit (1);
+	}
+
+    fread(cpu, sizeof(CPUState), 1, infile);
+    
+    if(fwrite != 0)
+		printf("[log] loaded cpu content from %s!\n", filename);
+	else
+		printf("[log] failed to load cpu from %s!\n", filename);
+
+	// close file
+	fclose (infile);
+    return 0;
+}
+
+int dump_cpu_state(CPUState *cpu, char *filename){
+    FILE *outfile; 
+    outfile = fopen(filename, "w");
+    if (outfile == NULL)
+	{
+		fprintf(stderr, "\nError opening CPU dump file\n");
+		exit (1);
+	}
+
+    fwrite (cpu, sizeof(CPUState), 1, outfile);
+    
+    if(fwrite != 0)
+		printf("[log] dumped cpu content to %s!\n", filename);
+	else
+		printf("[log] failed cpu dump to %s!\n", filename);
+
+	// close file
+	fclose (outfile);
+
+	return 0;
+
+}
+
 /**
  * @brief VCPU Thread init function fails if some of the CPUState fields 
  * have already been set, this functions handles resetting those fields. 
@@ -3122,10 +3166,27 @@ static void cpu_reset_state(CPUState *cpu){
 int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     int ret; 
     struct KVMState *s = cpu->kvm_state; 
+    struct kvm_run *run;
 	struct kvm_pit_config pit_config = { .flags = 0, };
     int identity_base = 0xfeffc000;
     int mmap_size; 
 
+
+    cpu->kvm_fd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
+    
+    
+    //set up the kvm_run for the vcpu --> update it in the vmstate
+    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
+    if (mmap_size < 0) {
+        ret = mmap_size;
+        return -1;
+    }
+    // runstate_set(RUN_STATE_RUNNING);
+    // qemu_notify_event();
+    run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                        cpu->kvm_fd, 0);
+    memcpy(cpu->kvm_run, run, sizeof(run)); 
+    cpu->kvm_run = run;
     
     #ifdef DBG
     printf("[debug] setting vm state\n");
@@ -3192,21 +3253,7 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
         ret = ioctl(s->vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
     } while (ret == -EINTR);
     
-    #ifdef SET_VCPU_IN_MAIN
-    cpu->kvm_fd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
-    
-    
-    //set up the kvm_run for the vcpu --> update it in the vmstate
-    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
-    if (mmap_size < 0) {
-        ret = mmap_size;
-        return -1;
-    }
-    // runstate_set(RUN_STATE_RUNNING);
-    // qemu_notify_event();
-    cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        cpu->kvm_fd, 0);
-                    
+    #ifdef SET_VCPU_IN_MAIN            
 
     ret = kvm_set_vcpu_attrs(cpu, state, cpu->kvm_fd);
 
@@ -3265,7 +3312,7 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     #endif 
 
     //get the values of the attributes before the fork
-    cpu_get_pre_fork_state(state, cpu->kvm_fd);
+    cpu_get_pre_fork_state(cpu, state, cpu->kvm_fd);
     #ifdef DBG
         printf("[debug] Done with getting cpu state! \n");
         fflush(stdout);
@@ -3485,6 +3532,9 @@ void handle_fork(void *opaque){
 
     //if the result is 1, we are ready for the fork 
     if(result == 1){
+        dump_cpu_state(cpu, "pre-fork.dat");
+        cpu->cpu_ases = NULL;
+        read_cpu_state(cpu, "pre-fork.dat");
         // return;
         #ifdef DBG
         printf("we can fork the main thread now\n");
@@ -3531,7 +3581,7 @@ void handle_fork(void *opaque){
 
         aio_context_acquire(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
-        fork_save_vm_state(cpu, prefork_state);
+        // fork_save_vm_state(cpu, prefork_state);
         // close(9);
         // save_kvm_state(cpu); 
 

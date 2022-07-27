@@ -5,4 +5,4 @@ gdb -q --args /usr/local/bin/qemu-system-x86_64 \
   -snapshot \
   -drive file=./snapshot.qcow2,format=qcow2 \
   -enable-kvm \
-  -nographic \
+  -nographic | tee gdb_out.txt \

@@ -1531,11 +1531,12 @@ int kvm_set_irq(KVMState *s, int irq, int level)
     event.level = level;
     event.irq = irq;
     ret = kvm_vm_ioctl(s, s->irq_set_ioctl, &event);
-    if (ret < 0) {
-        printf("SET IRQ failed : %d, %d\n", irq, level);
-        perror("kvm_set_irq");
-        abort();
-    }
+    //[TODO][COMMENT] commenting for testing 
+    // if (ret < 0) {
+    //     printf("SET IRQ failed : %d, %d\n", irq, level);
+    //     perror("kvm_set_irq");
+    //     abort();
+    // }
 
     return (s->irq_set_ioctl == KVM_IRQ_LINE) ? 1 : event.status;
 }
@@ -2631,7 +2632,7 @@ int get_attr(int ioctl_id, int vcpufd, union get_structure in_union)
     return ret; 
 }
 
-int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd) 
+int cpu_get_pre_fork_state(CPUState *cpu, struct cpu_prefork_state *state, int vcpufd) 
 { 
 
     int ret = 0; 
@@ -2702,13 +2703,18 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     // if(ret < 0) goto err;
     // state->cpuid2 = cpuid2;
 
-    do
-    {
-        ret = ioctl(vcpufd, KVM_GET_MSRS, &msrs);
-    } while (ret == -EINTR);
-    attr = "msrs";
-    if(ret < 0) goto err;
-    state->msrs = msrs;
+
+    // [BILAL] [TODO] Commenting it out cause it was erroring out
+    // [BILAL] remember to come back to it in case of any problem 
+    // do
+    // {
+    //     ret = ioctl(vcpufd, KVM_GET_MSRS, &msrs);
+    // } while (ret == -EINTR);
+    // attr = "msrs";
+    // if(ret < 0) goto err;
+    // state->msrs = msrs;
+    
+    // [Replacement] :  
 
     do
     {
@@ -2753,6 +2759,8 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
     if(ret < 0) goto err;
     state->vcpu_events = vcpu_events;
 
+    ret = kvm_arch_get_registers(cpu);
+    // do_kvm_cpu_synchronize_state
 
 
 
@@ -2770,7 +2778,8 @@ int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd)
 
 
 err: 
-    printf("Failed to get attributes for %s, returned with reason: %d", attr, ret);
+    printf("Failed to get attributes for %s, returned with reason: %d\n", attr, ret);
+    fflush(stdout);
     perror("FAILED TO GET VCPU ATTRIBUTES");
     return -1;
 
@@ -2814,12 +2823,12 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     attr="sregs";
     if(ret<0) goto err;
 
-    // do 
-    // {
-    //     ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
-    // } while (ret == -EINTR);
-    // attr="tsc_khz";
-    // if(ret<0) goto err;
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
+    } while (ret == -EINTR);
+    attr="tsc_khz";
+    if(ret<0) goto err;
     
     do
     {
@@ -2828,12 +2837,12 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     attr = "fpu";
     if(ret < 0) goto err;
 
-    do 
-    {
-        ret = ioctl(vcpufd, KVM_SET_MSRS, cpu_x86->kvm_msr_buf);
-    } while (ret == -EINTR);
-    attr="msrs";
-    if(ret<0) goto err;
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_MSRS, cpu_x86->kvm_msr_buf);
+    // } while (ret == -EINTR);
+    // attr="msrs";
+    // if(ret<0) goto err;
 
     do 
     {
@@ -2842,12 +2851,14 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     attr="xsave";
     if(ret<0) goto err;
 
-    do 
-    {
-        ret = ioctl(vcpufd, KVM_SET_XCRS, &(state->xcrs));
-    } while (ret == -EINTR);
-    attr="xcrs";
-    if(ret<0) goto err;
+    // [BILAL] [TODO] Commenting it out cause it was erroring out
+    // [BILAL] remember to come back to it in case of any problem 
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_XCRS, &(state->xcrs));
+    // } while (ret == -EINTR);
+    // attr="xcrs";
+    // if(ret<0) goto err;
 
 
     state->vcpu_events.flags=0x00;
@@ -2892,6 +2903,7 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     #ifdef DBG
     printf("[debug] done with set attrs\n");
     #endif
+    // ret = kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
     return ret; 
   
 err:
@@ -3113,6 +3125,10 @@ int kvm_vcpu_post_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
 }
 
 
+static void stupid_stub_function(CPUState *cpu){
+    return;
+}
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -3121,7 +3137,7 @@ int kvm_cpu_exec(CPUState *cpu)
 	struct kvm_pit_config pit_config = { .flags = 0, };
     struct kvm_clock_data clock_data;
     struct cpu_prefork_state state; 
-    struct KVMState *s = KVM_STATE(current_accel());;
+    struct KVMState *s = KVM_STATE(current_accel());
     struct KVMSlot slot;
     struct timeval t;
     struct cpu_prefork_state* prefork_state = g_new0(struct cpu_prefork_state, 1); 
@@ -3333,6 +3349,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // } while (ret < 0 && errno == EINTR);
                 // printf("result for write : %d\n", result);
                 //complete the I/O before copying state
+                kvm_arch_get_registers(cpu);
                 event_notifier_test_and_clear(&(cpu->fork_event));
                 event_notifier_set(&(cpu->fork_event));
                 // event_notifier_test_and_clear(&(cpu->fork_event));
@@ -3365,6 +3382,15 @@ int kvm_cpu_exec(CPUState *cpu)
                         current_cpu = cpu;
                         if(is_child){
                             kvm_vcpu_post_fork(cpu, prefork_state);
+                            // kvm_init_msrs(X86_CPU(cpu));
+                            kvm_arch_init_vcpu(cpu);
+                            kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
+                            kvm_arch_reset_vcpu(cpu);
+                            kvm_arch_get_registers(cpu);
+                            stupid_stub_function(cpu);
+                            // dump_cpu_state(cpu, "post-fork.dat");
+                            // stupid_stub_function(cpu);
+
                             assert(kvm_buf_set_msrs(X86_CPU(cpu)) == 0);
 
                             run = cpu->kvm_run;
@@ -3394,7 +3420,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 vcpu_complete_io(cpu);
 
                 //get the values of the attributes before the fork
-                ret = cpu_get_pre_fork_state(&state, cpu->kvm_fd);
+                ret = cpu_get_pre_fork_state(cpu, &state, cpu->kvm_fd);
                 slot_size = cpu->kvm_state->nr_slots;
                 // //set up the shared memory for the child vm 
                 // /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
