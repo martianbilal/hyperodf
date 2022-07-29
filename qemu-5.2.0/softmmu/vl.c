@@ -3253,6 +3253,7 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
         ret = ioctl(s->vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
     } while (ret == -EINTR);
     
+
     #ifdef SET_VCPU_IN_MAIN            
 
     ret = kvm_set_vcpu_attrs(cpu, state, cpu->kvm_fd);
@@ -3348,6 +3349,16 @@ int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     #endif
     // fflush(stdout);
     
+    // do
+    // {
+    //     ret = ioctl(s->vmfd, KVM_GET_TSC_KHZ, 0);
+    // } while (ret == -EINTR);
+    // if(ret < 0) 
+    // {
+    //     perror("master failed");
+    // }
+    // state->tsc_khz = ret; 
+
     do
     {
         #ifdef DBG

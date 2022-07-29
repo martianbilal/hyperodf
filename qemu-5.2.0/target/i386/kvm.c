@@ -560,6 +560,15 @@ static void hardware_memory_error(void *host_addr)
     exit(1);
 }
 
+void kvm_vcpu_debug_print_rip(CPUState *c){
+    X86CPU *cpu = X86_CPU(c);
+    CPUX86State *env = &cpu->env;
+       
+    //print the rip 
+    printf("[DEBUG] [RIP] [CHILD VCPU] RIP : %p\n", env->eip);
+
+}
+
 void kvm_arch_on_sigbus_vcpu(CPUState *c, int code, void *addr)
 {
     X86CPU *cpu = X86_CPU(c);
@@ -2535,7 +2544,7 @@ static int kvm_put_msr_feature_control(X86CPU *cpu)
         return ret;
     }
 
-    // assert(ret == 1);
+    assert(ret == 1);
     return 0;
 }
 
@@ -2692,14 +2701,15 @@ int kvm_buf_set_msrs(X86CPU *cpu)
         return ret;
     }
 
-    // if (ret < cpu->kvm_msr_buf->nmsrs) {
-    //     struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
-    //     error_report("error: failed to set MSR 0x%" PRIx32 " to 0x%" PRIx64,
-    //                  (uint32_t)e->index, (uint64_t)e->data);
-    // }
+    if (ret < cpu->kvm_msr_buf->nmsrs) {
+        print_backtrace();
+        struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
+        error_report("error: failed to set MSR 0x%" PRIx32 " to 0x%" PRIx64,
+                     (uint32_t)e->index, (uint64_t)e->data);
+    }
 
     // [TODO] [COMMENT] commenting out for testing 
-    // assert(ret == cpu->kvm_msr_buf->nmsrs);
+    assert(ret == cpu->kvm_msr_buf->nmsrs);
     return 0;
 }
 
@@ -3317,16 +3327,16 @@ static int kvm_get_msrs(X86CPU *cpu)
         return ret;
     }
 
-    // if (ret < cpu->kvm_msr_buf->nmsrs) {
-    //     struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
-    //     printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
-    //     fflush(stdout);
-    //     error_report("error: failed to get MSR 0x%" PRIx32,
-    //                  (uint32_t)e->index);
-    // }
+    if (ret < cpu->kvm_msr_buf->nmsrs) {
+        struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
+        printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
+        fflush(stdout);
+        error_report("error: failed to get MSR 0x%" PRIx32,
+                     (uint32_t)e->index);
+    }
 
     // [TODO] [COMMENT] commenting out for testing 
-    // assert(ret == cpu->kvm_msr_buf->nmsrs);
+    assert(ret == cpu->kvm_msr_buf->nmsrs);
     if(ret != cpu->kvm_msr_buf->nmsrs){
         printf("[DEBUG] ret != nmsrs\n");
         printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);

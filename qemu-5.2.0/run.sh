@@ -11,6 +11,7 @@
   -net nic,model=e1000 \
   -enable-kvm \
   -nographic \
+  -s\
   -monitor unix:qemu-monitor-socket,server,nowait \
   -pidfile vm.pid \
   2>&1 | tee vm.log

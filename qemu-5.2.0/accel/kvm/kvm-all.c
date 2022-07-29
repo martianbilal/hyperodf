@@ -59,10 +59,16 @@
 
 #include "hw/boards.h"
 #include "util/forkall-coop.h"
+// #include "cpu.h"
+
 
 
 // #define DBG_IO
 #define DBG_MEASURE
+#define DBG_RIP_CHILD
+
+// uncomment to print Parent RIP before each KVM_RUN [post fork]
+//#define DBG_RIP_PARENT
 
 #define BILLION  1E9
 
@@ -88,6 +94,8 @@ static int FORK_COUNTER = 0;
 // #define TIMESTAMP_PRINT 1 
 
 //#define DEBUG_KVM
+
+
 
 #ifdef DEBUG_KVM
 #define DPRINTF(fmt, ...) \
@@ -3034,17 +3042,13 @@ int kvm_vcpu_post_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
     int status;
     Error *local_err = NULL;
 
-    close(cpu->kvm_fd);
-    close(s->fd);
-    close(s->vmfd);
-
     #ifdef DBG 
         printf("[debug] creating child VM \n"); 
     #endif
     // raise(SIGSTOP);
     //open the new kvm fds
-    s->fd = open("/dev/kvm", 2); 
-    s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+    // s->fd = open("/dev/kvm", 2); 
+    // s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
     if (s->vmfd < 0) {
     fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
         strerror(-ret));
@@ -3141,6 +3145,8 @@ int kvm_cpu_exec(CPUState *cpu)
     struct KVMSlot slot;
     struct timeval t;
     struct cpu_prefork_state* prefork_state = g_new0(struct cpu_prefork_state, 1); 
+    // X86CPU *c86 = x86_CPU(cpu);
+
 
     char should_fork; 
     Error *err = NULL;
@@ -3209,9 +3215,33 @@ int kvm_cpu_exec(CPUState *cpu)
          * Matching barrier in kvm_eat_signals.
          */
         smp_rmb();
+        
+        #ifdef DBG_RIP_PARENT
+        // check if we are running a child VM 
+        if(cpu->forked && !cpu->child_cpu){
+            // print the rip in that case 
+            // synchronize the RIP with the actual VM 
+            kvm_arch_get_registers(cpu);
+            kvm_vcpu_debug_print_rip(cpu);
+            // print the synchornized VCPU RIP
+        }
+        #endif
+        
+        #ifdef DBG_RIP_CHILD
+        // check if we are running a child VM 
+        if(cpu->forked && cpu->child_cpu){
+            // print the rip in that case 
+            // synchronize the RIP with the actual VM 
+            kvm_arch_get_registers(cpu);
+            kvm_vcpu_debug_print_rip(cpu);
+            // print the synchornized VCPU RIP
+        }
+        #endif
+
 
         // printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        
 
         attrs = kvm_arch_post_run(cpu, run);
 
@@ -3372,6 +3402,7 @@ int kvm_cpu_exec(CPUState *cpu)
                     }
                     ski_forkall_slave(&did_fork, &is_child);
                     if(did_fork){
+                        cpu->forked = true;
                         // [Bilal] [Measure] clock time when cpu thread is restored
                         if( clock_gettime( CLOCK_REALTIME, &(cpu->cpu_thread_forked)) == -1 ) {
                             perror( "clock gettime" );
@@ -3381,17 +3412,24 @@ int kvm_cpu_exec(CPUState *cpu)
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
                         if(is_child){
-                            kvm_vcpu_post_fork(cpu, prefork_state);
+                            cpu->is_child = true;
+                            close(cpu->kvm_fd);
+                            close(s->fd);
+                            close(s->vmfd);
+                            s->fd = open("/dev/kvm", 2); 
+                            s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
                             // kvm_init_msrs(X86_CPU(cpu));
-                            kvm_arch_init_vcpu(cpu);
+                            kvm_vcpu_post_fork(cpu, prefork_state);
+                            kvm_init_vcpu(cpu, NULL);
                             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
                             kvm_arch_reset_vcpu(cpu);
+                            kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             kvm_arch_get_registers(cpu);
                             stupid_stub_function(cpu);
                             // dump_cpu_state(cpu, "post-fork.dat");
                             // stupid_stub_function(cpu);
 
-                            assert(kvm_buf_set_msrs(X86_CPU(cpu)) == 0);
+                            // assert(kvm_buf_set_msrs(X86_CPU(cpu)) == 0);
 
                             run = cpu->kvm_run;
                             s = cpu->kvm_state;
@@ -3407,6 +3445,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             #ifdef DBG_MEASURE
                             kvm_vcpu_print_times(cpu);
                             #endif
+                            // exit(0);
                         }
                         cpu->should_wait = false;
                         

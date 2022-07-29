@@ -488,6 +488,9 @@ struct CPUState {
     int hvf_fd;
     /* Used to send fork signals */
     int fork_fd[2]; 
+
+    bool forked; 
+
     /* track IOMMUs whose translations we've cached in the TCG TLB */
     GArray *iommu_notifiers;
     struct cpu_prefork_state *prefork_state;
