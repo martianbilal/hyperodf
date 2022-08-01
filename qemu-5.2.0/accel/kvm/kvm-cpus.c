@@ -41,6 +41,9 @@ static void *kvm_vcpu_thread_fn(void *arg)
     printf("[debug] entered vcpu thread function! \n");
     #endif
 
+    qemu_mutex_init(&cpu->vcpu_recreated_mutex);
+    qemu_cond_init(&cpu->vcpu_recreated_cond);
+    cpu->vcpu_recreated = false;
     cpu->should_wait = false;
     cpu->vm_forked = false;
     cpu->is_child = false; 

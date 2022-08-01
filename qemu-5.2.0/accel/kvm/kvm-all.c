@@ -65,10 +65,10 @@
 
 // #define DBG_IO
 #define DBG_MEASURE
-#define DBG_RIP_CHILD
+// #define DBG_RIP_CHILD
 
 // uncomment to print Parent RIP before each KVM_RUN [post fork]
-//#define DBG_RIP_PARENT
+//#define DBG_TEST_RIP_PARENT_EXCLUSIVE
 
 #define BILLION  1E9
 
@@ -546,7 +546,9 @@ static int do_kvm_destroy_vcpu(CPUState *cpu)
     if (ret < 0) {
         goto err;
     }
-
+    
+    qemu_mutex_destroy(&cpu->vcpu_recreated_mutex);
+    qemu_cond_destroy(&cpu->vcpu_recreated_cond);
     vcpu = g_malloc0(sizeof(*vcpu));
     vcpu->vcpu_id = kvm_arch_vcpu_id(cpu);
     vcpu->kvm_fd = cpu->kvm_fd;
@@ -3380,6 +3382,10 @@ int kvm_cpu_exec(CPUState *cpu)
                 // printf("result for write : %d\n", result);
                 //complete the I/O before copying state
                 kvm_arch_get_registers(cpu);
+
+                // [DEBUG] [BILAL] Adding this to test if the disk snapshot can be 
+                // reloaded in the child VM
+
                 event_notifier_test_and_clear(&(cpu->fork_event));
                 event_notifier_set(&(cpu->fork_event));
                 // event_notifier_test_and_clear(&(cpu->fork_event));
@@ -3426,6 +3432,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             kvm_arch_get_registers(cpu);
                             stupid_stub_function(cpu);
+
                             // dump_cpu_state(cpu, "post-fork.dat");
                             // stupid_stub_function(cpu);
 
@@ -3438,6 +3445,10 @@ int kvm_cpu_exec(CPUState *cpu)
                                 perror( "clock gettime" );
                                 exit( EXIT_FAILURE );
                             } 
+                            cpu->vcpu_recreated = true;
+                            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+                            qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
+                            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
                             // cpu->vcpu_dirty = false;
                             // qemu_mutex_lock_iothread();
                             // return ret;
@@ -3445,7 +3456,10 @@ int kvm_cpu_exec(CPUState *cpu)
                             #ifdef DBG_MEASURE
                             kvm_vcpu_print_times(cpu);
                             #endif
-                            // exit(0);
+
+                            #ifdef DBG_TEST_RIP_PARENT_EXCLUSIVE
+                            exit(0);
+                            #endif
                         }
                         cpu->should_wait = false;
                         
@@ -3539,7 +3553,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 timestamps[1] = milliseconds;
                 printf("Saving Snapshot====\n");
                 qemu_mutex_lock_iothread();
-                save_snapshot("fork-snap", &err);
+                // save_snapshot("fork-snap", &err);
                 qemu_mutex_unlock_iothread();
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
                 dumpKVMState(s, "./ParentKVMDump", "Parent VM");

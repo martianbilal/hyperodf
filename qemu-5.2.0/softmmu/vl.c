@@ -124,6 +124,7 @@
 
 #define MAX_VIRTIO_CONSOLES 1
 // #define DBG
+#define DBG_CMP_DRIVE_SNAPSHOT
 #define SET_VCPU_IN_MAIN
 
 static const char *SNAPSHOT_DISK_NAME = "prefork_state";
@@ -3619,6 +3620,10 @@ void handle_fork(void *opaque){
             perror( "clock gettime" );
             exit( EXIT_FAILURE );
         }
+
+        #ifdef DBG_CMP_DRIVE_SNAPSHOT
+        save_snapshot("ForkTest", NULL);
+        #endif  
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
         // [Bilal] [Measure] clock time on return from forkall master
@@ -3639,6 +3644,14 @@ void handle_fork(void *opaque){
                 perror( "clock gettime" );
                 exit( EXIT_FAILURE );
             } 
+            
+            #ifdef DBG_CMP_DRIVE_SNAPSHOT
+            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+            qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+            load_snapshot("ForkTest", NULL);
+            #endif
+        
             // sleep(30);
             /*child process*/
             // TODO : Create a new KVM VM and VCPU and

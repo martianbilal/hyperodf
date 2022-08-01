@@ -494,6 +494,9 @@ struct CPUState {
     /* track IOMMUs whose translations we've cached in the TCG TLB */
     GArray *iommu_notifiers;
     struct cpu_prefork_state *prefork_state;
+    bool vcpu_recreated;
+    QemuMutex vcpu_recreated_mutex; 
+    QemuCond vcpu_recreated_cond;
 };
 
 typedef QTAILQ_HEAD(CPUTailQ, CPUState) CPUTailQ;
