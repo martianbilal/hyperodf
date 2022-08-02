@@ -3544,6 +3544,13 @@ void handle_fork(void *opaque){
 
     //if the result is 1, we are ready for the fork 
     if(result == 1){
+         #ifdef DBG_CMP_DRIVE_SNAPSHOT
+        // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+        // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+        // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+        // load_snapshot("forktest", NULL);
+        // return;
+        #endif
         dump_cpu_state(cpu, "pre-fork.dat");
         cpu->cpu_ases = NULL;
         read_cpu_state(cpu, "pre-fork.dat");
@@ -3622,7 +3629,7 @@ void handle_fork(void *opaque){
         }
 
         #ifdef DBG_CMP_DRIVE_SNAPSHOT
-        save_snapshot("ForkTest", NULL);
+        // save_snapshot("ForkTest", NULL);
         #endif  
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
@@ -3646,10 +3653,17 @@ void handle_fork(void *opaque){
             } 
             
             #ifdef DBG_CMP_DRIVE_SNAPSHOT
+            vm_stop(RUN_STATE_RESTORE_VM);
+            
+            // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+            // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+            // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
             qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-            qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+            qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
             qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-            load_snapshot("ForkTest", NULL);
+            printf("[DEBUG] load snapshot is called!\n");
+            fflush(stdout);
+            load_snapshot("fork-snap", NULL);
             #endif
         
             // sleep(30);

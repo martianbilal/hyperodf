@@ -3392,6 +3392,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
                 ret = 0; 
+                // break;
                 while(1) {
                     int did_fork;
                     int is_child; 
@@ -3418,6 +3419,8 @@ int kvm_cpu_exec(CPUState *cpu)
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
                         if(is_child){
+                            qemu_cond_init(&cpu->vcpu_recreated_cond);
+                            qemu_mutex_init(&cpu->vcpu_recreated_mutex);
                             cpu->is_child = true;
                             close(cpu->kvm_fd);
                             close(s->fd);
@@ -3447,8 +3450,11 @@ int kvm_cpu_exec(CPUState *cpu)
                             } 
                             cpu->vcpu_recreated = true;
                             qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-                            qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
+                            qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
                             qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+                            // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+                            // qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
+                            // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
                             // cpu->vcpu_dirty = false;
                             // qemu_mutex_lock_iothread();
                             // return ret;
