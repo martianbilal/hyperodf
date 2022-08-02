@@ -497,6 +497,7 @@ struct CPUState {
     bool vcpu_recreated;
     QemuMutex vcpu_recreated_mutex; 
     QemuCond vcpu_recreated_cond;
+    bool system_reset;
 };
 
 typedef QTAILQ_HEAD(CPUTailQ, CPUState) CPUTailQ;

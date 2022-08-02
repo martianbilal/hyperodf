@@ -48,6 +48,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu->vm_forked = false;
     cpu->is_child = false; 
     cpu->forked = false;
+    cpu->system_reset = false;
     
     rcu_register_thread();
     ski_forkall_thread_add_self_tid();

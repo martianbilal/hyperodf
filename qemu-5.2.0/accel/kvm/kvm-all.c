@@ -66,6 +66,8 @@
 // #define DBG_IO
 #define DBG_MEASURE
 // #define DBG_RIP_CHILD
+// #define DBG_RIP_PARENT
+// #define DBG_RIP_PARENT_PREFORK
 
 // uncomment to print Parent RIP before each KVM_RUN [post fork]
 //#define DBG_TEST_RIP_PARENT_EXCLUSIVE
@@ -3217,6 +3219,17 @@ int kvm_cpu_exec(CPUState *cpu)
          * Matching barrier in kvm_eat_signals.
          */
         smp_rmb();
+
+        #ifdef DBG_RIP_PARENT_PREFORK
+        // check if we are running a child VM 
+        if(!cpu->forked && !cpu->child_cpu){
+            // print the rip in that case 
+            // synchronize the RIP with the actual VM 
+            kvm_arch_get_registers(cpu);
+            kvm_vcpu_debug_print_rip(cpu);
+            // print the synchornized VCPU RIP
+        }
+        #endif
         
         #ifdef DBG_RIP_PARENT
         // check if we are running a child VM 
@@ -3388,6 +3401,9 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 event_notifier_test_and_clear(&(cpu->fork_event));
                 event_notifier_set(&(cpu->fork_event));
+                // qemu_mutex_lock_iothread();
+                // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+
                 // event_notifier_test_and_clear(&(cpu->fork_event));
                 // cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
@@ -3419,6 +3435,9 @@ int kvm_cpu_exec(CPUState *cpu)
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
                         if(is_child){
+                            vm_stop(RUN_STATE_RESTORE_VM);
+                            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+
                             qemu_cond_init(&cpu->vcpu_recreated_cond);
                             qemu_mutex_init(&cpu->vcpu_recreated_mutex);
                             cpu->is_child = true;
@@ -3432,6 +3451,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             kvm_init_vcpu(cpu, NULL);
                             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
                             kvm_arch_reset_vcpu(cpu);
+                            // prefork_state->regs.rip = 0xfff0;
                             kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             kvm_arch_get_registers(cpu);
                             stupid_stub_function(cpu);
@@ -3449,9 +3469,9 @@ int kvm_cpu_exec(CPUState *cpu)
                                 exit( EXIT_FAILURE );
                             } 
                             cpu->vcpu_recreated = true;
-                            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-                            qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
-                            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+                            // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+                            // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+                            // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
                             // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
                             // qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
                             // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
