@@ -4744,3 +4744,11 @@ bool kvm_has_waitpkg(void)
 {
     return has_msr_umwait;
 }
+
+void kvm_set_old_env(){
+
+}
+
+int kvm_post_fork_fixup_env(CPUState *cpu){
+    return 0;
+}

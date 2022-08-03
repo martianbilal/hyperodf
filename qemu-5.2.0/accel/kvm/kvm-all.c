@@ -56,6 +56,7 @@
 #include "kvm-cpus.h"
 #include "migration/snapshot.h"
 #include "migration/misc.h"
+#include "target/i386/cpu.h"
 
 #include "hw/boards.h"
 #include "util/forkall-coop.h"
@@ -65,6 +66,7 @@
 
 // #define DBG_IO
 #define DBG_MEASURE
+#define DBG_FDS
 // #define DBG_RIP_CHILD
 // #define DBG_RIP_PARENT
 // #define DBG_RIP_PARENT_PREFORK
@@ -96,6 +98,13 @@ static int FORK_COUNTER = 0;
 // #define TIMESTAMP_PRINT 1 
 
 //#define DEBUG_KVM
+
+// #define DEBUG
+#ifdef DEBUG
+#define DEBUG_PRINTF(format, ...) do{  fprintf( stderr, "%s::%s(%d) " format, __FILE__, __FUNCTION__,  __LINE__, ##__VA_ARGS__ ); } while( 0 )
+#else
+#define DEBUG_PRINTF(format, ...) do{ } while ( 0 )
+#endif
 
 
 
@@ -603,7 +612,7 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
 
     trace_kvm_init_vcpu(cpu->cpu_index, kvm_arch_vcpu_id(cpu));
 
-    if(cpu->child_cpu){
+    if(cpu->is_child){
         ret = cpu->kvm_fd;
     } else {
         ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu));
@@ -627,16 +636,17 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
         goto err;
     }
 
-    cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        cpu->kvm_fd, 0);
-    if (cpu->kvm_run == MAP_FAILED) {
-        ret = -errno;
-        error_setg_errno(errp, ret,
-                         "kvm_init_vcpu: mmap'ing vcpu state failed (%lu)",
-                         kvm_arch_vcpu_id(cpu));
-        goto err;
+    if(!cpu->is_child){    
+        cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                            cpu->kvm_fd, 0);
+        if (cpu->kvm_run == MAP_FAILED) {
+            ret = -errno;
+            error_setg_errno(errp, ret,
+                            "kvm_init_vcpu: mmap'ing vcpu state failed (%lu)",
+                            kvm_arch_vcpu_id(cpu));
+            goto err;
+        }
     }
-
     if (s->coalesced_mmio && !s->coalesced_mmio_ring) {
         s->coalesced_mmio_ring =
             (void *)cpu->kvm_run + s->coalesced_mmio * PAGE_SIZE;
@@ -3137,6 +3147,45 @@ static void stupid_stub_function(CPUState *cpu){
     return;
 }
 
+static void kvm_post_fork_fixup_kvm_run(CPUState *cpu){
+    struct kvm_run* new_run = cpu->kvm_run; 
+    struct kvm_run* old_run = cpu->old_kvm_run;
+
+
+
+    new_run->exit_reason = old_run->exit_reason;
+    new_run->ready_for_interrupt_injection = old_run->ready_for_interrupt_injection;
+    new_run->if_flag = old_run->if_flag;
+    new_run->apic_base = old_run->apic_base;
+    new_run->io.direction = old_run->io.direction;
+    new_run->io.size = old_run->io.size;
+    new_run->io.port = old_run->io.port;
+    new_run->io.count = old_run->io.count;
+    new_run->io.data_offset = old_run->io.data_offset;
+    new_run->mmio.len=old_run->mmio.len;
+    new_run->mmio.is_write=old_run->mmio.is_write;
+    return;
+}
+
+static void kvm_post_fork_fixup(CPUState *cpu, struct cpu_prefork_state *prefork_state){
+    // [Bilal] copy the kvm_run
+    kvm_post_fork_fixup_kvm_run(cpu);
+    kvm_post_fork_fixup_env(cpu);
+    
+    return;
+}
+
+
+static void debug_maps_dump(){
+    #ifdef DEBUG
+	int self_pid = getpid();
+	char cmd[128];
+	sprintf(cmd, "cat /proc/%d/maps", self_pid);
+	DEBUG_PRINTF("Executing command \"%s\"\n", cmd);
+	system(cmd);
+    #endif
+}
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -3359,7 +3408,8 @@ int kvm_cpu_exec(CPUState *cpu)
                     ret = 0; 
                     break;
                 }
-
+                DEBUG_PRINTF("[DEBUG] parent dump\n");
+                debug_maps_dump();
                 // [TEST] [VERIFY] 
                 // if(cpu->should_wait){
                 //     ret = 0; 
@@ -3435,26 +3485,44 @@ int kvm_cpu_exec(CPUState *cpu)
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
                         if(is_child){
-                            vm_stop(RUN_STATE_RESTORE_VM);
+                            // vm_stop(RUN_STATE_RESTORE_VM);
                             // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-                            qemu_cond_init(&cpu->vcpu_recreated_cond);
-                            qemu_mutex_init(&cpu->vcpu_recreated_mutex);
+                            // qemu_cond_init(&cpu->vcpu_recreated_cond);
+                            // qemu_mutex_init(&cpu->vcpu_recreated_mutex);
                             cpu->is_child = true;
+
+                            #ifdef DBG_FDS
+                            printf("[DEBUG] [PARENT] cpu->kvm_fd -> %d\n", cpu->kvm_fd );
+                            printf("[DEBUG] [PARENT] s->fd -> %d\n", s->fd );
+                            printf("[DEBUG] [PARENT]  s->vmfd -> %d\n", s->vmfd );
+                            #endif
                             close(cpu->kvm_fd);
                             close(s->fd);
                             close(s->vmfd);
                             s->fd = open("/dev/kvm", 2); 
                             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+                            qemu_init_cpu_list();
+                            cpu->halt_cond = g_malloc0(sizeof(QemuCond));
+                            qemu_cond_init(cpu->halt_cond);
                             // kvm_init_msrs(X86_CPU(cpu));
                             kvm_vcpu_post_fork(cpu, prefork_state);
                             kvm_init_vcpu(cpu, NULL);
+                            // kvm_vcpu_post_fork(cpu, prefork_state);
                             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
                             kvm_arch_reset_vcpu(cpu);
                             // prefork_state->regs.rip = 0xfff0;
                             kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             kvm_arch_get_registers(cpu);
+                            #ifdef DBG_FDS
+                            printf("[DEBUG] [CHILD] cpu->kvm_fd -> %d\n", cpu->kvm_fd );
+                            printf("[DEBUG] [CHILD] s->fd -> %d\n", s->fd );
+                            printf("[DEBUG] [CHILD]  s->vmfd -> %d\n", s->vmfd );
+                            #endif
+                            kvm_post_fork_fixup(cpu, prefork_state);
                             stupid_stub_function(cpu);
+                            // [Bilal] fixup function 
+                            // vm_start();
 
                             // dump_cpu_state(cpu, "post-fork.dat");
                             // stupid_stub_function(cpu);
@@ -3482,6 +3550,9 @@ int kvm_cpu_exec(CPUState *cpu)
                             #ifdef DBG_MEASURE
                             kvm_vcpu_print_times(cpu);
                             #endif
+
+                            DEBUG_PRINTF("\n\n\n[DEBUG] child dump\n");
+                            debug_maps_dump();
 
                             #ifdef DBG_TEST_RIP_PARENT_EXCLUSIVE
                             exit(0);

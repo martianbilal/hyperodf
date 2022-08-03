@@ -3186,7 +3186,8 @@ int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
     // qemu_notify_event();
     run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                         cpu->kvm_fd, 0);
-    memcpy(cpu->kvm_run, run, sizeof(run)); 
+    // memcpy(cpu->kvm_run, run, sizeof(run)); 
+    cpu->old_kvm_run = cpu->kvm_run;
     cpu->kvm_run = run;
     
     #ifdef DBG
@@ -3551,9 +3552,9 @@ void handle_fork(void *opaque){
         // load_snapshot("forktest", NULL);
         // return;
         #endif
-        dump_cpu_state(cpu, "pre-fork.dat");
-        cpu->cpu_ases = NULL;
-        read_cpu_state(cpu, "pre-fork.dat");
+        // dump_cpu_state(cpu, "pre-fork.dat");
+        // cpu->cpu_ases = NULL;
+        // read_cpu_state(cpu, "pre-fork.dat");
         // return;
         #ifdef DBG
         printf("we can fork the main thread now\n");
@@ -3817,6 +3818,7 @@ void handle_fork(void *opaque){
         } else {
             waitpid(ret, &status, 0);
             // qemu_cleanup();
+            dump_cpu_state(cpu, "pre-fork.dat");
             // exit(0);
             return;
             // qemu_mutex_unlock_iothread();

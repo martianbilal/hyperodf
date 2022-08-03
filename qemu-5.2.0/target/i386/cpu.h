@@ -1650,6 +1650,7 @@ struct X86CPU {
 
     CPUNegativeOffsetState neg;
     CPUX86State env;
+    CPUX86State old_env;
     VMChangeStateEntry *vmsentry;
 
     uint64_t ucode_rev;
