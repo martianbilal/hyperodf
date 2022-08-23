@@ -13,8 +13,10 @@ print "==========Post fork CPUstate=========="
 p *cpu
 print "==========Post fork X86_CPU=========="
 p *X86_CPU(cpu)
-print "==========Post fork CPU_ENV=========="
-p X86_CPU(cpu)->env
+# print "==========Post fork CPU_ENV=========="
+# p X86_CPU(cpu)->env
+print "==========Post fork CPU_ENV->XSAVE_BUF=========="
+p (X86XSaveArea)(X86_CPU(cpu)->env->xsave_buf)
 print "==========Post fork KVM STATE=========="
 p *KVM_STATE(current_accel())
 p *(X86_CPU(cpu)->kvm_msr_buf)
@@ -38,8 +40,10 @@ print "==========Pre fork CPUstate=========="
 p *cpu
 print "==========Pre fork X86_CPU=========="
 p *X86_CPU(cpu)
-print "==========Pre fork CPU_ENV=========="
-p X86_CPU(cpu)->env
+# print "==========Pre fork CPU_ENV=========="
+# p X86_CPU(cpu)->env
+print "==========Pre fork CPU_ENV->XSAVE_BUF=========="
+p (X86XSaveArea)(X86_CPU(cpu)->env->xsave_buf)
 print "==========Pre fork KVM STATE=========="
 p *KVM_STATE(current_accel())
 p *(X86_CPU(cpu)->kvm_msr_buf)

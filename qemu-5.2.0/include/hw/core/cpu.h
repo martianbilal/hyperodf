@@ -455,6 +455,7 @@ struct CPUState {
 #endif
     
     EventNotifier fork_event; 
+    EventNotifier load_event;
     
     /* TODO Move common fields from CPUArchState here. */
     int cpu_index;

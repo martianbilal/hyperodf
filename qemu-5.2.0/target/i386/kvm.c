@@ -4745,10 +4745,48 @@ bool kvm_has_waitpkg(void)
     return has_msr_umwait;
 }
 
-void kvm_set_old_env(){
+void kvm_set_old_env(CPUState *cpu){
+    X86CPU *cs = X86_CPU(cpu);
+    cs->old_env = cs->env;
+    // CPUX86State env = cs->env;
+    // CPUX86State old_env = cs->old_env;
 
+    return;
 }
 
 int kvm_post_fork_fixup_env(CPUState *cpu){
+    X86CPU *cs = X86_CPU(cpu);
+    CPUX86State *env = &cs->env;
+    CPUX86State *old_env = &cs->old_env;
+
+    /**
+     * eflags 
+     * tsc
+     * msr_ia32_feature_control 
+     * msr_global_ctrl
+     * msr_hv_runtime
+     * mtrr_fixed
+     * mtrr_deftype
+     * mtrr_var -> base
+     * mtrr_var -> mask
+     * xsave_buf
+     * nested_state
+     * 
+     * 
+    */ 
+    env->eflags = old_env->eflags;
+    env->tsc = old_env->tsc;
+    env->msr_ia32_feature_control = old_env->msr_ia32_feature_control;
+    env->msr_hv_runtime = old_env->msr_hv_runtime;
+    env->msr_global_ctrl = old_env->msr_global_ctrl;
+    env->msr_hv_runtime = old_env->msr_hv_runtime;
+    for(int i = 0 ; i < sizeof(env->mtrr_fixed)/sizeof(uint64_t); i++){
+        env->mtrr_fixed[i] = old_env->mtrr_fixed[i];
+    }
+    env->mtrr_deftype = old_env->mtrr_deftype;     
+    env->mtrr_var[0].base = old_env->mtrr_var[0].base;
+    env->mtrr_var[0].mask = old_env->mtrr_var[0].mask;
+    // env->xsave_buf = old_env->xsave_buf; 
+    env->nested_state = old_env->nested_state;    
     return 0;
 }

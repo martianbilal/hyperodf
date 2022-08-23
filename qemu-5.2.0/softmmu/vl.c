@@ -2284,6 +2284,17 @@ static void add_device_config(int type, const char *cmdline)
     QTAILQ_INSERT_TAIL(&device_configs, conf, next);
 }
 
+static void change_gdb_device_config(){
+    struct device_config *conf; 
+    QTAILQ_FOREACH(conf, &device_configs, next){
+        if(conf->type == DEV_GDB){
+            conf->cmdline = "tcp::4444";
+        }
+    }
+    return 0;
+
+}
+
 static int foreach_device_config(int type, int (*func)(const char *cmdline))
 {
     struct device_config *conf;
@@ -3515,6 +3526,24 @@ static void qemu_pre_load_snapshot_setup(void){
     return;
 }
 
+void handle_load_snapshot(void *opaque){
+    CPUState *cpu = (CPUState*)opaque; 
+    struct KVMState* s = cpu->kvm_state;
+    int result; 
+
+    printf("[Debug] handle_load_snapshot is called! \n");
+
+    // vm_stop(RUN_STATE_RESTORE_VM);
+    result = event_notifier_test_and_clear(&(cpu->load_event));
+    if(result == 1 ) {
+        printf("[Debug] Load_snapshot event;\n");
+        if(load_snapshot("newtest", NULL) == 0){
+            vm_start();
+        }
+    }
+    return;
+}
+
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
     // CPUState *new_cpu;
@@ -3635,7 +3664,9 @@ void handle_fork(void *opaque){
 
         // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-        
+        kvm_set_old_env(cpu);
+        gdbserver_cleanup();
+        // gdbserver_fork_linux();
 
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
@@ -3653,23 +3684,25 @@ void handle_fork(void *opaque){
             printf("Failed to fork\n");
         } else if (ret == 0) {
             // [Bilal] [Measure] clock time on hypercall
+            printf("[DEBUG] load snapshot is called!\n");
+            fflush(stdout);
             if( clock_gettime( CLOCK_REALTIME, &(cpu->stop_universal)) == -1 ) {
                 perror( "clock gettime" );
                 exit( EXIT_FAILURE );
             } 
             
             #ifdef DBG_CMP_DRIVE_SNAPSHOT
-            vm_stop(RUN_STATE_RESTORE_VM);
+            // vm_stop(RUN_STATE_RESTORE_VM);
             
-            // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-            // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
-            // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+            qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
             // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
             // qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
             // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
             printf("[DEBUG] load snapshot is called!\n");
             fflush(stdout);
-            load_snapshot("forktest", NULL);
+            // load_snapshot("forktest", NULL);
             #endif
         
             // sleep(30);
@@ -3772,7 +3805,16 @@ void handle_fork(void *opaque){
             // register_global_state();
             // cpu->prefork_state = prefork_state;
             // cpu->child_cpu = 1; 
-            return;
+            // #define DEFAULT_GDBSTUB_PORT "1254"
+            // printf("[debug] starting the gdb server for the child process \n ");
+            // change_gdb_device_config();
+            // if (foreach_device_config(DEV_GDB, gdbserver_start) < 0) {
+            //     printf("[debug] {Failed} to start the gdb server for the child process \n ");
+            //     exit(1);
+            // }
+            // printf("[debug] {Started} the gdb server for the child process \n ");
+
+            // return;
             
             qemu_mutex_unlock_iothread();
             // qemu_init_child(ARGC, ARGV, ENVP 
@@ -3814,11 +3856,28 @@ void handle_fork(void *opaque){
                 printf("We have loaded the snapshot!\n"); 
             #endif 
             qemu_mutex_lock_iothread();
+
+            // printf("[DEBUG] load snapshot is called!\n");
+            // fflush(stdout);
+
+            // // doing this caused a dead lock 
+            // // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+            // // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+            // // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+            // // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+            // // qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
+            // // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+            // printf("[DEBUG] load snapshot is called!\n");
+            // fflush(stdout);
+            // load_snapshot("newtest", NULL);
             return; 
         } else {
             waitpid(ret, &status, 0);
             // qemu_cleanup();
+            load_snapshot("newtest", NULL);
             dump_cpu_state(cpu, "pre-fork.dat");
+            load_snapshot("newtest", NULL);
+
             // exit(0);
             return;
             // qemu_mutex_unlock_iothread();
@@ -5499,6 +5558,11 @@ void qemu_init(int argc, char **argv, char **envp)
     if(result < 0) {
         printf("Failed to init notifier\n");
     }
+    result = event_notifier_init(&(cpu->load_event), 0); 
+    if(result < 0) {
+        printf("Failed to init notifier\n");
+    }
+
     printf("Event RFD : %d\n", cpu->fork_event.rfd);
     printf("Event WFD : %d\n", cpu->fork_event.wfd);
 
@@ -5515,6 +5579,7 @@ void qemu_init(int argc, char **argv, char **envp)
 
     // printf("success :: make the pipe system call \n");
     qemu_set_fd_handler(cpu->fork_event.rfd, handle_fork, NULL, cpu);
+    qemu_set_fd_handler(cpu->load_event.rfd, handle_load_snapshot, NULL, cpu);
 
     accel_setup_post(current_machine);
     os_setup_post();
