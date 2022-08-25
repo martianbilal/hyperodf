@@ -1,11 +1,4 @@
-#!/bin/sh
-# make 
-# make install
-  # -append "console=ttyS0 root=/dev/vda earlyprintk=serial net.ifnames=0" \
-  # -drive file=$IMAGE/stretch_backup.qcow2,id=tst,if=none \
-  # -device virtio-blk-pci,scsi=off,drive=tst \
-
-/usr/local/bin/qemu-system-x86_64 \
+gdb --batch --command=script.gdb --args /usr/local/bin/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \
   -kernel $KERNEL \
@@ -15,8 +8,6 @@
   -net nic,model=e1000 \
   -enable-kvm \
   -nographic \
-  --trace "kvm_*"
   -s \
   -monitor unix:qemu-monitor-socket,server,nowait \
-  -pidfile vm.pid \
-  2> err.log | tee vm.log
+  -pidfile vm.pid | tee vm.log

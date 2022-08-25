@@ -3537,7 +3537,7 @@ void handle_load_snapshot(void *opaque){
     result = event_notifier_test_and_clear(&(cpu->load_event));
     if(result == 1 ) {
         printf("[Debug] Load_snapshot event;\n");
-        if(load_snapshot("newtest", NULL) == 0){
+        if(load_snapshot_memory("newtest", NULL) == 0){
             vm_start();
         }
     }
@@ -3874,9 +3874,9 @@ void handle_fork(void *opaque){
         } else {
             waitpid(ret, &status, 0);
             // qemu_cleanup();
-            load_snapshot("newtest", NULL);
+            // load_snapshot("newtest", NULL);
             dump_cpu_state(cpu, "pre-fork.dat");
-            load_snapshot("newtest", NULL);
+            // load_snapshot("newtest", NULL);
 
             // exit(0);
             return;
