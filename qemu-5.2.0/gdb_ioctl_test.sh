@@ -1,4 +1,8 @@
-gdb --batch --command=script.gdb --args /usr/local/bin/qemu-system-x86_64 \
+
+# Usage : ./gdb_ioctl_test.sh script.gdb
+# or : ./gdb_ioctl_test.sh script_kvm_state.gdb
+
+gdb --batch --command=$1 --args /usr/local/bin/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \
   -kernel $KERNEL \
