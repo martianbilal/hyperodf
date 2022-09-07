@@ -24,6 +24,7 @@
 #include "cpu.h"
 #include "exec/memory.h"
 #include "qemu/timer.h"
+#include "hw/sysbus.h"
 #include "target/i386/cpu-qom.h"
 #include "qom/object.h"
 
@@ -197,6 +198,51 @@ typedef struct VAPICState {
     uint8_t enabled;
 } QEMU_PACKED VAPICState;
 
+
+typedef enum VAPICMode {
+    VAPIC_INACTIVE = 0,
+    VAPIC_ACTIVE   = 1,
+    VAPIC_STANDBY  = 2,
+} VAPICMode;
+
+typedef struct VAPICHandlers {
+    uint32_t set_tpr;
+    uint32_t set_tpr_eax;
+    uint32_t get_tpr[8];
+    uint32_t get_tpr_stack;
+} QEMU_PACKED VAPICHandlers;
+
+typedef struct GuestROMState {
+    char signature[8];
+    uint32_t vaddr;
+    uint32_t fixup_start;
+    uint32_t fixup_end;
+    uint32_t vapic_vaddr;
+    uint32_t vapic_size;
+    uint32_t vcpu_shift;
+    uint32_t real_tpr_addr;
+    VAPICHandlers up;
+    VAPICHandlers mp;
+} QEMU_PACKED GuestROMState;
+
+struct VAPICROMState {
+    SysBusDevice busdev;
+    MemoryRegion io;
+    MemoryRegion rom;
+    uint32_t state;
+    uint32_t rom_state_paddr;
+    uint32_t rom_state_vaddr;
+    uint32_t vapic_paddr;
+    uint32_t real_tpr_addr;
+    GuestROMState rom_state;
+    size_t rom_size;
+    bool rom_mapped_writable;
+    VMChangeStateEntry *vmsentry;
+};
+
+#define TYPE_VAPIC "kvmvapic"
+OBJECT_DECLARE_SIMPLE_TYPE(VAPICROMState, VAPIC)
+
 extern bool apic_report_tpr_access;
 
 void apic_report_irq_delivered(int delivered);
@@ -226,6 +272,7 @@ static inline int apic_get_bit(uint32_t *tab, int index)
     return !!(tab[i] & mask);
 }
 
+int vapic_prepare(VAPICROMState *s);
 APICCommonClass *apic_get_class(void);
 
 #endif /* QEMU_APIC_INTERNAL_H */

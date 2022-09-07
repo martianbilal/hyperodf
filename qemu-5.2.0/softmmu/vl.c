@@ -3537,8 +3537,18 @@ void handle_load_snapshot(void *opaque){
     result = event_notifier_test_and_clear(&(cpu->load_event));
     if(result == 1 ) {
         printf("[Debug] Load_snapshot event;\n");
-        if(load_snapshot_memory("newtest", NULL) == 0){
+        if( clock_gettime( CLOCK_REALTIME, &(cpu->start_forkall_master)) == -1 ) {
+            perror( "clock gettime" );
+            exit( EXIT_FAILURE );
+        } 
+        printf("[DEBUG] time before the load_snapshot : %lf\n", (cpu->start_forkall_master.tv_sec + (cpu->start_forkall_master.tv_nsec / 1E9)));
+        if(load_snapshot_memory_pure("newtest", NULL) == 0){
             vm_start();
+            if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
+                perror( "clock gettime" );
+                exit( EXIT_FAILURE );
+            }
+            printf("[DEBUG] time after the load_snapshot : %lf\n", (cpu->end_forkall_master.tv_sec + (cpu->end_forkall_master.tv_nsec / 1E9)));
         }
     }
     return;

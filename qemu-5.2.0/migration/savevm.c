@@ -28,6 +28,8 @@
 
 #include "qemu/osdep.h"
 #include "hw/boards.h"
+#include "sysemu/cpus.h"
+
 #include "net/net.h"
 #include "migration.h"
 #include "migration/snapshot.h"
@@ -35,6 +37,7 @@
 #include "migration/misc.h"
 #include "migration/register.h"
 #include "migration/global_state.h"
+
 #include "ram.h"
 #include "qemu-file-channel.h"
 #include "qemu-file.h"
@@ -63,8 +66,8 @@
 #include "qemu/bitmap.h"
 #include "net/announce.h"
 
-#define DBG
 
+#define DBG
 const unsigned int postcopy_ram_discard_version;
 
 /* Subcommands for QEMU_VM_COMMAND */
@@ -147,7 +150,7 @@ static ssize_t block_get_buffer(void *opaque, uint8_t *buf, int64_t pos,
                                 size_t size, Error **errp)
 {
     #ifdef DBG
-    printf("%s is called\n", __func__); 
+    // printf("%s is called\n", __func__); 
     #endif
     return bdrv_load_vmstate(opaque, buf, pos, size);
 }
@@ -2951,6 +2954,112 @@ void qmp_xen_load_devices_state(const char *filename, Error **errp)
     }
     migration_incoming_state_destroy();
 }
+
+int load_snapshot_memory_pure(const char *name, Error **errp)
+{
+    BlockDriverState *bs, *bs_vm_state;
+    QEMUSnapshotInfo sn;
+    QEMUFile *f;
+    int ret;
+    AioContext *aio_context;
+    MigrationIncomingState *mis = migration_incoming_get_current();
+   
+    #ifdef DBG
+    printf("load_snapshot_memory_pure is called \n");
+    #endif
+
+
+    if (!bdrv_all_can_snapshot(&bs)) {
+        error_setg(errp,
+                   "Device '%s' is writable but does not support snapshots",
+                   bdrv_get_device_or_node_name(bs));
+        return -ENOTSUP;
+    }
+    printf("Finding the snapshot...\n");
+    ret = bdrv_all_find_snapshot(name, &bs);
+    if (ret < 0) {
+        error_setg(errp,
+                   "Device '%s' does not have the requested snapshot '%s'",
+                   bdrv_get_device_or_node_name(bs), name);
+        return ret;
+    }
+
+    printf("Finding VM State ... \n");
+
+    bs_vm_state = bdrv_all_find_vmstate_bs();
+    printf("pre aio progress... \n");
+    if (!bs_vm_state) {
+        error_setg(errp, "No block device supports snapshots");
+        return -ENOTSUP;
+    }
+    printf("aio progress...\n");
+    aio_context = bdrv_get_aio_context(bs_vm_state);
+    printf("progress...\n");
+
+    /* Don't even try to load empty VM states */
+    aio_context_acquire(aio_context);
+    ret = bdrv_snapshot_find(bs_vm_state, &sn, name);
+    aio_context_release(aio_context);
+    if (ret < 0) {
+        return ret;
+    } else if (sn.vm_state_size == 0) {
+        error_setg(errp, "This is a disk-only snapshot. Revert to it "
+                   " offline using qemu-img");
+        return -EINVAL;
+    }
+
+    /*
+     * Flush the record/replay queue. Now the VM state is going
+     * to change. Therefore we don't need to preserve its consistency
+     */
+    replay_flush_events();
+
+    /* Flush all IO requests so they don't interfere with the new state.  */
+    bdrv_drain_all_begin();
+
+    // ret = bdrv_all_goto_snapshot(name, &bs, errp);
+    if (ret < 0) {
+        error_prepend(errp, "Could not load snapshot '%s' on '%s': ",
+                      name, bdrv_get_device_or_node_name(bs));
+        goto err_drain;
+    }
+
+    /* restore the VM state */
+    f = qemu_fopen_bdrv(bs_vm_state, 0);
+    if (!f) {
+        error_setg(errp, "Could not open VM state file");
+        ret = -EINVAL;
+        goto err_drain;
+    }
+
+    qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+    mis->from_src_file = f;
+
+    aio_context_acquire(aio_context);
+    ret = qemu_loadvm_state(f);
+    
+    assert(VAPIC_RESTORE != NULL);
+    vapic_prepare(VAPIC_RESTORE);
+
+
+    migration_incoming_state_destroy();
+    aio_context_release(aio_context);
+
+    bdrv_drain_all_end();
+
+    if (ret < 0) {
+        error_setg(errp, "Error %d while loading VM state", ret);
+        return ret;
+    }
+    printf("progress...\n");
+
+    return 0;
+
+err_drain:
+    bdrv_drain_all_end();
+    return ret;
+}
+
 int load_snapshot_memory(const char *name, Error **errp)
 {
     BlockDriverState *bs, *bs_vm_state;

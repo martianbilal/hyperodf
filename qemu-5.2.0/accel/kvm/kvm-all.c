@@ -60,6 +60,8 @@
 
 #include "hw/boards.h"
 #include "util/forkall-coop.h"
+#include "hw/i386/apic_internal.h"
+
 // #include "cpu.h"
 
 
@@ -3414,6 +3416,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 #ifndef DBG_MEASURE
                 printf("Received the call for fork\n");
                 #endif
+                printf("[Debug] vapic_restore : %p\n", VAPIC_RESTORE );
 
                 do {
                     ret = ioctl(cpu->kvm_fd , KVM_DEBUG, NULL);

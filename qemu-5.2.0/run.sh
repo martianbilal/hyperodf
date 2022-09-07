@@ -15,7 +15,7 @@
   -net nic,model=e1000 \
   -enable-kvm \
   -nographic \
-  --trace "kvm_*"
+  --trace "kvm_*" \
   -s \
   -monitor unix:qemu-monitor-socket,server,nowait \
   -pidfile vm.pid \
