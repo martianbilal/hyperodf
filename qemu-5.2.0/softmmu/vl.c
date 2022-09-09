@@ -3542,12 +3542,16 @@ void handle_load_snapshot(void *opaque){
             exit( EXIT_FAILURE );
         } 
         printf("[DEBUG] time before the load_snapshot : %lf\n", (cpu->start_forkall_master.tv_sec + (cpu->start_forkall_master.tv_nsec / 1E9)));
-        if(load_snapshot_memory_pure("newtest", NULL) == 0){
+        if(load_snapshot_memory("newtest", NULL) == 0){
+            cpu->child_set = true;
+            // kvm_set_vcpu_attrs(cpu, cpu->prefork_state, cpu->kvm_fd);
+            kvm_vcpu_post_fork(cpu, cpu->prefork_state);
             vm_start();
             if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
                 perror( "clock gettime" );
                 exit( EXIT_FAILURE );
             }
+
             printf("[DEBUG] time after the load_snapshot : %lf\n", (cpu->end_forkall_master.tv_sec + (cpu->end_forkall_master.tv_nsec / 1E9)));
         }
     }

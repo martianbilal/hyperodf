@@ -46,6 +46,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu->vcpu_recreated = false;
     cpu->should_wait = false;
     cpu->vm_forked = false;
+    cpu->child_set = false;
     cpu->is_child = false; 
     cpu->forked = false;
     cpu->system_reset = false;

@@ -122,6 +122,8 @@ static int FORK_COUNTER = 0;
 
 #define KVM_MSI_HASHTAB_SIZE    256
 
+int CHILD_SETS = 0;
+
 struct KVMParkedVcpu {
     unsigned long vcpu_id;
     int kvm_fd;
@@ -3266,6 +3268,14 @@ int kvm_cpu_exec(CPUState *cpu)
             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
             cpu->vcpu_dirty = false;
         }
+
+        if (cpu->child_set && CHILD_SETS){
+            printf("[DEBUG] child set!\n");
+            CHILD_SETS = CHILD_SETS + 1;
+            // kvm_cpu_synchronize_state(cpu);
+            kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
+        }
+
         kvm_arch_pre_run(cpu, run); 
         if (qatomic_read(&cpu->exit_request)) {
             DPRINTF("interrupt exit requested\n");
@@ -3531,6 +3541,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
                             kvm_arch_reset_vcpu(cpu);
                             // prefork_state->regs.rip = 0xfff0;
+                            cpu->prefork_state = prefork_state;
                             kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             kvm_arch_get_registers(cpu);
                             #ifdef DBG_FDS
