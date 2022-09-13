@@ -2285,6 +2285,16 @@ static void kvm_getput_reg(__u64 *kvm_reg, target_ulong *qemu_reg, int set)
     }
 }
 
+int kvm_update_rip(CPUState *cs, int set){
+    X86CPU *cpu = X86_CPU(cs);
+    CPUX86State *env = &cpu->env;
+    struct kvm_regs regs;
+    int ret = 0;
+    env->eip = env->eip + 1;
+    kvm_getput_reg(&regs.rip, &env->eip, set);
+
+}
+
 static int kvm_getput_regs(X86CPU *cpu, int set)
 {
     CPUX86State *env = &cpu->env;

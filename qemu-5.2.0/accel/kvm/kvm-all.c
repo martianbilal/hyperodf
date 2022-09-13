@@ -122,8 +122,6 @@ static int FORK_COUNTER = 0;
 
 #define KVM_MSI_HASHTAB_SIZE    256
 
-int CHILD_SETS = 0;
-
 struct KVMParkedVcpu {
     unsigned long vcpu_id;
     int kvm_fd;
@@ -2837,7 +2835,7 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     #ifdef DBG
     printf("starting set attrs\n");
     #endif
-    // state->regs.rip = 0xacdc;
+    state->regs.rip = state->regs.rip + 1;
     //set regs
     /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
     do 
@@ -3268,14 +3266,6 @@ int kvm_cpu_exec(CPUState *cpu)
             kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
             cpu->vcpu_dirty = false;
         }
-
-        if (cpu->child_set && CHILD_SETS){
-            printf("[DEBUG] child set!\n");
-            CHILD_SETS = CHILD_SETS + 1;
-            // kvm_cpu_synchronize_state(cpu);
-            kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
-        }
-
         kvm_arch_pre_run(cpu, run); 
         if (qatomic_read(&cpu->exit_request)) {
             DPRINTF("interrupt exit requested\n");
@@ -3433,7 +3423,10 @@ int kvm_cpu_exec(CPUState *cpu)
                 } while (ret == -EINTR);
                 FORK_COUNTER = FORK_COUNTER + 1;
                 if(FORK_COUNTER > 1){
-                    ret = 0; 
+                    ret = 0;
+                    kvm_update_rip(cpu, 0);
+                    printf("[Debug] vmfork called!\n");
+                    vm_start();
                     break;
                 }
                 DEBUG_PRINTF("[DEBUG] parent dump\n");
@@ -3482,7 +3475,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
                 // event_notifier_test_and_clear(&(cpu->fork_event));
-                // cpu_synchronize_all_pre_loadvm();
+                cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
                 ret = 0; 
                 // break;
@@ -3534,16 +3527,18 @@ int kvm_cpu_exec(CPUState *cpu)
                             cpu->halt_cond = g_malloc0(sizeof(QemuCond));
                             qemu_cond_init(cpu->halt_cond);
                             // kvm_init_msrs(X86_CPU(cpu));
-                            kvm_vcpu_post_fork(cpu, prefork_state);
 
+                            kvm_vcpu_post_fork(cpu, prefork_state);
                             kvm_init_vcpu(cpu, NULL);
                             // kvm_vcpu_post_fork(cpu, prefork_state);
-                            kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
-                            kvm_arch_reset_vcpu(cpu);
+                            // kvm_cpu_synchronize_state(cpu);
+                            kvm_arch_put_registers(cpu, 3);
+                            // 3# kvm_arch_reset_vcpu(cpu);
                             // prefork_state->regs.rip = 0xfff0;
-                            cpu->prefork_state = prefork_state;
-                            kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
+                            // 4# kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             kvm_arch_get_registers(cpu);
+                            run = cpu->kvm_run;
+                            s = cpu->kvm_state;
                             #ifdef DBG_FDS
                             printf("[DEBUG] [CHILD] cpu->kvm_fd -> %d\n", cpu->kvm_fd );
                             printf("[DEBUG] [CHILD] s->fd -> %d\n", s->fd );
@@ -3559,8 +3554,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
                             // assert(kvm_buf_set_msrs(X86_CPU(cpu)) == 0);
 
-                            run = cpu->kvm_run;
-                            s = cpu->kvm_state;
+                            
                             // [Bilal] [Measure] clock time on complete CPU restore
                             if( clock_gettime( CLOCK_REALTIME, &(cpu->end_cpu_restore)) == -1 ) {
                                 perror( "clock gettime" );

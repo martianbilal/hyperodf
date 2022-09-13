@@ -362,6 +362,8 @@ int kvm_arch_process_async_events(CPUState *cpu);
 
 int kvm_arch_get_registers(CPUState *cpu);
 
+int kvm_update_rip(CPUState *cs, int set);
+
 /* state subset only touched by the VCPU itself during runtime */
 #define KVM_PUT_RUNTIME_STATE   1
 /* state subset modified during VCPU reset */
