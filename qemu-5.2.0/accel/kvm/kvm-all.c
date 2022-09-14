@@ -3425,6 +3425,8 @@ int kvm_cpu_exec(CPUState *cpu)
                 if(FORK_COUNTER > 1){
                     ret = 0;
                     kvm_update_rip(cpu, 0);
+                    kvm_update_rip(cpu, 0);
+                    kvm_update_rip(cpu, 0);
                     printf("[Debug] vmfork called!\n");
                     vm_start();
                     break;
@@ -3536,6 +3538,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             // 3# kvm_arch_reset_vcpu(cpu);
                             // prefork_state->regs.rip = 0xfff0;
                             // 4# kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
+    
                             kvm_arch_get_registers(cpu);
                             run = cpu->kvm_run;
                             s = cpu->kvm_state;

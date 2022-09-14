@@ -22,6 +22,8 @@
  * THE SOFTWARE.
  */
 
+#include "hyperodf/hello.c"
+
 #include "qemu/osdep.h"
 #include "qemu-common.h"
 #include "qemu/units.h"
@@ -3947,7 +3949,7 @@ void qemu_init(int argc, char **argv, char **envp)
     ARGV = argv;
     ENVP = envp; 
     ARGC = argc;
-
+    hello();
     os_set_line_buffering();
 
     error_init(argv[0]);
