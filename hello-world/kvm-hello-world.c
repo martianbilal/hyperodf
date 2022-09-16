@@ -439,7 +439,10 @@ restart:
 						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
 						printf("This is the pid of child : %ld", (long)getpid());
 						fflush(stdout);
-						sleep(50);
+						// sleep(50);
+						close(vm->fd);
+						close(vm->sys_fd);
+						close(vcpu->fd);
 						
 						fork_child(vm, parent_sregs, parent_regs);
 						printf("== Child VM Ended====\n");

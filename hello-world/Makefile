@@ -4,6 +4,10 @@ CFLAGS = -Wall -Wextra -O2
 run: kvm-hello-world
 	./kvm-hello-world -l -2
 
+
+replayer:
+	cd ./replayer && $(MAKE)
+
 kvm-hello-world: kvm-hello-world.o payload.o
 	$(CC) $^ -o $@
 
