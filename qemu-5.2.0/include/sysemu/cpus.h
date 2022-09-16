@@ -22,6 +22,9 @@ typedef struct CpusAccel {
     int64_t (*get_elapsed_ticks)(void);
 } CpusAccel;
 
+
+extern void *VAPIC_RESTORE;
+
 /* register accel-specific cpus interface implementation */
 void cpus_register_accel(const CpusAccel *i);
 

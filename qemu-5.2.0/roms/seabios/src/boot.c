@@ -854,6 +854,7 @@ static void
 call_boot_entry(struct segoff_s bootsegip, u8 bootdrv)
 {
     dprintf(1, "Booting from %04x:%04x\n", bootsegip.seg, bootsegip.offset);
+    dprintf(1, "testing from %04x:%04x\n", bootsegip.seg, bootsegip.offset);
     struct bregs br;
     memset(&br, 0, sizeof(br));
     br.flags = F_IF;
@@ -880,7 +881,7 @@ boot_disk(u8 bootdrv, int checksig)
     br.al = 1;
     br.cl = 1;
     call16_int(0x13, &br);
-
+    
     if (br.flags & F_CF) {
         printf("Boot failed: could not read the boot disk\n\n");
         return;

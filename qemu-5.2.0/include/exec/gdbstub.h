@@ -177,6 +177,9 @@ static inline uint8_t * gdb_get_reg_ptr(GByteArray *buf, int len)
 
 #endif
 
+
+void gdbserver_fork_linux();
+
 /**
  * gdbserver_start: start the gdb server
  * @port_or_device: connection spec for gdb

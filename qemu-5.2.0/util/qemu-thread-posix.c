@@ -16,6 +16,7 @@
 #include "qemu/notify.h"
 #include "qemu-thread-common.h"
 #include "qemu/tsan.h"
+#include "forkall-coop.h"
 
 static bool name_threads;
 
@@ -559,9 +560,16 @@ void qemu_thread_create(QemuThread *thread, const char *name,
 
     printf("This is the name of the name of the thread: %s\n", qemu_thread_args->name);
 
-    err = pthread_create(&thread->thread, &attr,
-                         qemu_thread_start, qemu_thread_args);
 
+    if(USE_HYPERODF && strcmp(qemu_thread_args->name, "call_rcu") != 0 ){
+        err = ski_forkall_pthread_create(&thread->thread, &attr,
+                         qemu_thread_start, qemu_thread_args);
+    }
+    else{
+        err = pthread_create(&thread->thread, &attr,
+                         qemu_thread_start, qemu_thread_args);
+    }
+    
     if (err)
         error_exit(err, __func__);
 

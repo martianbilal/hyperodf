@@ -18,6 +18,7 @@
 #include <sys/ioctl.h>
 #include <sys/utsname.h>
 
+
 #include <linux/kvm.h>
 #include "standard-headers/asm-x86/kvm_para.h"
 
@@ -71,7 +72,7 @@
  * 255 kvm_msr_entry structs */
 #define MSR_BUF_SIZE 4096
 
-static void kvm_init_msrs(X86CPU *cpu);
+void kvm_init_msrs(X86CPU *cpu);
 
 const KVMCapabilityInfo kvm_arch_required_capabilities[] = {
     KVM_CAP_INFO(SET_TSS_ADDR),
@@ -558,6 +559,15 @@ static void hardware_memory_error(void *host_addr)
     emit_hypervisor_memory_failure(MEMORY_FAILURE_ACTION_FATAL, true);
     error_report("QEMU got Hardware memory error at addr %p", host_addr);
     exit(1);
+}
+
+void kvm_vcpu_debug_print_rip(CPUState *c){
+    X86CPU *cpu = X86_CPU(c);
+    CPUX86State *env = &cpu->env;
+       
+    //print the rip 
+    printf("[DEBUG] [RIP] [CHILD VCPU] RIP : %p\n", env->eip);
+
 }
 
 void kvm_arch_on_sigbus_vcpu(CPUState *c, int code, void *addr)
@@ -2276,6 +2286,16 @@ static void kvm_getput_reg(__u64 *kvm_reg, target_ulong *qemu_reg, int set)
     }
 }
 
+int kvm_update_rip(CPUState *cs, int set){
+    X86CPU *cpu = X86_CPU(cs);
+    CPUX86State *env = &cpu->env;
+    struct kvm_regs regs;
+    int ret = 0;
+    env->eip = env->eip + 1;
+    kvm_getput_reg(&regs.rip, &env->eip, set);
+
+}
+
 static int kvm_getput_regs(X86CPU *cpu, int set)
 {
     CPUX86State *env = &cpu->env;
@@ -2685,7 +2705,7 @@ static void kvm_msr_entry_add_perf(X86CPU *cpu, FeatureWordArray f)
     }
 }
 
-static int kvm_buf_set_msrs(X86CPU *cpu)
+int kvm_buf_set_msrs(X86CPU *cpu)
 {
     int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MSRS, cpu->kvm_msr_buf);
     if (ret < 0) {
@@ -2693,16 +2713,18 @@ static int kvm_buf_set_msrs(X86CPU *cpu)
     }
 
     if (ret < cpu->kvm_msr_buf->nmsrs) {
+        print_backtrace();
         struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
         error_report("error: failed to set MSR 0x%" PRIx32 " to 0x%" PRIx64,
                      (uint32_t)e->index, (uint64_t)e->data);
     }
 
+    // [TODO] [COMMENT] commenting out for testing 
     assert(ret == cpu->kvm_msr_buf->nmsrs);
     return 0;
 }
 
-static void kvm_init_msrs(X86CPU *cpu)
+void kvm_init_msrs(X86CPU *cpu)
 {
     CPUX86State *env = &cpu->env;
 
@@ -3318,11 +3340,19 @@ static int kvm_get_msrs(X86CPU *cpu)
 
     if (ret < cpu->kvm_msr_buf->nmsrs) {
         struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
+        printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
+        fflush(stdout);
         error_report("error: failed to get MSR 0x%" PRIx32,
                      (uint32_t)e->index);
     }
 
+    // [TODO] [COMMENT] commenting out for testing 
     assert(ret == cpu->kvm_msr_buf->nmsrs);
+    if(ret != cpu->kvm_msr_buf->nmsrs){
+        printf("[DEBUG] ret != nmsrs\n");
+        printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
+        cpu->kvm_msr_buf->nmsrs = ret;
+    }
     /*
      * MTRR masks: Each mask consists of 5 parts
      * a  10..0: must be zero
@@ -4724,4 +4754,50 @@ int kvm_arch_msi_data_to_gsi(uint32_t data)
 bool kvm_has_waitpkg(void)
 {
     return has_msr_umwait;
+}
+
+void kvm_set_old_env(CPUState *cpu){
+    X86CPU *cs = X86_CPU(cpu);
+    cs->old_env = cs->env;
+    // CPUX86State env = cs->env;
+    // CPUX86State old_env = cs->old_env;
+
+    return;
+}
+
+int kvm_post_fork_fixup_env(CPUState *cpu){
+    X86CPU *cs = X86_CPU(cpu);
+    CPUX86State *env = &cs->env;
+    CPUX86State *old_env = &cs->old_env;
+
+    /**
+     * eflags 
+     * tsc
+     * msr_ia32_feature_control 
+     * msr_global_ctrl
+     * msr_hv_runtime
+     * mtrr_fixed
+     * mtrr_deftype
+     * mtrr_var -> base
+     * mtrr_var -> mask
+     * xsave_buf
+     * nested_state
+     * 
+     * 
+    */ 
+    env->eflags = old_env->eflags;
+    env->tsc = old_env->tsc;
+    env->msr_ia32_feature_control = old_env->msr_ia32_feature_control;
+    env->msr_hv_runtime = old_env->msr_hv_runtime;
+    env->msr_global_ctrl = old_env->msr_global_ctrl;
+    env->msr_hv_runtime = old_env->msr_hv_runtime;
+    for(int i = 0 ; i < sizeof(env->mtrr_fixed)/sizeof(uint64_t); i++){
+        env->mtrr_fixed[i] = old_env->mtrr_fixed[i];
+    }
+    env->mtrr_deftype = old_env->mtrr_deftype;     
+    env->mtrr_var[0].base = old_env->mtrr_var[0].base;
+    env->mtrr_var[0].mask = old_env->mtrr_var[0].mask;
+    // env->xsave_buf = old_env->xsave_buf; 
+    env->nested_state = old_env->nested_state;    
+    return 0;
 }

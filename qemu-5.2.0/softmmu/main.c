@@ -24,7 +24,6 @@
 
 #include "qemu/osdep.h"
 #include "qemu-common.h"
-#include "qemu/vmfork.h"
 #include "sysemu/sysemu.h"
 #include <sys/time.h>
 

@@ -11,3 +11,7 @@ TAGS
 *.ast_raw
 *.depend_raw
 *.log
+bin/
+trace*
+simple.*
+../hyperodf
