@@ -1,6 +1,13 @@
 #include "sys-replay.h"
 
 #define DBG_PRINT_STRUCT
+// uncomment to debug freeing routines
+// #define DBG_FREE
+// uncomment to debug struct printing routines 
+// #define DBG_PRINT_STRUCT
+// uncomment to debug dumping routines
+// #define DBG_DUMP 
+
 
 #define FOREACH_IOCTLS_INDEX                        \
       for (int i = 0; i < CURR_IOCTLS_INDEX; i++)   \
@@ -46,7 +53,8 @@ void replay_print_ioctl_args(void *a){
     printf("\n\n IOCTL_ARGS ==> ");
     printf("\nfd :  %p", args->fd);
     printf("\nioctl_id :  %p", args->ioctl_id);
-    printf("\nioctl_stuct :  %p\n", args->ioctl_struct);
+    printf("\nioctl_stuct :  %p", args->ioctl_struct);
+    printf("\nioctl_result :  %p\n", args->result);
     #endif
 
     return;
@@ -60,7 +68,7 @@ void replay_print_ioctl_list(void){
 /// @param fd 
 /// @param ioctl_id 
 /// @param ioctl_struct 
-void replay_extend_ioctls(void* fd, void* ioctl_id, void* ioctl_struct){
+void replay_extend_ioctls(void *fd, void *ioctl_id, void *ioctl_struct, void *result){
     ioctl_args *new_ioctl = (ioctl_args*)malloc(sizeof(ioctl_args)); 
 
     assert(new_ioctl != NULL);
@@ -68,6 +76,7 @@ void replay_extend_ioctls(void* fd, void* ioctl_id, void* ioctl_struct){
     new_ioctl->fd = fd;
     new_ioctl->ioctl_id = ioctl_id;
     new_ioctl->ioctl_struct = ioctl_struct;
+    new_ioctl->result = result;
 
     ioctls[CURR_IOCTLS_INDEX] = new_ioctl;
     CURR_IOCTLS_INDEX++;
@@ -109,10 +118,10 @@ int main(){
     init_ioctls();
     
 
-    replay_extend_ioctls((void *)0x1, (void *)0x1, (void *)0x1);
-    replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1);
+    replay_extend_ioctls((void *)0x1, (void *)0x1, (void *)0x1, (void *)0x0);
+    replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
 
-    replay_dump_ioctls("dump.ioctls");
+    // replay_dump_ioctls("dump.ioctls");
 
     // replay_print_ioctl_args(ioctls[0]);
     // replay_print_ioctl_args(ioctls[1]);

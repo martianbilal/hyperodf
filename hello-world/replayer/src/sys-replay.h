@@ -10,6 +10,7 @@ typedef struct ioctl_args
     void *fd;
     void *ioctl_id;
     void *ioctl_struct;
+    void *result;
 } ioctl_args;
 
 
