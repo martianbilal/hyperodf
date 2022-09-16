@@ -75,10 +75,29 @@ void replay_extend_ioctls(void* fd, void* ioctl_id, void* ioctl_struct){
     return;
 }
 
+int replay_dump_single_ioctl(void *a, FILE *dump){
+    ioctl_args *args = (ioctl_args*)a;
+
+    #ifdef DBG_DUMP
+    printf("Writing to file | ioctl.id %p\n", args->ioctl_id);
+    #endif
+    
+    fwrite(args, sizeof(ioctl_args), 1, dump);
+    assert(fwrite!=0);
+}
 
 int replay_dump_ioctls(char* out_file){
     int ret = 0;
-    
+    FILE *dump;
+
+    dump = fopen(out_file, "w");
+    assert(dump != NULL);
+
+    FOREACH_IOCTLS_INDEX{
+        replay_dump_single_ioctl(ioctls[i], dump);
+    }
+    fclose(dump);
+
     return ret;
 }
 

@@ -43,6 +43,7 @@ OBJS = $(SRCS:.c=.o)
 .PHONY: run
 run:	replay
 	./replay
+	./ioctl_parse.py
 
 # define the executable file 
 MAIN = replay
@@ -55,7 +56,11 @@ MAIN = replay
 
 .PHONY: depend clean
 
-all:	$(MAIN)
+all:	$(MAIN)	parse_logs
+
+.PHONY: parse_logs
+parse_logs: 
+	./ioctl_parse.py
 
 $(MAIN): $(OBJS) 
 	$(CC) $(CFLAGS) -o $(MAIN) $(OBJS)
