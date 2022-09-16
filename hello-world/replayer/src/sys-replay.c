@@ -188,6 +188,31 @@ void hello_test(){
     printf("[Replayer] %p\n", ioctls);
 }
 
+int replay_attach_strace(int pid, char* out_file){
+    int ret = 0;
+    char strace_cmd[128];
+
+    snprintf(strace_cmd, 128, "strace -fe trace=ioctl -p %d -o %s",
+            pid, out_file);
+    ret = system(strace_cmd);
+
+    assert(!ret);
+
+    return ret;
+}
+
+int replay_detach_strace(){
+    int ret = 0;
+
+    ret = system("killall strace");
+
+    assert(!ret);
+
+    return ret;
+}
+
+
+
 int replayer_main(){
     char *in_file = "/home/bilal/kvm-samples/hello-world/\
 replayer/logs/simple.csv";
@@ -215,8 +240,9 @@ replayer/logs/simple.csv";
     // replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
     replay_print_ioctl_list();
 
-    printf("\n\n\n");
+    printf("\n");
     printf("\n********************   ******  ********************\n");
+    printf("\n\n\n");
 
     return 0;
         

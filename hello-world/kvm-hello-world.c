@@ -428,7 +428,8 @@ restart:
 				exit(1);
 			}
 			if (parent_regs.rax == 42)
-			{				
+			{
+				replay_detach_strace();				
 				if(MODE == 1){
 					printf("This is the pid of the parent : %ld", (long)getpid());
 					fflush(stdout);
@@ -792,6 +793,8 @@ int main(int argc, char **argv)
 
 	hello_test();
 	replayer_main();
+	// need /proc/sys/kernel/yama/ptrace_scope to be 0 for this 
+	// replay_attach_strace(getpid(), "replayer/logs/first.log");
 
 	enum {
 		REAL_MODE,
