@@ -27,6 +27,7 @@ def parse_strace(in_file: str):
         
 
 def dump_to_csv(out_file: str):
+    # print(comma_sep_ioctls)
     with open("logs/" + out_file, "w+") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerows(comma_sep_ioctls)

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>     // for malloc and stuff
 #include <assert.h>     // for using assertions
+#include <string.h>
 
 #define max_ioctls 100
 
@@ -15,4 +16,4 @@ typedef struct ioctl_args
 
 
 // array of ioctl args
-ioctl_args **ioctls;
+extern ioctl_args **ioctls;

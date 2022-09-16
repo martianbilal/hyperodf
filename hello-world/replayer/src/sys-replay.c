@@ -1,12 +1,15 @@
 #include "sys-replay.h"
 
-#define DBG_PRINT_STRUCT
+#define DBG_PRINT_IOCTL_TAB
+// #define DBG_PRINT_STRUCT
 // uncomment to debug freeing routines
 // #define DBG_FREE
 // uncomment to debug struct printing routines 
 // #define DBG_PRINT_STRUCT
 // uncomment to debug dumping routines
 // #define DBG_DUMP 
+// uncomment to print strings read from file
+#define DBG_FILE_READING
 
 
 #define FOREACH_IOCTLS_INDEX                        \
@@ -16,8 +19,12 @@
 #define FOREACH_IOCTL(function) FOREACH_IOCTLS_INDEX{(function)(ioctls[i]);}
 
       
+#define MAX_BUFFER 100 //used for reading lines from the file
+
+
 
 int CURR_IOCTLS_INDEX = 0;
+ioctl_args **ioctls = NULL;
 
 
 void init_ioctls(void){
@@ -57,11 +64,22 @@ void replay_print_ioctl_args(void *a){
     printf("\nioctl_result :  %p\n", args->result);
     #endif
 
+    #ifdef DBG_PRINT_IOCTL_TAB
+    printf("[ioctl entry]\t");
+    printf("%p,", args->fd);
+    printf("%p,", args->ioctl_id);
+    printf("%p,", args->ioctl_struct);
+    printf("%p\n", args->result);
+    #endif
+
+
     return;
 }
 
 void replay_print_ioctl_list(void){
+    printf("\n\tPRINT IOCTL LIST\t\n");
     FOREACH_IOCTL(replay_print_ioctl_args);
+    printf("\tEND IOCTL LIST\t\n");
 }
 
 /// @brief 
@@ -79,7 +97,7 @@ void replay_extend_ioctls(void *fd, void *ioctl_id, void *ioctl_struct, void *re
     new_ioctl->result = result;
 
     ioctls[CURR_IOCTLS_INDEX] = new_ioctl;
-    CURR_IOCTLS_INDEX++;
+    CURR_IOCTLS_INDEX = CURR_IOCTLS_INDEX + 1;
 
     return;
 }
@@ -93,6 +111,8 @@ int replay_dump_single_ioctl(void *a, FILE *dump){
     
     fwrite(args, sizeof(ioctl_args), 1, dump);
     assert(fwrite!=0);
+
+    return 0;
 }
 
 int replay_dump_ioctls(char* out_file){
@@ -110,24 +130,83 @@ int replay_dump_ioctls(char* out_file){
     return ret;
 }
 
+int replay_read_csv(char *in_file){
+    int ret = 0;
+    char buffer[MAX_BUFFER];
+    const char delim[2] = ",";
+    char *token;
+    void* cache_buf[4];
+    int index = 0;
+
+    FILE *in_stream = fopen(in_file, "r");
+
+    assert(in_stream);
+
+    #ifdef DBG_FILE_READING
+    printf("\n");
+    #endif
+    while(fgets(buffer, MAX_BUFFER, in_stream)){
+        if(strlen(buffer)<=1) continue;
+        #ifdef DBG_FILE_READING
+        printf("[%d] [ioctl entry]\t [size = %ld]\t", index, strlen(buffer));
+        printf("%s", buffer);
+        #endif
+        index = index + 1;
+
+        token = strtok(buffer, delim);
+        int counter = 0;
+        while(token){
+            switch (counter)
+            {
+            case 0:
+                cache_buf[0] = (void *)atol(token);
+                break;
+            case 1:
+                cache_buf[1] = (void *)atol(token);
+                break;
+            case 2:
+                cache_buf[2] = (void *)atol(token);
+                break;
+            case 3:
+                cache_buf[3] = (void *)atol(token);
+                break;
+            }
+            counter = counter + 1;
+            token = strtok(NULL, delim);
+        }
+        replay_extend_ioctls(cache_buf[0], cache_buf[1], 
+                        cache_buf[2], cache_buf[3]);
+        
+    }
+    assert(ret == 0);
+    return ret;
+}
+
 int main(){
+    char *in_file = "logs/simple.csv";
+
+
     printf("\n********************   ******  ********************\n");
     printf("\n********************   REPLAY  ********************\n");
     printf("\n********************   ******  ********************\n");
 
     init_ioctls();
     
-
-    replay_extend_ioctls((void *)0x1, (void *)0x1, (void *)0x1, (void *)0x0);
-    replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
+    // TODO : BUG : does not work if you extend before reading file
+    // replay_extend_ioctls((void *)0x1, (void *)0x1, (void *)0x1, (void *)0x0);
+    // replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
 
     // replay_dump_ioctls("dump.ioctls");
 
     // replay_print_ioctl_args(ioctls[0]);
     // replay_print_ioctl_args(ioctls[1]);
-    replay_print_ioctl_list();
+    // replay_print_ioctl_list();
 
     destroy();
+
+    replay_read_csv(in_file);
+    // replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
+    replay_print_ioctl_list();
 
     printf("\n\n\n");
     printf("\n********************   ******  ********************\n");

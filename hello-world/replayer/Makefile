@@ -63,7 +63,7 @@ parse_logs:
 	./ioctl_parse.py
 
 $(MAIN): $(OBJS) 
-	$(CC) $(CFLAGS) -o $(MAIN) $(OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) $(OBJS)
         # $(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) $(OBJS) $(LFLAGS) $(LIBS)
 
 # this is a suffix replacement rule for building .o's from .c's
@@ -75,6 +75,7 @@ $(MAIN): $(OBJS)
 
 clean:
 	$(RM) *.o *~ $(MAIN)
+	$(RM) $(OBJS)
 
 depend: $(SRCS)
 	makedepend $(INCLUDES) $^
