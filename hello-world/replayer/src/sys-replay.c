@@ -138,6 +138,7 @@ int replay_read_csv(char *in_file){
     void* cache_buf[4];
     int index = 0;
 
+    printf("%s\n", in_file);
     FILE *in_stream = fopen(in_file, "r");
 
     assert(in_stream);
@@ -182,8 +183,14 @@ int replay_read_csv(char *in_file){
     return ret;
 }
 
-int main(){
-    char *in_file = "logs/simple.csv";
+void hello_test(){
+    printf("[Replayer] Hello :)\n");
+    printf("[Replayer] %p\n", ioctls);
+}
+
+int replayer_main(){
+    char *in_file = "/home/bilal/kvm-samples/hello-world/\
+replayer/logs/simple.csv";
 
 
     printf("\n********************   ******  ********************\n");

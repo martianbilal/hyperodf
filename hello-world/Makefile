@@ -1,14 +1,17 @@
 CFLAGS = -O1 -g
+INCLUDES = -I./replayer/src
+
+SRCS_REPLAYER = replayer/src/parse-logs.c replayer/src/sys-replay.c
+OBJS_REPLAYER = $(SRCS_REPLAYER:.c=.o)
 
 .PHONY: run
 run: kvm-hello-world
 	./kvm-hello-world -l -2
 
-
 replayer:
 	cd ./replayer && $(MAKE)
 
-kvm-hello-world: kvm-hello-world.o payload.o
+kvm-hello-world: kvm-hello-world.o payload.o $(OBJS_REPLAYER)
 	$(CC) $^ -o $@
 
 payload.o: payload.ld guest16.o guest32.img.o guest64.img.o
@@ -28,6 +31,9 @@ guest32.img: guest32.o
 
 %.img.o: %.img
 	$(LD) -b binary -r $^ -o $@
+
+.c.o:
+	$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@
 
 .PHONY: clean
 clean:

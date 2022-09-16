@@ -17,3 +17,7 @@ typedef struct ioctl_args
 
 // array of ioctl args
 extern ioctl_args **ioctls;
+
+
+void hello_test();
+int replayer_main();

@@ -10,6 +10,7 @@
 #include <linux/kvm.h>
 #include <time.h>
 #include <sys/wait.h>
+#include "replayer/src/sys-replay.h"
 
 
 /* CR0 bits */
@@ -788,6 +789,9 @@ int main(int argc, char **argv)
 	struct vcpu vcpu;
 	struct vcpu parent_vcpu;
 	// clock_t start_clk;
+
+	hello_test();
+	replayer_main();
 
 	enum {
 		REAL_MODE,
