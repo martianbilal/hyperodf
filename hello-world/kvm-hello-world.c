@@ -419,17 +419,17 @@ restart:
 		
 		switch (vcpu->kvm_run->exit_reason) {
 		case KVM_EXIT_HLT:
-			if (ioctl(vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
-				perror("KVM_GET_SREGS - fc");
-				exit(1);
-			}
-			if (ioctl(vcpu->fd, KVM_GET_REGS, &parent_regs) < 0) {
-				perror("KVM_GET_SREGS - fc");
-				exit(1);
-			}
+			replay_detach_strace();
 			if (parent_regs.rax == 42)
-			{
-				// replay_detach_strace();				
+			{	
+				if (ioctl(vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
+					perror("KVM_GET_SREGS - fc");
+					exit(1);
+				}
+				if (ioctl(vcpu->fd, KVM_GET_REGS, &parent_regs) < 0) {
+					perror("KVM_GET_SREGS - fc");
+					exit(1);
+				}
 				if(MODE == 1){
 					printf("This is the pid of the parent : %ld", (long)getpid());
 					fflush(stdout);

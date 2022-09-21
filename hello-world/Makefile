@@ -6,7 +6,7 @@ OBJS_REPLAYER = $(SRCS_REPLAYER:.c=.o)
 
 .PHONY: run
 run: kvm-hello-world
-	./kvm-hello-world -l -2
+	./kvm-hello-world -l -1
 
 replayer:
 	cd ./replayer && $(MAKE)
