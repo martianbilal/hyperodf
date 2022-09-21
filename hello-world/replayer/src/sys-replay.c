@@ -192,9 +192,27 @@ int replay_attach_strace(int pid, char* out_file){
     int ret = 0;
     char strace_cmd[128];
 
-    snprintf(strace_cmd, 128, "strace -fe trace=ioctl -p %d -o %s",
+    snprintf(strace_cmd, 128, "strace --raw=all -fe trace=ioctl -p %d -o %s",
             pid, out_file);
-    ret = system(strace_cmd);
+
+    ret = fork();
+
+    if(ret == 0){
+        /* Child process */
+        // execve("/usr/bin/strace", );
+        printf("\n[replayer] pid\t:\t%d\n", getpid());
+        // printf("[replayer]\tCalling strace child process\n");
+        system(strace_cmd);
+        // printf("[replayer] pid\t:\t%d\t--\treturned\n", getpid());
+
+    } else {
+        // while(wait(NULL) > 0);
+        sleep(2);
+        printf("\n[replayer] Parent pid\t:\t%d\n", getpid());
+        // wait(NULL);
+        return ret;
+    }
+
 
     assert(!ret);
 

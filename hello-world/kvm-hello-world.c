@@ -794,7 +794,7 @@ int main(int argc, char **argv)
 	hello_test();
 	replayer_main();
 	// need /proc/sys/kernel/yama/ptrace_scope to be 0 for this 
-	// replay_attach_strace(getpid(), "replayer/logs/first.log");
+	replay_attach_strace(getpid(), "replayer/logs/first.log");
 
 	enum {
 		REAL_MODE,
