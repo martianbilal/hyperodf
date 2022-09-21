@@ -25,6 +25,10 @@
 
 int CURR_IOCTLS_INDEX = 0;
 ioctl_args **ioctls = NULL;
+char proj_root[128];
+char log_directory[128];
+char raw_logs[128];
+char csv_logs[128];
 
 
 void init_ioctls(void){
@@ -34,6 +38,31 @@ void init_ioctls(void){
 
     CURR_IOCTLS_INDEX = 0;
 
+    return;
+}
+
+void init_env(void){
+    snprintf(proj_root,128,"/root/kvm-samples/hello-world");
+    snprintf(log_directory, 128, "%s/replayer/logs", proj_root);
+    snprintf(raw_logs, 128, "%s/final.log", log_directory);
+    snprintf(csv_logs, 128, "%s/final.csv", log_directory);
+
+    return;
+}
+
+void replay_init(){
+    init_ioctls();
+    init_env();
+
+}
+
+
+void replay_generate_csv_logs(char* raw_logs, char* csv_logs){
+    char generate_cmd[256];
+
+    snprintf(generate_cmd, 256, "%s/replayer/ioctl_parse.py %s %s", proj_root, raw_logs, csv_logs);
+
+    system(generate_cmd);
     return;
 }
 
@@ -104,13 +133,14 @@ void replay_extend_ioctls(void *fd, void *ioctl_id, void *ioctl_struct, void *re
 
 int replay_dump_single_ioctl(void *a, FILE *dump){
     ioctl_args *args = (ioctl_args*)a;
+    int ret = 0;
 
     #ifdef DBG_DUMP
     printf("Writing to file | ioctl.id %p\n", args->ioctl_id);
     #endif
     
-    fwrite(args, sizeof(ioctl_args), 1, dump);
-    assert(fwrite!=0);
+    ret = fwrite(args, sizeof(ioctl_args), 1, dump);
+    assert(ret != 0);
 
     return 0;
 }
@@ -192,7 +222,7 @@ int replay_attach_strace(int pid, char* out_file){
     int ret = 0;
     char strace_cmd[128];
 
-    snprintf(strace_cmd, 128, "strace -e trace=ioctl -p %d -o %s",
+    snprintf(strace_cmd, 128, "strace --raw=all -e trace=ioctl -p %d -o %s",
             pid, out_file);
 
     ret = fork();
@@ -230,18 +260,56 @@ int replay_detach_strace(){
     return ret;
 }
 
+int replay_get_parent_fds(){
+    int ret = 0;
+    return ret;
+}
+
+int replay_ioctl_rewind(){
+    int ret = 0;
+    return ret;
+}
+
+int replay_verify_results(){
+    int ret = 0;
+    return ret;
+}
+
+
+/// @brief entry function for child related replayer routines
+/// @return 0 on success, -1 on failure
+int replay_child(){
+    int ret = 0;
+    int parent_kvm_fd = 0;
+    int parent_kvm_vm_fd = 0;
+    int parent_kvm_vcpu_fd = 0;
+
+
+    ret = replay_get_parent_fds(&parent_kvm_fd, &parent_kvm_vm_fd, &parent_kvm_vcpu_fd);
+    
+    if(!(parent_kvm_fd && parent_kvm_vm_fd && parent_kvm_vcpu_fd)){
+        return -1;
+    }
+    
+    ret = replay_close_parent_fds();
+    ret = replay_ioctl_rewind();
+    ret = replay_verify_results();
+ 
+
+    return ret;
+}
 
 
 int replayer_main(){
-    char *in_file = "/root/kvm-samples/hello-world/\
-replayer/logs/simple.csv";
+    char *in_file = csv_logs;
 
 
     printf("\n********************   ******  ********************\n");
     printf("\n********************   REPLAY  ********************\n");
     printf("\n********************   ******  ********************\n");
 
-    init_ioctls();
+    // init_ioctls();
+    replay_init();
     
     // TODO : BUG : does not work if you extend before reading file
     // replay_extend_ioctls((void *)0x1, (void *)0x1, (void *)0x1, (void *)0x0);
@@ -252,7 +320,7 @@ replayer/logs/simple.csv";
     // replay_print_ioctl_args(ioctls[0]);
     // replay_print_ioctl_args(ioctls[1]);
     // replay_print_ioctl_list();
-
+    replay_generate_csv_logs(raw_logs, csv_logs);
 
     replay_read_csv(in_file);
     // replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
@@ -266,3 +334,7 @@ replayer/logs/simple.csv";
     return 0;
         
 }
+
+// int main() {
+//     replayer_main();
+// }

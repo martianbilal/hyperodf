@@ -419,17 +419,20 @@ restart:
 		
 		switch (vcpu->kvm_run->exit_reason) {
 		case KVM_EXIT_HLT:
+						
+			if (ioctl(vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
+				perror("KVM_GET_SREGS - fc");
+				exit(1);
+			}
+			if (ioctl(vcpu->fd, KVM_GET_REGS, &parent_regs) < 0) {
+				perror("KVM_GET_SREGS - fc");
+				exit(1);
+			}
 			replay_detach_strace();
+
 			if (parent_regs.rax == 42)
 			{	
-				if (ioctl(vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
-					perror("KVM_GET_SREGS - fc");
-					exit(1);
-				}
-				if (ioctl(vcpu->fd, KVM_GET_REGS, &parent_regs) < 0) {
-					perror("KVM_GET_SREGS - fc");
-					exit(1);
-				}
+				
 				if(MODE == 1){
 					printf("This is the pid of the parent : %ld", (long)getpid());
 					fflush(stdout);
@@ -794,7 +797,7 @@ int main(int argc, char **argv)
 	hello_test();
 	replayer_main();
 	// need /proc/sys/kernel/yama/ptrace_scope to be 0 for this 
-	replay_attach_strace(getpid(), "replayer/logs/first.log");
+	replay_attach_strace(getpid(), "replayer/logs/final.log");
 
 	enum {
 		REAL_MODE,
