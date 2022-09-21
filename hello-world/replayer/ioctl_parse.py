@@ -1,13 +1,16 @@
-#!/usr/bin/python3.6
+#!/usr/bin/python3
 import csv
 
+
+helloworlddir = "/root/kvm-samples/hello-world"
+replayerdir = helloworlddir + "/replayer"
 
 ioctls = []
 comma_sep_ioctls = []
 
 def parse_strace(in_file: str):
     comma_sep_ioctl = []
-    with open("logs/" + in_file, "r") as syscalls:
+    with open(replayerdir + "/logs/" + in_file, "r") as syscalls:
         for syscall in syscalls:
             if "ioctl" in syscall:
                 ioctls.append(syscall)
@@ -28,12 +31,12 @@ def parse_strace(in_file: str):
 
 def dump_to_csv(out_file: str):
     # print(comma_sep_ioctls)
-    with open("logs/" + out_file, "w+") as csv_file:
+    with open(replayerdir + "/logs/" + out_file, "w+") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerows(comma_sep_ioctls)
 
 def main():
-    in_file = "simple.log"
+    in_file =  "simple.log"
     out_file = "simple.csv"
     
     parse_strace(in_file)

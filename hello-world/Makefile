@@ -13,6 +13,8 @@ replayer:
 
 kvm-hello-world: kvm-hello-world.o payload.o $(OBJS_REPLAYER)
 	$(CC) $^ -o $@
+	cd replayer
+	./replayer/ioctl_parse.py
 
 payload.o: payload.ld guest16.o guest32.img.o guest64.img.o
 	$(LD) -T $< -o $@

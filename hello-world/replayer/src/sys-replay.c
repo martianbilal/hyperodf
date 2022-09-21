@@ -214,7 +214,7 @@ int replay_detach_strace(){
 
 
 int replayer_main(){
-    char *in_file = "/home/bilal/kvm-samples/hello-world/\
+    char *in_file = "/root/kvm-samples/hello-world/\
 replayer/logs/simple.csv";
 
 
@@ -234,11 +234,11 @@ replayer/logs/simple.csv";
     // replay_print_ioctl_args(ioctls[1]);
     // replay_print_ioctl_list();
 
-    destroy();
 
     replay_read_csv(in_file);
     // replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
     replay_print_ioctl_list();
+    destroy();
 
     printf("\n");
     printf("\n********************   ******  ********************\n");

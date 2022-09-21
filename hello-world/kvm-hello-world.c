@@ -429,7 +429,7 @@ restart:
 			}
 			if (parent_regs.rax == 42)
 			{
-				replay_detach_strace();				
+				// replay_detach_strace();				
 				if(MODE == 1){
 					printf("This is the pid of the parent : %ld", (long)getpid());
 					fflush(stdout);
