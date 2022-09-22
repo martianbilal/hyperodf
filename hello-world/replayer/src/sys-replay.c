@@ -63,6 +63,8 @@ void init_env(void){
     snprintf(raw_logs, 128, "%s/final.log", log_directory);
     snprintf(csv_logs, 128, "%s/final.csv", log_directory);
 
+    parent_fds = {0,0,0};
+
     return;
 }
 
