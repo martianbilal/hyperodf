@@ -3,6 +3,7 @@
 #include <assert.h>     // for using assertions
 #include <string.h>
 #include <unistd.h>     // for calling exec
+#include <linux/kvm.h>  // for getting KVM IOCTL identifiers
 
 #define max_ioctls 100
 

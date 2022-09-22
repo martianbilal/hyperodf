@@ -5,16 +5,19 @@ SRCS_REPLAYER = replayer/src/parse-logs.c replayer/src/sys-replay.c
 OBJS_REPLAYER = $(SRCS_REPLAYER:.c=.o)
 
 .PHONY: run
-run: kvm-hello-world
+run: clean kvm-hello-world
 	./kvm-hello-world -l -1
 
 replayer:
-	cd ./replayer && $(MAKE)
+	cd ./replayer 
+	$(MAKE) clean
+	$(MAKE)
 
 kvm-hello-world: kvm-hello-world.o payload.o $(OBJS_REPLAYER)
 	$(CC) $^ -o $@
-	cd replayer
-	./replayer/ioctl_parse.py
+	# cd replayer
+	# ./replayer/ioctl_parse.py
+	# cd ../
 
 payload.o: payload.ld guest16.o guest32.img.o guest64.img.o
 	$(LD) -T $< -o $@
@@ -41,4 +44,6 @@ guest32.img: guest32.o
 clean:
 	$(RM) kvm-hello-world kvm-hello-world.o payload.o guest16.o \
 		guest32.o guest32.img guest32.img.o \
-		guest64.o guest64.img guest64.img.o
+		guest64.o guest64.img guest64.img.o \
+		replayer/src/sys-replay.o \
+		replayer/src/parse-logs.o 

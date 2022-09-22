@@ -9,7 +9,7 @@
 CC = gcc
 
 # define any compile-time flags
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -DSTANDALONE_BUILD
 
 # define any directories containing header files other than /usr/include
 #
@@ -27,7 +27,7 @@ INCLUDES = -I./src
 # LIBS = -lmylib -lm
 
 # define the C source files
-SRCS = src/parse-logs.c src/sys-replay.c 
+SRCS = src/parse-logs.c src/sys-replay.c
 
 # define the C object files 
 #
@@ -41,9 +41,8 @@ OBJS = $(SRCS:.c=.o)
 
 
 .PHONY: run
-run:	replay
+run:	clean replay
 	./replay
-	./ioctl_parse.py
 
 # define the executable file 
 MAIN = replay
@@ -56,11 +55,15 @@ MAIN = replay
 
 .PHONY: depend clean
 
-all:	$(MAIN)	parse_logs
+all:	$(MAIN)
+
+# .PHONY: stdalone
+# stdalone:
+# 	$(MAIN_ALONE) parse_logs
 
 .PHONY: parse_logs
 parse_logs: 
-	./ioctl_parse.py
+	./ioctl_parse.py logs/final.log logs/final.csv
 
 $(MAIN): $(OBJS) 
 	$(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) $(OBJS)

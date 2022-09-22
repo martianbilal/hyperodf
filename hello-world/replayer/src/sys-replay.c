@@ -11,6 +11,19 @@
 // uncomment to print strings read from file
 #define DBG_FILE_READING
 
+// uncomment this to use debug printing
+#define DBG_PRINT 1
+
+#define STANDALONE_BUILD
+
+#define dbg_pr_verbose(fmt, ...) \
+        do { if(DBG_PRINT) fprintf(stderr, "%s:%d:%s(): [replayer]\t" fmt, __FILE__, \
+                                __LINE__, __func__, ##__VA_ARGS__); } while (0)
+
+#define dbg_pr(fmt, ...) \
+        do { if(DBG_PRINT) fprintf(stderr, "[replayer]\t" fmt, ##__VA_ARGS__); } while (0)
+
+
 
 #define FOREACH_IOCTLS_INDEX                        \
       for (int i = 0; i < CURR_IOCTLS_INDEX; i++)   \
@@ -270,6 +283,11 @@ int replay_ioctl_rewind(){
     return ret;
 }
 
+int replay_close_parent_fds(){
+    int ret = 0;
+    return ret;
+}
+
 int replay_verify_results(){
     int ret = 0;
     return ret;
@@ -335,6 +353,11 @@ int replayer_main(){
         
 }
 
-// int main() {
-//     replayer_main();
-// }
+#ifdef STANDALONE_BUILD
+int main() {
+    dbg_pr("*********STANDALONE BUILD*********\t\n");
+    replayer_main();
+    replay_get_parent_fds();
+    dbg_pr("*********STANDALONE BUILD*********\t\n");
+}
+#endif
