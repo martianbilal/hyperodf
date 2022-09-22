@@ -6,6 +6,7 @@
 #include <linux/kvm.h>  // for getting KVM IOCTL identifiers
 
 #define max_ioctls 100
+#define max_fds 3
 
 typedef struct ioctl_args
 {
@@ -26,6 +27,13 @@ extern char proj_root[128];
 extern char log_directory[128]; 
 extern char raw_logs[128]; 
 extern char csv_logs[128];
+
+/**
+ * 1st id => kvm id 
+ * 2nd id => vm id
+ * 3rd id => vcpu id
+*/
+extern unsigned long parent_fds[3]; 
 
 
 void hello_test();

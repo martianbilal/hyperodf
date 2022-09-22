@@ -21,7 +21,7 @@
                                 __LINE__, __func__, ##__VA_ARGS__); } while (0)
 
 #define dbg_pr(fmt, ...) \
-        do { if(DBG_PRINT) fprintf(stderr, "[replayer]\t" fmt, ##__VA_ARGS__); } while (0)
+        do { if(DBG_PRINT) fprintf(stderr, "[replayer]\t" fmt "\n", ##__VA_ARGS__); } while (0)
 
 
 
@@ -37,12 +37,15 @@
 
 
 int CURR_IOCTLS_INDEX = 0;
+
 ioctl_args **ioctls = NULL;
+
 char proj_root[128];
 char log_directory[128];
 char raw_logs[128];
 char csv_logs[128];
 
+unsigned long parent_fds[3];
 
 void init_ioctls(void){
     
@@ -273,8 +276,43 @@ int replay_detach_strace(){
     return ret;
 }
 
+int replay_get_parent_fd(void *a){
+    ioctl_args* arg = (ioctl_args*)a;
+    int ret = 0;
+
+    // dbg_pr("id:  %p", (arg->ioctl_id));
+    // replay_print_ioctl_args(arg);
+
+    switch ((unsigned long)(arg->ioctl_id))
+    {
+    case KVM_CREATE_VM:
+        /* code */
+        parent_fds[0] = (unsigned long)arg->fd;
+        parent_fds[1] = (unsigned long)arg->result;
+        ret = 0;
+        break;
+
+    case KVM_CREATE_VCPU:
+        /* code */
+        parent_fds[2] = (unsigned long)arg->result;
+        ret = 0;
+        break;
+    
+    default:
+        ret = -1;
+        break;
+    }
+
+    return ret; 
+}
+
 int replay_get_parent_fds(){
     int ret = 0;
+    FOREACH_IOCTL(replay_get_parent_fd);
+    dbg_pr("kvm_fd : %lu", parent_fds[0]);
+    dbg_pr("vm_fd : %lu", parent_fds[1]);
+    dbg_pr("vcpu_fd : %lu", parent_fds[2]);
+
     return ret;
 }
 
@@ -343,7 +381,6 @@ int replayer_main(){
     replay_read_csv(in_file);
     // replay_extend_ioctls((void *)0x1, (void *)0x24, (void *)0x1, (void *)0x23);
     replay_print_ioctl_list();
-    destroy();
 
     printf("\n");
     printf("\n********************   ******  ********************\n");
@@ -355,9 +392,11 @@ int replayer_main(){
 
 #ifdef STANDALONE_BUILD
 int main() {
-    dbg_pr("*********STANDALONE BUILD*********\t\n");
+    dbg_pr("*********STANDALONE BUILD*********");
     replayer_main();
+
     replay_get_parent_fds();
-    dbg_pr("*********STANDALONE BUILD*********\t\n");
+    dbg_pr("*********STANDALONE BUILD*********");
+    // dbg_pr("create : %p", KVM_CREATE_VM);
 }
 #endif
