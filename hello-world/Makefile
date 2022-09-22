@@ -14,7 +14,7 @@ replayer:
 	$(MAKE)
 
 kvm-hello-world: kvm-hello-world.o payload.o $(OBJS_REPLAYER)
-	$(CC) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@
 	# cd replayer
 	# ./replayer/ioctl_parse.py
 	# cd ../

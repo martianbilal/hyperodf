@@ -265,6 +265,7 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	uint64_t memval = 0;
 	int r = 0;
 	printf("vm----\n");
+	dbg_pr("vcpu : %d", vcpu->fd);
 	for (int i=0;; i++) {
 		r = ioctl(vcpu->fd, KVM_RUN, 0);
 		if (r < 0) {
@@ -333,10 +334,17 @@ extern const unsigned char guest64[], guest64_end[];
 
 void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_regs parent_regs){
 	struct vm vm; 
-	struct vcpu vcpu; 
+	struct vcpu vcpu;
+
+	#ifdef use_replayer
+	vm = *parent_vm;
+	#endif 
 	// struct kvm_sregs parent_sregs;
 	// struct kvm_regs parent_regs;
-
+	/*
+		commenting this stuff out for testing with replay
+	*/
+	#ifndef use_replayer
 	child_vm_init(parent_vm, &vm, 0x200000);
 	vcpu_init(&vm, &vcpu);
 	
@@ -348,6 +356,17 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 		perror("KVM_SET_REGS");
 		exit(1);
 	}
+	#endif
+	#ifdef use_replayer
+	replay_child();
+	replay_print_child_fds();
+	replay_print_parent_fds();
+	vcpu.fd = parent_fds[2];
+
+	#endif
+	/*
+		commented uptil this point
+	*/
 	// memcpy(vm.mem, guest64, guest64_end-guest64); //Todo : remove it 
 	child_run_vm(&vm, &vcpu, 8);
 	return; 
@@ -428,11 +447,16 @@ restart:
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
-			replay_detach_strace();
+			
 
 			if (parent_regs.rax == 42)
 			{	
-				
+				#ifdef use_replayer
+				replay_detach_strace();
+				replay_generate_csv_logs(raw_logs, csv_logs);
+				replay_read_csv(csv_logs);
+				replay_print_ioctl_list();
+				#endif
 				if(MODE == 1){
 					printf("This is the pid of the parent : %ld", (long)getpid());
 					fflush(stdout);
@@ -445,9 +469,11 @@ restart:
 						printf("This is the pid of child : %ld", (long)getpid());
 						fflush(stdout);
 						// sleep(50);
+						#ifndef use_replayer
 						close(vm->fd);
 						close(vm->sys_fd);
 						close(vcpu->fd);
+						#endif
 						
 						fork_child(vm, parent_sregs, parent_regs);
 						printf("== Child VM Ended====\n");
@@ -795,7 +821,8 @@ int main(int argc, char **argv)
 	// clock_t start_clk;
 
 	hello_test();
-	replayer_main();
+	// replayer_main();
+	replay_init();
 	// need /proc/sys/kernel/yama/ptrace_scope to be 0 for this 
 	replay_attach_strace(getpid(), "replayer/logs/final.log");
 

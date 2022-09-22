@@ -1,40 +1,5 @@
 #include "sys-replay.h"
 
-#define DBG_PRINT_IOCTL_TAB
-// #define DBG_PRINT_STRUCT
-// uncomment to debug freeing routines
-// #define DBG_FREE
-// uncomment to debug struct printing routines 
-// #define DBG_PRINT_STRUCT
-// uncomment to debug dumping routines
-// #define DBG_DUMP 
-// uncomment to print strings read from file
-#define DBG_FILE_READING
-
-// uncomment this to use debug printing
-#define DBG_PRINT 1
-
-#define STANDALONE_BUILD
-
-#define dbg_pr_verbose(fmt, ...) \
-        do { if(DBG_PRINT) fprintf(stderr, "%s:%d:%s(): [replayer]\t" fmt, __FILE__, \
-                                __LINE__, __func__, ##__VA_ARGS__); } while (0)
-
-#define dbg_pr(fmt, ...) \
-        do { if(DBG_PRINT) fprintf(stderr, "[replayer]\t" fmt "\n", ##__VA_ARGS__); } while (0)
-
-
-
-#define FOREACH_IOCTLS_INDEX                        \
-      for (int i = 0; i < CURR_IOCTLS_INDEX; i++)   \
-
-
-#define FOREACH_IOCTL(function) FOREACH_IOCTLS_INDEX{(function)(ioctls[i]);}
-
-      
-#define MAX_BUFFER 100 //used for reading lines from the file
-
-
 
 int CURR_IOCTLS_INDEX = 0;
 
@@ -45,7 +10,8 @@ char log_directory[128];
 char raw_logs[128];
 char csv_logs[128];
 
-unsigned long parent_fds[3];
+unsigned long parent_fds[max_fds];
+unsigned long child_fds[max_fds];
 
 void init_ioctls(void){
     
@@ -63,7 +29,10 @@ void init_env(void){
     snprintf(raw_logs, 128, "%s/final.log", log_directory);
     snprintf(csv_logs, 128, "%s/final.csv", log_directory);
 
-    parent_fds = {0,0,0};
+    for(int i = 0; i < max_fds; i++){
+        parent_fds[i] = 0;
+        child_fds[i] = 0;
+    }
 
     return;
 }
@@ -74,6 +43,19 @@ void replay_init(){
 
 }
 
+void replay_print_parent_fds(){
+    dbg_pr("[Parent]\tKVM:\t%d", parent_fds[0]);
+    dbg_pr("[Parent]\tKVM VM:\t%d", parent_fds[1]);
+    dbg_pr("[Parent]\tKVM VCPU:\t%d", parent_fds[2]);
+    return;
+}
+
+void replay_print_child_fds(){
+    dbg_pr("[Child]\t\tKVM:\t%d", child_fds[0]);
+    dbg_pr("[Child]\t\tKVM VM:\t%d", child_fds[1]);
+    dbg_pr("[Child]\t\tKVM VCPU:\t%d", child_fds[2]);
+    return;
+}
 
 void replay_generate_csv_logs(char* raw_logs, char* csv_logs){
     char generate_cmd[256];
@@ -240,7 +222,9 @@ int replay_attach_strace(int pid, char* out_file){
     int ret = 0;
     char strace_cmd[128];
 
-    snprintf(strace_cmd, 128, "strace --raw=all -e trace=ioctl -p %d -o %s",
+    // snprintf(strace_cmd, 128, "strace --raw=all -e trace=ioctl -p %d -o %s",
+    //         pid, out_file);
+    snprintf(strace_cmd, 128, "strace --raw=all -p %d -o %s",
             pid, out_file);
 
     ret = fork();
@@ -318,14 +302,74 @@ int replay_get_parent_fds(){
     return ret;
 }
 
+
+/**
+ * @brief run an ioctl given an ioctl_arg
+ * 
+ * @return -1 on failure, ioctl result on success
+ * */
+int replay_run_ioctl(void *a){
+    unsigned long ret = 0;
+    ioctl_args *arg = a;
+
+    int max_tries = 10;
+    int tries = 0;
+
+    int vcpu_mmap_size;
+
+    do{
+        ret = ioctl((int)(arg->fd), (unsigned long)(arg->ioctl_id), arg->ioctl_struct);
+        tries = tries + 1;
+    }while(ret != (unsigned long)(arg->result) && tries < max_tries);
+    
+    if(ret != (unsigned long)(arg->result)) ret = -1;
+
+    if((unsigned long)(arg->ioctl_id) == KVM_CREATE_VCPU){
+        vcpu_mmap_size = ioctl(parent_fds[0], KVM_GET_VCPU_MMAP_SIZE, 0);
+            if (vcpu_mmap_size <= 0) {
+            perror("KVM_GET_VCPU_MMAP_SIZE");
+                    exit(1);
+        }
+
+        mmap(NULL, vcpu_mmap_size, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE, parent_fds[2], 0);
+    }
+
+    return ret;
+}
+
 int replay_ioctl_rewind(){
     int ret = 0;
+
+    FOREACH_IOCTL(replay_run_ioctl);
+
     return ret;
 }
 
 int replay_close_parent_fds(){
     int ret = 0;
+
+    for(int i = 0; i < max_fds; i++){
+        close(parent_fds[i]);
+    }
+
     return ret;
+}
+
+int replay_reopen_kvm_device(){
+    int ret = 0; 
+    
+    // open kvm device
+    ret = open("/dev/kvm", O_RDWR);
+	if (ret < 0) {
+		perror("open /dev/kvm");
+		exit(1);
+	}
+    child_fds[0] = ret;
+    assert(child_fds[0] == parent_fds[0]);
+
+
+    return ret; 
 }
 
 int replay_verify_results(){
@@ -338,18 +382,18 @@ int replay_verify_results(){
 /// @return 0 on success, -1 on failure
 int replay_child(){
     int ret = 0;
-    int parent_kvm_fd = 0;
-    int parent_kvm_vm_fd = 0;
-    int parent_kvm_vcpu_fd = 0;
 
 
-    ret = replay_get_parent_fds(&parent_kvm_fd, &parent_kvm_vm_fd, &parent_kvm_vcpu_fd);
-    
-    if(!(parent_kvm_fd && parent_kvm_vm_fd && parent_kvm_vcpu_fd)){
-        return -1;
+    ret = replay_get_parent_fds();
+
+    for(int i = 0; i < max_fds; i++){
+        if(!parent_fds[i]){
+            return -1;
+        }
     }
     
     ret = replay_close_parent_fds();
+    ret = replay_reopen_kvm_device();
     ret = replay_ioctl_rewind();
     ret = replay_verify_results();
  
