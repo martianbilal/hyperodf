@@ -228,7 +228,7 @@ int replay_attach_strace(int pid, char* out_file){
 
     // snprintf(strace_cmd, 128, "strace --raw=all -e trace=ioctl -p %d -o %s",
     //         pid, out_file);
-    snprintf(strace_cmd, 128, "strace --raw=all -p %d -o %s",
+    snprintf(strace_cmd, 128, "strace  --raw=all -p %d -o %s",
             pid, out_file);
 
     ret = fork();

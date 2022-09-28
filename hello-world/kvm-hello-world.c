@@ -830,8 +830,9 @@ int main(int argc, char **argv)
 	// replayer_main();
 	replay_init();
 	// need /proc/sys/kernel/yama/ptrace_scope to be 0 for this 
+	#ifdef use_replayer
 	replay_attach_strace(getpid(), "replayer/logs/final.log");
-
+	#endif
 	enum {
 		REAL_MODE,
 		PROTECTED_MODE,
