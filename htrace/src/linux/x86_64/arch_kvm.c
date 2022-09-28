@@ -5,6 +5,11 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
+
+#ifndef HAVE_STRUCT_KVM_REGS
+#define HAVE_STRUCT_KVM_REGS
+#endif
+
 #ifdef HAVE_STRUCT_KVM_REGS
 static void
 arch_print_kvm_regs(struct tcb *const tcp,
@@ -59,6 +64,11 @@ arch_print_kvm_regs(struct tcb *const tcp,
 	PRINT_FIELD_X(*regs, rflags);
 
 	tprint_struct_end();
+
+	/**
+	 * [BILAL] [TODO] Add the function for saving the kvm_regs struct here
+	*/
+
 }
 #endif	/* HAVE_STRUCT_KVM_REGS */
 

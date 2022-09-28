@@ -11,11 +11,19 @@
 
 #include "defs.h"
 
+#ifndef HAVE_LINUX_KVM_H
+#define HAVE_LINUX_KVM_H
+#endif
+
+
 #ifdef HAVE_LINUX_KVM_H
+
 # include <linux/kvm.h>
 # include "arch_kvm.c"
 # include "xmalloc.h"
 # include "mmap_cache.h"
+
+
 
 struct vcpu_info {
 	struct vcpu_info *next;
@@ -27,6 +35,39 @@ struct vcpu_info {
 };
 
 static bool dump_kvm_run_structure;
+
+
+/**
+ * code for dumping n bytes at location struct_ptr in a file name in_file
+*/
+static int print_struct_to_file(void * struct_ptr, int len_struct,
+								char *in_file)
+{
+	int ret = 0;
+	FILE *outfile;
+
+
+	outfile = fopen(in_file, "w");
+	if(outfile == NULL){
+		fprintf(stderr, "\nError Opening struct dump file\n");
+		exit(1); 
+	}
+
+	ret = fwrite(struct_ptr, len_struct, 1, outfile);	
+
+	if(ret != 0){
+        printf("contents to file written successfully !\n");
+	}
+    else{
+        printf("error writing file !\n");
+	}
+	
+	fclose(outfile);
+	
+
+
+	return ret;
+}
 
 static struct vcpu_info *
 vcpu_find(struct tcb *const tcp, int fd)
@@ -212,6 +253,11 @@ kvm_ioctl_set_user_memory_region(struct tcb *const tcp, const kernel_ulong_t arg
 	return RVAL_IOCTL_DECODED;
 }
 # endif /* HAVE_STRUCT_KVM_USERSPACE_MEMORY_REGION */
+
+#ifndef HAVE_STRUCT_KVM_REGS
+#define HAVE_STRUCT_KVM_REGS
+#endif
+
 
 # ifdef HAVE_STRUCT_KVM_REGS
 static int
