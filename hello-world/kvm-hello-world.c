@@ -266,6 +266,7 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	int r = 0;
 	printf("vm----\n");
 	dbg_pr("vcpu : %d", vcpu->fd);
+	dbg_pr("vcpu->kvm_run : %p", vcpu->kvm_run);
 	for (int i=0;; i++) {
 		r = ioctl(vcpu->fd, KVM_RUN, 0);
 		if (r < 0) {
@@ -357,11 +358,16 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 		exit(1);
 	}
 	#endif
+
 	#ifdef use_replayer
 	replay_child();
 	replay_print_child_fds();
 	replay_print_parent_fds();
+	vm.fd = parent_fds[1];
+	vm.sys_fd = parent_fds[0];
+	vm.mem = parent_vm->mem;
 	vcpu.fd = parent_fds[2];
+	vcpu.kvm_run = replay_kvm_run;
 
 	#endif
 	/*
@@ -461,20 +467,20 @@ restart:
 					printf("This is the pid of the parent : %ld", (long)getpid());
 					fflush(stdout);
 					if(fork() == 0){
+						fflush(stdout);
 						printf("== Child VM Started====\n");
 						//do work for the child 
 						//setup the vm --> with the same memory as that of the parent store in the 
 						//in vm->mem =====> Do all of the child vm init
 						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
 						printf("This is the pid of child : %ld", (long)getpid());
-						fflush(stdout);
 						// sleep(50);
 						#ifndef use_replayer
 						close(vm->fd);
 						close(vm->sys_fd);
 						close(vcpu->fd);
 						#endif
-						
+						dbg_pr("[parent]\tvcpu->kvm_run : %p", vcpu->kvm_run);
 						fork_child(vm, parent_sregs, parent_regs);
 						printf("== Child VM Ended====\n");
 						return 0;

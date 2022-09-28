@@ -5,6 +5,8 @@ int CURR_IOCTLS_INDEX = 0;
 
 ioctl_args **ioctls = NULL;
 
+void *replay_kvm_run;
+
 char proj_root[128];
 char log_directory[128];
 char raw_logs[128];
@@ -33,6 +35,8 @@ void init_env(void){
         parent_fds[i] = 0;
         child_fds[i] = 0;
     }
+
+    replay_kvm_run = NULL;
 
     return;
 }
@@ -311,6 +315,7 @@ int replay_get_parent_fds(){
 int replay_run_ioctl(void *a){
     unsigned long ret = 0;
     ioctl_args *arg = a;
+    struct kvm_userspace_memory_region *memreg;
 
     int max_tries = 10;
     int tries = 0;
@@ -324,6 +329,15 @@ int replay_run_ioctl(void *a){
     
     if(ret != (unsigned long)(arg->result)) ret = -1;
 
+    if((unsigned long)(arg->ioctl_id) == KVM_SET_USER_MEMORY_REGION){
+        dbg_pr("memory set");
+        memreg = (struct kvm_userspace_memory_region*)(arg->ioctl_struct);
+        dbg_pr("&memreg : %p", arg->ioctl_struct);
+        dbg_pr("memreg.userspace_addr : %p", memreg->userspace_addr);
+        dbg_pr("memreg.guest_phys_addr : %p", memreg->guest_phys_addr);
+        dbg_pr("memreg.memsize : %p", memreg->memory_size);
+    }
+
     if((unsigned long)(arg->ioctl_id) == KVM_CREATE_VCPU){
         vcpu_mmap_size = ioctl(parent_fds[0], KVM_GET_VCPU_MMAP_SIZE, 0);
             if (vcpu_mmap_size <= 0) {
@@ -331,8 +345,9 @@ int replay_run_ioctl(void *a){
                     exit(1);
         }
 
-        mmap(NULL, vcpu_mmap_size, PROT_READ | PROT_WRITE,
+        replay_kvm_run = mmap(NULL, vcpu_mmap_size, PROT_READ | PROT_WRITE,
                     MAP_PRIVATE, parent_fds[2], 0);
+        dbg_pr("[module]\t%p",replay_kvm_run);
     }
 
     return ret;

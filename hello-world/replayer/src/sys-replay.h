@@ -78,6 +78,9 @@ extern char log_directory[128];
 extern char raw_logs[128]; 
 extern char csv_logs[128];
 
+
+extern void* replay_kvm_run;
+
 /**
  * 1st id => kvm id 
  * 2nd id => vm id
@@ -88,6 +91,7 @@ extern unsigned long child_fds[max_fds];
 
 
 void hello_test();
+void replay_init();
 int replayer_main();
 
 
