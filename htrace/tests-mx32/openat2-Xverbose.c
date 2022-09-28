@@ -1,1 +1,0 @@
-../tests/openat2-Xverbose.c

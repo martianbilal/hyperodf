@@ -1,1 +1,0 @@
-../tests/adjtimex.c

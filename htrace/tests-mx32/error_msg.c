@@ -1,1 +1,0 @@
-../tests/error_msg.c

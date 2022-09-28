@@ -1,1 +1,0 @@
-../tests/scno_tampering.sh

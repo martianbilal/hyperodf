@@ -1,1 +1,0 @@
-../tests/recvmsg.c

@@ -1,1 +1,0 @@
-../tests/mount_setattr-P.c

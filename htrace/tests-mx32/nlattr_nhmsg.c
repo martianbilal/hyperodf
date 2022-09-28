@@ -1,1 +1,0 @@
-../tests/nlattr_nhmsg.c

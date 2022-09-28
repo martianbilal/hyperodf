@@ -1,1 +1,0 @@
-../tests/faccessat-y--secontext_full_mismatch.c

@@ -1,1 +1,0 @@
-../tests/recvmmsg-timeout.c

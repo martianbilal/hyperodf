@@ -1,1 +1,0 @@
-../tests/dup2.c

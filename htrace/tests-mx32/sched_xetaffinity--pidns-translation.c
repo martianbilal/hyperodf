@@ -1,1 +1,0 @@
-../tests/sched_xetaffinity--pidns-translation.c

@@ -1,1 +1,0 @@
-../tests/ioctl_lirc-success.c

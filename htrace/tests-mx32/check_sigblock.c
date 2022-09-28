@@ -1,1 +1,0 @@
-../tests/check_sigblock.c

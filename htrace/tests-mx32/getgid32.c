@@ -1,1 +1,0 @@
-../tests/getgid32.c

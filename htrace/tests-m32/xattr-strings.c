@@ -1,1 +1,0 @@
-../tests/xattr-strings.c

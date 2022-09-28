@@ -1,1 +1,0 @@
-../tests/ioctl_perf-success.c

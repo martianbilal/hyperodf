@@ -1,1 +1,0 @@
-../tests/setgroups.c

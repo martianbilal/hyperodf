@@ -1,1 +1,0 @@
-../tests/getsockname--secontext_mismatch.c

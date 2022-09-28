@@ -1,1 +1,0 @@
-../tests/perf_event_open_nonverbose.c

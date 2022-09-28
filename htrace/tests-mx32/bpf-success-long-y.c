@@ -1,1 +1,0 @@
-../tests/bpf-success-long-y.c

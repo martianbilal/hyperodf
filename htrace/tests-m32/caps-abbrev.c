@@ -1,1 +1,0 @@
-../tests/caps-abbrev.c

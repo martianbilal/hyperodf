@@ -1,1 +1,0 @@
-../tests/nlattr_inet_diag_req_compat.c

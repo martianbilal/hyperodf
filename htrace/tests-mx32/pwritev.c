@@ -1,1 +1,0 @@
-../tests/pwritev.c

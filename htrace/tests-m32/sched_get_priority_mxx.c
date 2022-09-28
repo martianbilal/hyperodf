@@ -1,1 +1,0 @@
-../tests/sched_get_priority_mxx.c

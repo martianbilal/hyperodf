@@ -1,1 +1,0 @@
-../tests/faccessat2.c

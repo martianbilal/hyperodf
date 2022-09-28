@@ -1,1 +1,0 @@
-../tests/fstat64-Xraw.c

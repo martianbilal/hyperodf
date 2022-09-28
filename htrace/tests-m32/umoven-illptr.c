@@ -1,1 +1,0 @@
-../tests/umoven-illptr.c

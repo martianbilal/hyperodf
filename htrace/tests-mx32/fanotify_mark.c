@@ -1,1 +1,0 @@
-../tests/fanotify_mark.c

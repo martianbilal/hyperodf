@@ -1,1 +1,0 @@
-../tests/pidfd_open--decode-fd-socket.c

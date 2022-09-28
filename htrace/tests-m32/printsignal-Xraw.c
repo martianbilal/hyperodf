@@ -1,1 +1,0 @@
-../tests/printsignal-Xraw.c

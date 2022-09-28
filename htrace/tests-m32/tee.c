@@ -1,1 +1,0 @@
-../tests/tee.c

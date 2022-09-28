@@ -1,1 +1,0 @@
-../tests/_newselect-P.c

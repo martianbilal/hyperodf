@@ -1,1 +1,0 @@
-../tests/unix-pair-sendto-recvfrom.c

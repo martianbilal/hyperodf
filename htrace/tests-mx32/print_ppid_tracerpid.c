@@ -1,1 +1,0 @@
-../tests/print_ppid_tracerpid.c

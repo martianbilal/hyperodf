@@ -1,1 +1,0 @@
-../tests/print_scno_getcwd.sh

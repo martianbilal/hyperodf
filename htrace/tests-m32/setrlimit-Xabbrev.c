@@ -1,1 +1,0 @@
-../tests/setrlimit-Xabbrev.c

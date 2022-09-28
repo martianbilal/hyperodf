@@ -1,1 +1,0 @@
-../tests/printstrn-umoven.c

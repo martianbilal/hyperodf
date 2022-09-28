@@ -1,1 +1,0 @@
-../tests/nlattr_ifaddrmsg.c

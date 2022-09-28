@@ -1,1 +1,0 @@
-../tests/status-none-threads.c

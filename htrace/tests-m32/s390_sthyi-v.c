@@ -1,1 +1,0 @@
-../tests/s390_sthyi-v.c

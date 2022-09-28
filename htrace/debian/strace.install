@@ -1,2 +1,0 @@
-build/src/strace usr/bin
-src/strace-log-merge usr/bin

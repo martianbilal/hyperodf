@@ -1,1 +1,0 @@
-../tests/getsid.c

@@ -1,1 +1,0 @@
-../tests/fchown32.c

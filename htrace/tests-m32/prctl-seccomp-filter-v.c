@@ -1,1 +1,0 @@
-../tests/prctl-seccomp-filter-v.c

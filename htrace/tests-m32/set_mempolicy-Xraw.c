@@ -1,1 +1,0 @@
-../tests/set_mempolicy-Xraw.c

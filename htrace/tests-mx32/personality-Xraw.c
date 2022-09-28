@@ -1,1 +1,0 @@
-../tests/personality-Xraw.c

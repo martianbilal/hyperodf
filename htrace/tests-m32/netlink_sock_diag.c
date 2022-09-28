@@ -1,1 +1,0 @@
-../tests/netlink_sock_diag.c

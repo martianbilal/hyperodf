@@ -1,1 +1,0 @@
-../tests/quotactl-Xabbrev.c

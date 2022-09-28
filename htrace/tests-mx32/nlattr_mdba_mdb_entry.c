@@ -1,1 +1,0 @@
-../tests/nlattr_mdba_mdb_entry.c

@@ -1,1 +1,0 @@
-../tests/ioctl_kvm_run_auxstr_vcpu.c

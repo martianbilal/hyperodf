@@ -1,1 +1,0 @@
-../tests/renameat2.c

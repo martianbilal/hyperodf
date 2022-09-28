@@ -1,1 +1,0 @@
-../tests/acct.c

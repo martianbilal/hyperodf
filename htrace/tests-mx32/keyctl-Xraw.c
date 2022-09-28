@@ -1,1 +1,0 @@
-../tests/keyctl-Xraw.c

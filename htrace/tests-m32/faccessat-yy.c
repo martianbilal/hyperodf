@@ -1,1 +1,0 @@
-../tests/faccessat-yy.c

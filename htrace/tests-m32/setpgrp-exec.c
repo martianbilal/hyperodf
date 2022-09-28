@@ -1,1 +1,0 @@
-../tests/setpgrp-exec.c

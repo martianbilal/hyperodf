@@ -1,1 +1,0 @@
-../tests/lchown32.c

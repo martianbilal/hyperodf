@@ -1,1 +1,0 @@
-../tests/qualify_personality.sh

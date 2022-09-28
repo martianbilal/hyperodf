@@ -1,1 +1,0 @@
-../tests/setgroups32.c

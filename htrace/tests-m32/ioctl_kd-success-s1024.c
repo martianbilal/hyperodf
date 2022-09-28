@@ -1,1 +1,0 @@
-../tests/ioctl_kd-success-s1024.c

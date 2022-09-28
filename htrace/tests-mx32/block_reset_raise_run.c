@@ -1,1 +1,0 @@
-../tests/block_reset_raise_run.c

@@ -1,1 +1,0 @@
-../tests/inode_of_sockfd.c

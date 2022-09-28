@@ -1,1 +1,0 @@
-../tests/xgetdents.c

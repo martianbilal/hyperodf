@@ -1,1 +1,0 @@
-../tests/prctl-sve-success-Xabbrev.c

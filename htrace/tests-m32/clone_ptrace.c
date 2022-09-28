@@ -1,1 +1,0 @@
-../tests/clone_ptrace.c

@@ -1,1 +1,0 @@
-../tests/getegid.c

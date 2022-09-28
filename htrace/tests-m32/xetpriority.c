@@ -1,1 +1,0 @@
-../tests/xetpriority.c

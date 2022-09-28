@@ -1,1 +1,0 @@
-../tests/get_page_size.c

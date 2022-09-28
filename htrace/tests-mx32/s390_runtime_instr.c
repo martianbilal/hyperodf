@@ -1,1 +1,0 @@
-../tests/s390_runtime_instr.c

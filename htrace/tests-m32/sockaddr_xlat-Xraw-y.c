@@ -1,1 +1,0 @@
-../tests/sockaddr_xlat-Xraw-y.c

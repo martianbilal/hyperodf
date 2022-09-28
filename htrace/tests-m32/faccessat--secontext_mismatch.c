@@ -1,1 +1,0 @@
-../tests/faccessat--secontext_mismatch.c

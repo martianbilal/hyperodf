@@ -1,2 +1,0 @@
-PR_SME_SET_VL_ONEXEC          (1 << 18)
-PR_SME_VL_INHERIT             (1 << 17)

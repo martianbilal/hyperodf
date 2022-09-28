@@ -1,1 +1,0 @@
-../tests/getpgrp--pidns-translation.c

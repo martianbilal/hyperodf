@@ -1,1 +1,0 @@
-../tests/sched_xetaffinity.c

@@ -1,1 +1,0 @@
-../tests/fchmodat--secontext_full_mismatch.c

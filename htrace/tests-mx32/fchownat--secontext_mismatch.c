@@ -1,1 +1,0 @@
-../tests/fchownat--secontext_mismatch.c

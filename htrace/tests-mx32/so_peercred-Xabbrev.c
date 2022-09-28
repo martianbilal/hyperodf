@@ -1,1 +1,0 @@
-../tests/so_peercred-Xabbrev.c

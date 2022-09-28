@@ -1,1 +1,0 @@
-../tests/clock_t_str.c

@@ -1,1 +1,0 @@
-../tests/errno2name.c

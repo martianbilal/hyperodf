@@ -1,1 +1,0 @@
-../tests/dup-yy.c

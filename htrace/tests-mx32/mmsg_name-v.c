@@ -1,1 +1,0 @@
-../tests/mmsg_name-v.c

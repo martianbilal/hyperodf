@@ -1,1 +1,0 @@
-../tests/move_pages--pidns-translation.c

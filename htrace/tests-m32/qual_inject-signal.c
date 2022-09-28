@@ -1,1 +1,0 @@
-../tests/qual_inject-signal.c

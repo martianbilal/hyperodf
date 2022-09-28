@@ -1,1 +1,0 @@
-../tests/getegid32.c

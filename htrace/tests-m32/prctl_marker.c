@@ -1,1 +1,0 @@
-../tests/prctl_marker.c

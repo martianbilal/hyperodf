@@ -1,1 +1,0 @@
-../tests/landlock_add_rule-y.c

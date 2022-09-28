@@ -1,1 +1,0 @@
-../tests/oldselect-efault.c

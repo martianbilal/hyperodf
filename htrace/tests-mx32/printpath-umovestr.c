@@ -1,1 +1,0 @@
-../tests/printpath-umovestr.c

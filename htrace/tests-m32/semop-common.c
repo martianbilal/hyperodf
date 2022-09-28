@@ -1,1 +1,0 @@
-../tests/semop-common.c

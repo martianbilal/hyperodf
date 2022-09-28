@@ -1,1 +1,0 @@
-../tests/pkey_mprotect.c

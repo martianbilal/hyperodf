@@ -1,1 +1,0 @@
-../tests/sockopt-timestamp.c

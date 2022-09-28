@@ -1,1 +1,0 @@
-../tests/fchdir.c

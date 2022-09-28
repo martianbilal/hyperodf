@@ -1,1 +1,0 @@
-../tests/attach-p-cmd-p.c

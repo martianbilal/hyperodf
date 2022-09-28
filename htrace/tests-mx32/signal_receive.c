@@ -1,1 +1,0 @@
-../tests/signal_receive.c

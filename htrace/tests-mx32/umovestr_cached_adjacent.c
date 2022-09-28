@@ -1,1 +1,0 @@
-../tests/umovestr_cached_adjacent.c

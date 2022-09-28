@@ -1,1 +1,0 @@
-../tests/inet-cmsg.c

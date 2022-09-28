@@ -1,1 +1,0 @@
-../tests/setregid32.c

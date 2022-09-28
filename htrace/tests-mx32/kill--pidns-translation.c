@@ -1,1 +1,0 @@
-../tests/kill--pidns-translation.c

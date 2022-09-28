@@ -1,1 +1,0 @@
-../tests/fchmod.c

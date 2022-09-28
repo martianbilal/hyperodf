@@ -1,1 +1,0 @@
-../tests/semtimedop-syscall.c

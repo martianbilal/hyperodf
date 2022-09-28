@@ -1,1 +1,0 @@
-../tests/nlattr_unix_diag_msg.c

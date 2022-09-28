@@ -1,1 +1,0 @@
-../tests/lstat64.c

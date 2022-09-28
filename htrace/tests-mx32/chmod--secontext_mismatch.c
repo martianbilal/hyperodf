@@ -1,1 +1,0 @@
-../tests/chmod--secontext_mismatch.c

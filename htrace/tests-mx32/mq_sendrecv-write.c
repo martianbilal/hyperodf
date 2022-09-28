@@ -1,1 +1,0 @@
-../tests/mq_sendrecv-write.c

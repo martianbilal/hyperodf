@@ -1,1 +1,0 @@
-../tests/openat--secontext_full.c

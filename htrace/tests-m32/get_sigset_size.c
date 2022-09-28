@@ -1,1 +1,0 @@
-../tests/get_sigset_size.c

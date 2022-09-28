@@ -1,1 +1,0 @@
-../tests/stack-fcall-2.c

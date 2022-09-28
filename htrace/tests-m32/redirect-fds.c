@@ -1,1 +1,0 @@
-../tests/redirect-fds.c

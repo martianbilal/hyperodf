@@ -1,1 +1,0 @@
-../tests/pipe.c

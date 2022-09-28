@@ -1,1 +1,0 @@
-../tests/accept4.c

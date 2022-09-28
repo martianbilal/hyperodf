@@ -1,1 +1,0 @@
-../tests/ptrace-Xraw.c

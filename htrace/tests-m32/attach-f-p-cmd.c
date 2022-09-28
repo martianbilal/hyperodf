@@ -1,1 +1,0 @@
-../tests/attach-f-p-cmd.c

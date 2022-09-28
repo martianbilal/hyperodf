@@ -1,1 +1,0 @@
-../tests/getuid32.c

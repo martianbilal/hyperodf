@@ -1,1 +1,0 @@
-../tests/getsockname.c
