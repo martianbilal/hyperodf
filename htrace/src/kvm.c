@@ -37,10 +37,10 @@ struct vcpu_info {
 static bool dump_kvm_run_structure;
 
 
-/**
- * code for dumping n bytes at location struct_ptr in a file name in_file
-*/
-static int print_struct_to_file(void * struct_ptr, int len_struct,
+// /**
+//  * code for dumping n bytes at location struct_ptr in a file name in_file
+// */
+int print_struct_to_file(void * struct_ptr, int len_struct,
 								char *in_file)
 {
 	int ret = 0;
@@ -266,12 +266,18 @@ kvm_ioctl_decode_regs(struct tcb *const tcp, const unsigned int code,
 {
 	struct kvm_regs regs;
 
+	char outfile[100] = "/root/kvm-samples/htrace/test.dump";
+
 	if (code == KVM_GET_REGS && entering(tcp))
 		return 0;
 
 	tprint_arg_next();
 	if (!umove_or_printaddr(tcp, arg, &regs))
 		arch_print_kvm_regs(tcp, arg, &regs);
+	
+	print_struct_to_file(&regs, sizeof(struct kvm_regs), outfile);
+	
+	
 
 	return RVAL_IOCTL_DECODED;
 }

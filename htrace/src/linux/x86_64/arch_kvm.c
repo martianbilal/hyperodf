@@ -10,6 +10,40 @@
 #define HAVE_STRUCT_KVM_REGS
 #endif
 
+
+/**
+ * code for dumping n bytes at location struct_ptr in a file name in_file
+*/
+// int print_struct_to_file(void * struct_ptr, int len_struct,
+// 								char *in_file)
+// {
+// 	int ret = 0;
+// 	FILE *outfile;
+
+
+// 	outfile = fopen(in_file, "w");
+// 	if(outfile == NULL){
+// 		fprintf(stderr, "\nError Opening struct dump file\n");
+// 		exit(1); 
+// 	}
+
+// 	ret = fwrite(struct_ptr, len_struct, 1, outfile);	
+
+// 	if(ret != 0){
+//         printf("contents to file written successfully !\n");
+// 	}
+//     else{
+//         printf("error writing file !\n");
+// 	}
+	
+// 	fclose(outfile);
+	
+
+
+// 	return ret;
+// }
+
+
 #ifdef HAVE_STRUCT_KVM_REGS
 static void
 arch_print_kvm_regs(struct tcb *const tcp,

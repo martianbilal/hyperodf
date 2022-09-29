@@ -2075,4 +2075,7 @@ print_big_u64_addr(const uint64_t addr)
 #  include "syscall.h"
 # endif
 
+extern int print_struct_to_file(void * struct_ptr, int len_struct,
+								char *in_file);
+
 #endif /* !STRACE_DEFS_H */
