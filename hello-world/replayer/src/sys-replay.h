@@ -62,6 +62,10 @@
 #define MAX_BUFFER 100 //used for reading lines from the file
 
 
+#define max_struct_req 20
+extern unsigned int ioctl_req_struct[];
+extern unsigned int ioctl_struct_sizes[];
+
 
 typedef struct ioctl_args
 {

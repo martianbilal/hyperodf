@@ -1,4 +1,5 @@
 #include "sys-replay.h"
+#include "read-structs.h"
 
 
 int CURR_IOCTLS_INDEX = 0;
@@ -9,6 +10,28 @@ void *replay_kvm_run;
 
 FILE *infile;
 char INFILE_NAME[] = "/root/kvm-samples/dumps/kvm.structs";
+
+
+// KVM ioctls that require a struct
+unsigned int ioctl_req_struct[max_struct_req] = {
+    KVM_GET_REGS, 
+    KVM_SET_REGS, 
+    KVM_GET_SREGS,
+    KVM_SET_SREGS,    
+    KVM_SET_USER_MEMORY_REGION
+};
+
+
+// corresponding structures
+unsigned int ioctl_struct_sizes[max_struct_req] = {
+    sizeof(struct kvm_regs), 
+    sizeof(struct kvm_regs), 
+    sizeof(struct kvm_sregs),
+    sizeof(struct kvm_sregs),    
+    sizeof(struct kvm_userspace_memory_region)
+};
+
+
 
 
 
@@ -335,6 +358,23 @@ int replay_get_parent_fds(){
 
 
 /**
+ * @brief Checks if the given ioctl needs 
+ * struct or not 
+ * 
+ * @return -1 if ioctl does not need struct, 
+ * index of the ioctl in the check array otherwise
+*/
+static int ioctl_need_struct(unsigned int ioctl){
+    int ret = -1;
+    for(int i = 0; i < max_struct_req; i++){
+        if(ioctl == ioctl_req_struct[i]){
+            ret = i;
+            break;
+        }
+    }
+    return ret;
+}
+/**
  * @brief run an ioctl given an ioctl_arg
  * 
  * @return -1 on failure, ioctl result on success
@@ -343,16 +383,49 @@ int replay_run_ioctl(void *a){
     unsigned long ret = 0;
     ioctl_args *arg = a;
     struct kvm_userspace_memory_region *memreg;
+    int need_struct = -1;
+
+    // for reading random ioctl structs from the dump
+    void *ioctl_struct;
+    int ioctl_struct_size;
 
     int max_tries = 10;
     int tries = 0;
 
     int vcpu_mmap_size;
 
-    do{
-        ret = ioctl((int)(arg->fd), (unsigned long)(arg->ioctl_id), arg->ioctl_struct);
-        tries = tries + 1;
-    }while(ret != (unsigned long)(arg->result) && tries < max_tries);
+    need_struct = ioctl_need_struct((unsigned long)(arg->ioctl_id));
+    
+    if(need_struct != -1){
+        //get struct
+        // [TODO] get the actual type of the struct 
+
+        // thing we want to do is 
+        /**
+         * void *struct = malloc(sizeof(corresponding struct));
+         * read(struct);
+         * 
+         * for finding the corresponding struct 
+         * arrayofstructtype[need_struct]
+         * 
+        */
+        ioctl_struct_size = ioctl_struct_sizes[need_struct];
+        ioctl_struct = malloc(ioctl_struct_size);   
+
+        dbg_pr("%s\t||\treplay read struct being called ", __func__);
+        replay_read_struct(ioctl_struct, ioctl_struct_size, infile);
+        do{
+            ret = ioctl((int)(arg->fd), (unsigned long)(arg->ioctl_id), ioctl_struct);
+            tries = tries + 1;
+        }while(ret != (unsigned long)(arg->result) && tries < max_tries);
+    } else {
+        do{
+            ret = ioctl((int)(arg->fd), (unsigned long)(arg->ioctl_id), arg->ioctl_struct);
+            tries = tries + 1;
+        }while(ret != (unsigned long)(arg->result) && tries < max_tries);
+    }
+
+    
     
     if(ret != (unsigned long)(arg->result)) ret = -1;
 

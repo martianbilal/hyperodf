@@ -1,0 +1,15 @@
+ioctl(4, KVM_GET_API_VERSION, 0)        = 12
+ioctl(4, KVM_CREATE_VM, 0)              = 5
+ioctl(5, KVM_SET_TSS_ADDR, 0xfffbd000)  = 0
+ioctl(5, KVM_SET_USER_MEMORY_REGION, {slot=0, flags=0, guest_phys_addr=0, memory_size=2097152, userspace_addr=0x7f6b3a9a3000}) = 0
+ioctl(5, KVM_CREATE_VCPU, 0)            = 6
+ioctl(4, KVM_GET_VCPU_MMAP_SIZE, 0)     = 12288
+ioctl(6, KVM_GET_SREGS, {cs={base=0xffff0000, limit=65535, selector=61440, type=11, present=1, dpl=0, db=0, s=1, l=0, g=0, avl=0}, ...}) = 0
+ioctl(6, KVM_SET_SREGS, {cs={base=0, limit=4294967295, selector=8, type=11, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, ...}) = 0
+ioctl(6, KVM_SET_REGS, {rax=0, ..., rsp=0x200000, rbp=0, ..., rip=0, rflags=0x2}) = 0
+ioctl(6, KVM_RUN, 0)                    = 0
+ioctl(6, KVM_RUN, 0)                    = 0
+ioctl(6, KVM_RUN, 0)                    = 0
+ioctl(6, KVM_RUN, 0)                    = 0
+ioctl(6, KVM_GET_SREGS, {cs={base=0, limit=4294967295, selector=8, type=11, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, ...}) = 0
+ioctl(6, KVM_GET_REGS, {rax=0x2a, ..., rsp=0x200000, rbp=0, ..., rip=0x27, rflags=0x2}) = 0
