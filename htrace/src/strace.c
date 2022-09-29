@@ -66,6 +66,9 @@ bool stack_trace_enabled;
 
 const unsigned int syscall_trap_sig = SIGTRAP | 0x80;
 
+char KVM_DUMP_FILE[] = "/root/kvm-samples/htrace/kvm.structs";
+
+
 cflag_t cflag = CFLAG_NONE;
 bool followfork;
 bool output_separately;

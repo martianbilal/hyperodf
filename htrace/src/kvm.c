@@ -11,6 +11,8 @@
 
 #include "defs.h"
 
+#define TEST_DUMP
+
 #ifndef HAVE_LINUX_KVM_H
 #define HAVE_LINUX_KVM_H
 #endif
@@ -47,7 +49,7 @@ int print_struct_to_file(void * struct_ptr, int len_struct,
 	FILE *outfile;
 
 
-	outfile = fopen(in_file, "w");
+	outfile = fopen(in_file, "w+");
 	if(outfile == NULL){
 		fprintf(stderr, "\nError Opening struct dump file\n");
 		exit(1); 
@@ -275,6 +277,10 @@ kvm_ioctl_decode_regs(struct tcb *const tcp, const unsigned int code,
 	if (!umove_or_printaddr(tcp, arg, &regs))
 		arch_print_kvm_regs(tcp, arg, &regs);
 	
+
+	#ifdef TEST_DUMP
+	STRACE_PRINTF("[DEBUG]\t+++\tDUMP KVM_REGS\t+++\n");
+	#endif
 	print_struct_to_file(&regs, sizeof(struct kvm_regs), outfile);
 	
 	
