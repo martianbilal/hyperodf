@@ -39,19 +39,19 @@ struct vcpu_info {
 static bool dump_kvm_run_structure;
 
 
-// /**
-//  * code for dumping n bytes at location struct_ptr in a file name in_file
-// */
+/**
+ * code for dumping n bytes at location struct_ptr in a file name in_file
+ *  CHANGES IN USAGE : 
+ * 		instead of making the name of the file a global variable use a global FILE variable 
+ * 		close it when strace ends 
+*/
 int print_struct_to_file(void * struct_ptr, int len_struct,
-								char *in_file)
+								FILE *outfile)
 {
 	int ret = 0;
-	FILE *outfile;
 
-
-	outfile = fopen(in_file, "w+");
 	if(outfile == NULL){
-		fprintf(stderr, "\nError Opening struct dump file\n");
+		fprintf(stderr, "\nUnopened dump file\n");
 		exit(1); 
 	}
 
@@ -63,9 +63,7 @@ int print_struct_to_file(void * struct_ptr, int len_struct,
     else{
         printf("error writing file !\n");
 	}
-	
-	fclose(outfile);
-	
+		
 
 
 	return ret;
@@ -268,8 +266,6 @@ kvm_ioctl_decode_regs(struct tcb *const tcp, const unsigned int code,
 {
 	struct kvm_regs regs;
 
-	char outfile[100] = "/root/kvm-samples/htrace/test.dump";
-
 	if (code == KVM_GET_REGS && entering(tcp))
 		return 0;
 
@@ -281,7 +277,7 @@ kvm_ioctl_decode_regs(struct tcb *const tcp, const unsigned int code,
 	#ifdef TEST_DUMP
 	STRACE_PRINTF("[DEBUG]\t+++\tDUMP KVM_REGS\t+++\n");
 	#endif
-	print_struct_to_file(&regs, sizeof(struct kvm_regs), outfile);
+	print_struct_to_file(&regs, sizeof(struct kvm_regs), kvm_outfile);
 	
 	
 

@@ -67,6 +67,7 @@ bool stack_trace_enabled;
 const unsigned int syscall_trap_sig = SIGTRAP | 0x80;
 
 char KVM_DUMP_FILE[] = "/root/kvm-samples/htrace/kvm.structs";
+FILE *kvm_outfile;
 
 
 cflag_t cflag = CFLAG_NONE;
@@ -2171,7 +2172,7 @@ init(int argc, char *argv[])
 	static const char ttflag_str[] = "precision:us,format:time";
 	static const char tttflag_str[] = "format:unix,precision:us";
 	static const char secontext_qual[] = "!full,mismatch";
-
+	
 	int c, i;
 	int optF = 0, zflags = 0;
 	int lopt_idx;
@@ -2212,6 +2213,8 @@ init(int argc, char *argv[])
 		program_invocation_name =
 			(argc > 0 && argv[0] && *argv[0]) ? argv[0] : name;
 	}
+
+	kvm_outfile = fopen(KVM_DUMP_FILE, "w");
 
 	strace_tracer_pid = getpid();
 
@@ -3956,6 +3959,7 @@ terminate(void)
 	}
 
 	print_totd();
+	fclose(kvm_outfile);
 	exit(exit_code);
 }
 

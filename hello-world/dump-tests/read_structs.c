@@ -8,7 +8,7 @@
 int main(){
     int ret = 0;
     FILE *infile;
-    char filename[] = "/root/kvm-samples/htrace/test.dump";
+    char filename[] = "/root/kvm-samples/htrace/kvm.structs";
     struct kvm_regs regs;
 
     /* read data from the file */
