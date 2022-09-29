@@ -17,10 +17,14 @@
 #include <sys/mman.h>
 
 
+#include "read-structs.h"
+
+
 
 
 #define max_ioctls 100
 #define max_fds 3
+
 
 #define DBG_PRINT_IOCTL_TAB
 // #define DBG_PRINT_STRUCT
@@ -32,6 +36,7 @@
 // #define DBG_DUMP 
 // uncomment to print strings read from file
 #define DBG_FILE_READING
+
 
 // uncomment this to use debug printing
 #define DBG_PRINT 1
@@ -90,6 +95,10 @@ extern unsigned long parent_fds[max_fds];
 extern unsigned long child_fds[max_fds]; 
 
 
+extern char INFILE_NAME[];
+extern FILE* infile;
+
+
 void hello_test();
 void replay_init();
 int replayer_main();
@@ -110,4 +119,7 @@ int replay_read_csv(char *in_file);
 void replay_print_ioctl_list(void);
 
 int replay_child(void);
+
+
+void replay_destroy(void);
 

@@ -824,6 +824,7 @@ int main(int argc, char **argv)
 	struct vm parent_vm;
 	struct vcpu vcpu;
 	struct vcpu parent_vcpu;
+	int ret = 0;
 	// clock_t start_clk;
 
 	hello_test();
@@ -890,13 +891,15 @@ int main(int argc, char **argv)
 
 	switch (mode) {
 	case REAL_MODE:
-		return !run_real_mode(&vm, &vcpu);
-
+		ret = !run_real_mode(&vm, &vcpu);
+		goto ret_gracefully;
 	case PROTECTED_MODE:
-		return !run_protected_mode(&vm, &vcpu);
+		ret = !run_protected_mode(&vm, &vcpu);
+		goto ret_gracefully;
 
 	case PAGED_32BIT_MODE:
-		return !run_paged_32bit_mode(&vm, &vcpu);
+		ret = !run_paged_32bit_mode(&vm, &vcpu);
+		goto ret_gracefully;
 
 	case LONG_MODE:
 		// start_clk = clock();
@@ -907,13 +910,16 @@ int main(int argc, char **argv)
 		// printf("\nTime for VCPU init(child): %lg\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
 		// start_clk = clock();
 		// MODE = 1;
-		run_long_mode(&parent_vm, &parent_vcpu);
+		ret = !run_long_mode(&parent_vm, &parent_vcpu);
+		goto ret_gracefully;
 		// run_long_mode(NULL, &parent_vm, &parent_vcpu);
 		// run_long_mode(&parent_vcpu, &vm, &vcpu);
 		// printf("\nDid calls in %lg seconds\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
- 		
-		return 0;
+
 	}
 
-	return 1;
+ret_gracefully: 
+	replay_destroy();
+
+	return !ret;
 }

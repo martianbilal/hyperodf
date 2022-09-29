@@ -350,6 +350,10 @@ kvm_ioctl_decode_cpuid2(struct tcb *const tcp, const unsigned int code,
 }
 # endif /* HAVE_STRUCT_KVM_CPUID2 */
 
+#ifndef HAVE_STRUCT_KVM_SREGS
+#define HAVE_STRUCT_KVM_SREGS
+#endif
+
 # ifdef HAVE_STRUCT_KVM_SREGS
 static int
 kvm_ioctl_decode_sregs(struct tcb *const tcp, const unsigned int code,
@@ -363,6 +367,9 @@ kvm_ioctl_decode_sregs(struct tcb *const tcp, const unsigned int code,
 	tprint_arg_next();
 	if (!umove_or_printaddr(tcp, arg, &sregs))
 		arch_print_kvm_sregs(tcp, arg, &sregs);
+
+	print_struct_to_file(&sregs, sizeof(struct kvm_sregs), kvm_outfile);
+	
 
 	return RVAL_IOCTL_DECODED;
 }

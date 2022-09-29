@@ -1,7 +1,7 @@
 CFLAGS = -O1 -g
 INCLUDES = -I./replayer/src
 
-SRCS_REPLAYER = replayer/src/parse-logs.c replayer/src/sys-replay.c
+SRCS_REPLAYER = replayer/src/parse-logs.c replayer/src/sys-replay.c replayer/src/read-structs.c
 OBJS_REPLAYER = $(SRCS_REPLAYER:.c=.o)
 
 .PHONY: run
@@ -46,4 +46,5 @@ clean:
 		guest32.o guest32.img guest32.img.o \
 		guest64.o guest64.img guest64.img.o \
 		replayer/src/sys-replay.o \
+		replayer/src/read-structs.o \
 		replayer/src/parse-logs.o 

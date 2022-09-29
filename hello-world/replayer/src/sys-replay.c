@@ -7,6 +7,11 @@ ioctl_args **ioctls = NULL;
 
 void *replay_kvm_run;
 
+FILE *infile;
+char INFILE_NAME[] = "/root/kvm-samples/dumps/kvm.structs";
+
+
+
 char proj_root[128];
 char log_directory[128];
 char raw_logs[128];
@@ -41,11 +46,28 @@ void init_env(void){
     return;
 }
 
+int init_files(){
+    int ret = 0;    
+
+    
+    infile = fopen(INFILE_NAME, "r");
+    #ifdef DBG_FILE_READING
+    dbg_pr("Open file: %s", INFILE_NAME);
+    dbg_pr("File ptr: %p", infile);
+    #endif
+
+
+    return ret; 
+}
+
 void replay_init(){
+    
+    init_files();
     init_ioctls();
     init_env();
 
 }
+
 
 void replay_print_parent_fds(){
     dbg_pr("[Parent]\tKVM:\t%d", parent_fds[0]);
@@ -70,7 +92,7 @@ void replay_generate_csv_logs(char* raw_logs, char* csv_logs){
     return;
 }
 
-void destroy(void){
+void replay_destroy(void){
     for(int i = 0; i<CURR_IOCTLS_INDEX; i++){
         #ifdef DBG_FREE
         printf("\nfreeing ioctls[%d] : %p\n", i, ioctls[i]);
@@ -82,6 +104,11 @@ void destroy(void){
     printf("freeing ioctls : %p\n", ioctls);
     #endif
     free(ioctls);
+
+    #ifdef DBG_FILE_READING
+    printf("File ptr closing : %p", infile);
+    #endif
+    // fclose(infile);
 }
 
 /// @brief pretty prints an ioctl_args struct -> given DBG_PRINT_STRUCT is defined
@@ -417,7 +444,7 @@ int replay_child(){
 }
 
 
-int replayer_main(){
+int replay_main(){
     char *in_file = csv_logs;
 
 

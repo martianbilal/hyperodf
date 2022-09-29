@@ -27,7 +27,7 @@ INCLUDES = -I./src
 # LIBS = -lmylib -lm
 
 # define the C source files
-SRCS = src/parse-logs.c src/sys-replay.c
+SRCS = src/parse-logs.c src/sys-replay.c src/read-structs.c
 
 # define the C object files 
 #

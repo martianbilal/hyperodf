@@ -66,7 +66,7 @@ bool stack_trace_enabled;
 
 const unsigned int syscall_trap_sig = SIGTRAP | 0x80;
 
-char KVM_DUMP_FILE[] = "/root/kvm-samples/htrace/kvm.structs";
+char KVM_DUMP_FILE[] = "/root/kvm-samples/dumps/kvm.structs";
 FILE *kvm_outfile;
 
 
