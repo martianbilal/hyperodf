@@ -278,7 +278,7 @@ int replay_attach_strace(int pid, char* out_file){
 
     // snprintf(strace_cmd, 128, "strace --raw=all -e trace=ioctl -p %d -o %s",
     //         pid, out_file);
-    snprintf(strace_cmd, 128, "strace  --raw=all -p %d -o %s",
+    snprintf(strace_cmd, 128, "/root/kvm-samples/htrace/src/strace  --raw=all -p %d -o %s",
             pid, out_file);
 
     ret = fork();
@@ -372,6 +372,7 @@ static int ioctl_need_struct(unsigned int ioctl){
             break;
         }
     }
+    dbg_pr("ret::\tneed_struct:\t%d",ret);
     return ret;
 }
 /**
@@ -384,6 +385,7 @@ int replay_run_ioctl(void *a){
     ioctl_args *arg = a;
     struct kvm_userspace_memory_region *memreg;
     int need_struct = -1;
+    struct kvm_regs *regs_test;
 
     // for reading random ioctl structs from the dump
     void *ioctl_struct;
@@ -395,6 +397,7 @@ int replay_run_ioctl(void *a){
     int vcpu_mmap_size;
 
     need_struct = ioctl_need_struct((unsigned long)(arg->ioctl_id));
+    dbg_pr("need_struct\t:\t%d", need_struct);
     
     if(need_struct != -1){
         //get struct
@@ -414,6 +417,15 @@ int replay_run_ioctl(void *a){
 
         dbg_pr("%s\t||\treplay read struct being called ", __func__);
         replay_read_struct(ioctl_struct, ioctl_struct_size, infile);
+
+        #ifdef DBG_LOAD_STRUCT
+        if(need_struct == 0){
+            regs_test = (struct kvm_reg *)ioctl_struct;
+            dbg_pr();
+            dbg_pr("REGS==>RAX\t:\t%lu", regs_test->rax);
+        }
+        #endif
+
         do{
             ret = ioctl((int)(arg->fd), (unsigned long)(arg->ioctl_id), ioctl_struct);
             tries = tries + 1;

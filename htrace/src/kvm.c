@@ -11,7 +11,7 @@
 
 #include "defs.h"
 
-#define TEST_DUMP
+// #define TEST_DUMP
 
 #ifndef HAVE_LINUX_KVM_H
 #define HAVE_LINUX_KVM_H
@@ -275,7 +275,7 @@ kvm_ioctl_decode_regs(struct tcb *const tcp, const unsigned int code,
 	
 
 	#ifdef TEST_DUMP
-	STRACE_PRINTF("[DEBUG]\t+++\tDUMP KVM_REGS\t+++\n");
+	// STRACE_PRINTF("[DEBUG]\t+++\tDUMP KVM_REGS\t+++\n");
 	#endif
 	print_struct_to_file(&regs, sizeof(struct kvm_regs), kvm_outfile);
 	

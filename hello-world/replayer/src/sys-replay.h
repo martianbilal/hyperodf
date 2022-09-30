@@ -36,6 +36,9 @@
 // #define DBG_DUMP 
 // uncomment to print strings read from file
 #define DBG_FILE_READING
+// uncomment to load structs read from files
+#define DBG_LOAD_STRUCT
+ 
 
 
 // uncomment this to use debug printing
