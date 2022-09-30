@@ -46,6 +46,9 @@
 
 // #define STANDALONE_BUILD
 
+
+#define CONVERTED_IDS
+
 #define dbg_pr_verbose(fmt, ...) \
         do { if(DBG_PRINT) fprintf(stderr, "%s:%d:%s(): [replayer]\t" fmt, __FILE__, \
                                 __LINE__, __func__, ##__VA_ARGS__); } while (0)
@@ -58,16 +61,41 @@
 #define FOREACH_IOCTLS_INDEX                        \
       for (int i = 0; i < CURR_IOCTLS_INDEX; i++)   \
 
+#define FOREACH_KVM_IOCTL_INDEX                         \
+      for (int i = 0; i < max_ioctls_supported; i++)       \
+
+
+#define FOREACH_KVM_IOCTL_STR(function) FOREACH_KVM_IOCTL_INDEX{(function)(ioctl_strings[i]);}
+
 
 #define FOREACH_IOCTL(function) FOREACH_IOCTLS_INDEX{(function)(ioctls[i]);}
 
-      
+#define STRINGIFY(x) #x
+
+#define TOSTRING(x) STRINGIFY(x)
+
+
+#define check_ioctl(istr, ireal, irealID, curr, ret)             \
+        do{                                             \
+                if(!(strcmp(istr, ireal))){  \
+                        curr = irealID;                   \
+                        goto ret;                       \
+                }                                       \
+        } while (0)
+        
+
+
 #define MAX_BUFFER 100 //used for reading lines from the file
 
 
 #define max_struct_req 20
 extern unsigned int ioctl_req_struct[];
 extern unsigned int ioctl_struct_sizes[];
+
+
+#define max_ioctls_supported 12
+extern unsigned int ioctl_ids[];
+extern char *ioctl_strings[];
 
 
 typedef struct ioctl_args

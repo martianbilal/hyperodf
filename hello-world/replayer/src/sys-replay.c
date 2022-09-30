@@ -22,6 +22,7 @@ unsigned int ioctl_req_struct[max_struct_req] = {
 };
 
 
+
 // corresponding structures
 unsigned int ioctl_struct_sizes[max_struct_req] = {
     sizeof(struct kvm_regs), 
@@ -31,6 +32,38 @@ unsigned int ioctl_struct_sizes[max_struct_req] = {
     sizeof(struct kvm_userspace_memory_region)
 };
 
+
+
+// a list of all the ioctls 
+unsigned int ioctl_ids[max_ioctls_supported] = {
+    KVM_GET_API_VERSION,
+    KVM_CREATE_VM,
+    KVM_CHECK_EXTENSION,
+    KVM_GET_VCPU_MMAP_SIZE,
+    KVM_CREATE_VCPU,
+    KVM_SET_TSS_ADDR,
+    KVM_SET_USER_MEMORY_REGION,
+    KVM_RUN,
+    KVM_GET_REGS,
+    KVM_SET_REGS,
+    KVM_GET_SREGS,
+    KVM_SET_SREGS
+};
+
+char *ioctl_strings[max_ioctls_supported] = {
+    "KVM_GET_API_VERSION",
+    "KVM_CREATE_VM",
+    "KVM_CHECK_EXTENSION",
+    "KVM_GET_VCPU_MMAP_SIZE",
+    "KVM_CREATE_VCPU",
+    "KVM_SET_TSS_ADDR",
+    "KVM_SET_USER_MEMORY_REGION",
+    "KVM_RUN",
+    "KVM_GET_REGS",
+    "KVM_SET_REGS",
+    "KVM_GET_SREGS",
+    "KVM_SET_SREGS"
+};
 
 
 
@@ -148,11 +181,20 @@ void replay_print_ioctl_args(void *a){
     #endif
 
     #ifdef DBG_PRINT_IOCTL_TAB
+    #ifdef CONVERTED_IDS
     printf("[ioctl entry]\t");
     printf("%p,", args->fd);
-    printf("%s,", args->ioctl_id);
+    printf("%p,", args->ioctl_id);
     printf("%p,", args->ioctl_struct);
     printf("%p\n", args->result);
+    #endif
+    #ifndef CONVERTED_IDS
+    printf("[ioctl entry]\t");
+    printf("%p,", args->fd);
+    printf("%p,", args->ioctl_id);
+    printf("%p,", args->ioctl_struct);
+    printf("%p\n", args->result);
+    #endif 
     #endif
 
 
@@ -214,6 +256,40 @@ int replay_dump_ioctls(char* out_file){
     return ret;
 }
 
+
+unsigned int replay_get_ioctl_id(char *ioctl_name){
+    int ioctl_id = 0;
+
+    FOREACH_KVM_IOCTL_INDEX{
+        check_ioctl(ioctl_name, ioctl_strings[i], ioctl_ids[i], ioctl_id, ret_ioctl);
+    }
+
+
+    // check_ioctl(ioctl_name, "KVM_GET_API_VERSION", KVM_GET_API_VERSION, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_CREATE_VM", KVM_CREATE_VM, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_CHECK_EXTENSION", KVM_CHECK_EXTENSION, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_GET_VCPU_MMAP_SIZE", KVM_GET_VCPU_MMAP_SIZE, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_CREATE_VCPU", KVM_CREATE_VCPU, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_SET_TSS_ADDR", KVM_SET_TSS_ADDR, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_SET_USER_MEMORY_REGION", KVM_SET_USER_MEMORY_REGION, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_RUN", KVM_RUN, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_GET_REGS", KVM_GET_REGS, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_SET_REGS", KVM_SET_REGS, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_GET_SREGS", KVM_GET_SREGS, ioctl_id, ret_ioctl);
+    // check_ioctl(ioctl_name, "KVM_SET_SREGS", KVM_SET_SREGS, ioctl_id, ret_ioctl);
+
+ret_ioctl:
+    return ioctl_id;
+}
+
+int replay_update_ioctls(){
+    unsigned int id = 0;
+    FOREACH_IOCTLS_INDEX{
+        id = replay_get_ioctl_id((char *)(ioctls[i]->ioctl_id));
+        ioctls[i]->ioctl_id = (void *)id;
+    }
+}
+
 int replay_read_csv(char *in_file){
     int ret = 0;
     char buffer[MAX_BUFFER];
@@ -266,6 +342,9 @@ int replay_read_csv(char *in_file){
     // [TODO] [START]Shortcircuiting the system for testing the proper parsing of 
     // verbose strace ouptut 
     dbg_pr("\t++exiting for testing++");
+    dbg_pr("KVM_GET_REGS : %p", KVM_GET_REGS);
+    dbg_pr("KVM_GET_REGS - DESTRINGIF¥: %p", replay_get_ioctl_id("KVM_GET_REGS"));
+    replay_update_ioctls();
     replay_print_ioctl_list();
     exit(0);
 

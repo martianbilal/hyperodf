@@ -1,19 +1,19 @@
 restart_syscall(<... resuming interrupted read ...>) = 0
-getpid()                                = 5288
+getpid()                                = 6234
 write(1, "\n", 1)                       = 1
-write(1, "[replayer] Parent pid\t:\t5288\n", 29) = 29
+write(1, "[replayer] Parent pid\t:\t6234\n", 29) = 29
 open("/dev/kvm", O_RDWR)                = 3
 ioctl(3, KVM_GET_API_VERSION, 0)        = 12
 ioctl(3, KVM_CREATE_VM, 0)              = 4
 ioctl(4, KVM_SET_TSS_ADDR, 0xfffbd000)  = 0
-mmap(NULL, 2097152, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7f8cac480000
-madvise(0x7f8cac480000, 2097152, MADV_MERGEABLE) = -1 EINVAL (Invalid argument)
-ioctl(4, KVM_SET_USER_MEMORY_REGION, {slot=0, flags=0, guest_phys_addr=0, memory_size=2097152, userspace_addr=0x7f8cac480000}) = 0
+mmap(NULL, 2097152, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7faaa5e98000
+madvise(0x7faaa5e98000, 2097152, MADV_MERGEABLE) = -1 EINVAL (Invalid argument)
+ioctl(4, KVM_SET_USER_MEMORY_REGION, {slot=0, flags=0, guest_phys_addr=0, memory_size=2097152, userspace_addr=0x7faaa5e98000}) = 0
 write(1, "api_version : : 12 180 \n", 24) = 24
 ioctl(4, KVM_CREATE_VCPU, 0)            = 5
 write(1, " ----------> res 1\n\n", 20)  = 20
 ioctl(3, KVM_GET_VCPU_MMAP_SIZE, 0)     = 12288
-mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE, 5, 0) = 0x7f8cacc3f000
+mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE, 5, 0) = 0x7faaa6657000
 write(1, "LONG MODE == Testing 64-bit mode"..., 33) = 33
 ioctl(5, KVM_GET_SREGS, {cs={base=0xffff0000, limit=65535, selector=61440, type=11, present=1, dpl=0, db=0, s=1, l=0, g=0, avl=0}, ds={base=0, limit=65535, selector=0, type=3, present=1, dpl=0, db=0, s=1, l=0, g=0, avl=0}, es={base=0, limit=65535, selector=0, type=3, present=1, dpl=0, db=0, s=1, l=0, g=0, avl=0}, fs={base=0, limit=65535, selector=0, type=3, present=1, dpl=0, db=0, s=1, l=0, g=0, avl=0}, gs={base=0, limit=65535, selector=0, type=3, present=1, dpl=0, db=0, s=1, l=0, g=0, avl=0}, ss={base=0, limit=65535, selector=0, type=3, present=1, dpl=0, db=0, s=1, l=0, g=0, avl=0}, tr={base=0, limit=65535, selector=0, type=11, present=1, dpl=0, db=0, s=0, l=0, g=0, avl=0}, ldt={base=0, limit=65535, selector=0, type=2, present=1, dpl=0, db=0, s=0, l=0, g=0, avl=0}, gdt={base=0, limit=65535}, idt={base=0, limit=65535}, cr0=1610612752, cr2=0, cr3=0, cr4=0, cr8=0, efer=0, apic_base=0xfee00900, interrupt_bitmap=[0, 0, 0, 0]}) = 0
 write(1, "--Start Setting the page tables-"..., 34) = 34
@@ -32,8 +32,8 @@ ioctl(5, KVM_RUN, 0)                    = 0
 ioctl(5, KVM_GET_SREGS, {cs={base=0, limit=4294967295, selector=8, type=11, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, ds={base=0, limit=4294967295, selector=16, type=3, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, es={base=0, limit=4294967295, selector=16, type=3, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, fs={base=0, limit=4294967295, selector=16, type=3, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, gs={base=0, limit=4294967295, selector=16, type=3, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, ss={base=0, limit=4294967295, selector=16, type=3, present=1, dpl=0, db=0, s=1, l=1, g=1, avl=0}, tr={base=0, limit=65535, selector=0, type=11, present=1, dpl=0, db=0, s=0, l=0, g=0, avl=0}, ldt={base=0, limit=65535, selector=0, type=2, present=1, dpl=0, db=0, s=0, l=0, g=0, avl=0}, gdt={base=0, limit=65535}, idt={base=0, limit=65535}, cr0=2147811379, cr2=0, cr3=8192, cr4=32, cr8=0, efer=1280, apic_base=0xfee00900, interrupt_bitmap=[0, 0, 0, 0]}) = 0
 ioctl(5, KVM_GET_REGS, {rax=0x2a, rbx=0, rcx=0, rdx=0xe9, rsi=0x72, rdi=0xe9, rsp=0x1ffff8, rbp=0x1ffff8, r8=0, r9=0, r10=0, r11=0, r12=0, r13=0, r14=0, r15=0, rip=0x43, rflags=0x2}) = 0
 write(2, "[replayer]\t------------------\tde"..., 66) = 66
-rt_sigaction(SIGINT, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER, sa_restorer=0x7f8cac6b3060}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
-rt_sigaction(SIGQUIT, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER, sa_restorer=0x7f8cac6b3060}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+rt_sigaction(SIGINT, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER, sa_restorer=0x7faaa60cb060}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+rt_sigaction(SIGQUIT, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER, sa_restorer=0x7faaa60cb060}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
 rt_sigprocmask(SIG_BLOCK, [CHLD], [], 8) = 0
-clone(child_stack=NULL, flags=CLONE_PARENT_SETTID|SIGCHLD, parent_tid=[5323]) = 5323
-wait4(5323,  <detached ...>
+clone(child_stack=NULL, flags=CLONE_PARENT_SETTID|SIGCHLD, parent_tid=[6269]) = 6269
+wait4(6269,  <detached ...>
