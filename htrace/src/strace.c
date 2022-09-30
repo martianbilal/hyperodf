@@ -2215,7 +2215,8 @@ init(int argc, char *argv[])
 	}
 
 	kvm_outfile = fopen(KVM_DUMP_FILE, "w");
-
+	assert(kvm_outfile);
+	
 	strace_tracer_pid = getpid();
 
 	os_release = get_os_release();

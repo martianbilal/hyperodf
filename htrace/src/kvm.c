@@ -51,17 +51,19 @@ int print_struct_to_file(void * struct_ptr, int len_struct,
 	int ret = 0;
 
 	if(outfile == NULL){
-		fprintf(stderr, "\nUnopened dump file\n");
+		// STRACE_PRINTF("\nUnopened dump file\n");
 		exit(1); 
 	}
+
+	// STRACE_PRINTF("[STRACE_LOGS]\tPrinting a struct of len %d to file %s\n", len_struct, KVM_DUMP_FILE);
 
 	ret = fwrite(struct_ptr, len_struct, 1, outfile);	
 
 	if(ret != 0){
-        printf("contents to file written successfully !\n");
+        // STRACE_PRINTF("contents to file written successfully !\n");
 	}
     else{
-        printf("error writing file !\n");
+        // STRACE_PRINTF("error writing file !\n");
 	}
 		
 
@@ -277,6 +279,8 @@ kvm_ioctl_decode_regs(struct tcb *const tcp, const unsigned int code,
 	#ifdef TEST_DUMP
 	// STRACE_PRINTF("[DEBUG]\t+++\tDUMP KVM_REGS\t+++\n");
 	#endif
+
+	
 	print_struct_to_file(&regs, sizeof(struct kvm_regs), kvm_outfile);
 	
 	
@@ -360,7 +364,7 @@ kvm_ioctl_decode_sregs(struct tcb *const tcp, const unsigned int code,
 		       const kernel_ulong_t arg)
 {
 	struct kvm_sregs sregs;
-
+	// STRACE_PRINTF("[STRACE_LOGS]\tCalled %s", __func__);
 	if (code == KVM_GET_SREGS && entering(tcp))
 		return 0;
 

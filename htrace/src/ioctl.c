@@ -349,6 +349,9 @@ ioctl_decode(struct tcb *tcp)
 	const unsigned int code = tcp->u_arg[1];
 	const kernel_ulong_t arg = tcp->u_arg[2];
 
+	// STRACE_PRINTF("[STRACE_LOGS]\tCalled %s", __func__);
+
+
 	switch (_IOC_TYPE(code)) {
 	case 0x03:
 		return hdio_ioctl(tcp, code, arg);
@@ -432,6 +435,8 @@ SYS_FUNC(ioctl)
 {
 	const struct_ioctlent *iop;
 	int ret;
+
+	// STRACE_PRINTF("[STRACE_LOGS]\tCalled %s", __func__);
 
 	if (entering(tcp)) {
 		printfd(tcp, tcp->u_arg[0]);

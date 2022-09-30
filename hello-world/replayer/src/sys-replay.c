@@ -85,7 +85,7 @@ int init_files(){
 
 void replay_init(){
     
-    init_files();
+    // init_files();
     init_ioctls();
     init_env();
 
@@ -263,6 +263,13 @@ int replay_read_csv(char *in_file){
                         cache_buf[2], cache_buf[3]);
         
     }
+    // [TODO] [START]Shortcircuiting the system for testing the proper parsing of 
+    // verbose strace ouptut 
+    dbg_pr("\t++exiting for testing++");
+    exit(0);
+
+    // [TODO] [END]Befor this point 
+    
     assert(ret == 0);
     return ret;
 }
@@ -278,7 +285,8 @@ int replay_attach_strace(int pid, char* out_file){
 
     // snprintf(strace_cmd, 128, "strace --raw=all -e trace=ioctl -p %d -o %s",
     //         pid, out_file);
-    snprintf(strace_cmd, 128, "/root/kvm-samples/htrace/src/strace  --raw=all -p %d -o %s",
+    dbg_pr("strace file\t:\t%s", out_file);
+    snprintf(strace_cmd, 128, "/root/kvm-samples/htrace/src/strace  --abbrev=none -p %d -o %s",
             pid, out_file);
 
     ret = fork();
@@ -309,7 +317,9 @@ int replay_attach_strace(int pid, char* out_file){
 int replay_detach_strace(){
     int ret = 0;
 
+    dbg_pr("------------------\tdetaching from strace\t-------------");
     ret = system("killall strace");
+    init_files();
 
     // assert(!ret);
 
@@ -419,7 +429,7 @@ int replay_run_ioctl(void *a){
         replay_read_struct(ioctl_struct, ioctl_struct_size, infile);
 
         #ifdef DBG_LOAD_STRUCT
-        if(need_struct == 0){
+        if(need_struct == 0 || need_struct == 1){
             regs_test = (struct kvm_reg *)ioctl_struct;
             dbg_pr();
             dbg_pr("REGS==>RAX\t:\t%lu", regs_test->rax);
