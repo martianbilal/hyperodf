@@ -228,7 +228,9 @@ kvm_ioctl_create_vcpu(struct tcb *const tcp, const kernel_ulong_t arg)
 
 	return RVAL_IOCTL_DECODED | RVAL_FD;
 }
-
+# ifndef HAVE_STRUCT_KVM_USERSPACE_MEMORY_REGION
+#define HAVE_STRUCT_KVM_USERSPACE_MEMORY_REGION
+#endif
 # ifdef HAVE_STRUCT_KVM_USERSPACE_MEMORY_REGION
 #  include "xlat/kvm_mem_flags.h"
 static int
@@ -251,7 +253,7 @@ kvm_ioctl_set_user_memory_region(struct tcb *const tcp, const kernel_ulong_t arg
 	tprint_struct_next();
 	PRINT_FIELD_X(u_memory_region, userspace_addr);
 	tprint_struct_end();
-
+	print_struct_to_file(&u_memory_region, sizeof(struct kvm_userspace_memory_region), kvm_outfile);
 	return RVAL_IOCTL_DECODED;
 }
 # endif /* HAVE_STRUCT_KVM_USERSPACE_MEMORY_REGION */

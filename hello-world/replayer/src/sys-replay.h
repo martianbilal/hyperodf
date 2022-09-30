@@ -42,7 +42,7 @@
 
 
 // uncomment this to use debug printing
-#define DBG_PRINT 1
+#define DBG_PRINT 0
 
 // #define STANDALONE_BUILD
 

@@ -341,12 +341,12 @@ int replay_read_csv(char *in_file){
     }
     // [TODO] [START]Shortcircuiting the system for testing the proper parsing of 
     // verbose strace ouptut 
-    dbg_pr("\t++exiting for testing++");
-    dbg_pr("KVM_GET_REGS : %p", KVM_GET_REGS);
-    dbg_pr("KVM_GET_REGS - DESTRINGIF¥: %p", replay_get_ioctl_id("KVM_GET_REGS"));
+    // dbg_pr("\t++exiting for testing++");
+    // dbg_pr("KVM_GET_REGS : %p", KVM_GET_REGS);
+    // dbg_pr("KVM_GET_REGS - DESTRINGIF¥: %p", replay_get_ioctl_id("KVM_GET_REGS"));
     replay_update_ioctls();
     replay_print_ioctl_list();
-    exit(0);
+    // exit(0);
 
     // [TODO] [END]Befor this point 
     
@@ -462,7 +462,7 @@ static int ioctl_need_struct(unsigned int ioctl){
             break;
         }
     }
-    dbg_pr("ret::\tneed_struct:\t%d",ret);
+    // dbg_pr("ret::\tneed_struct:\t%d",ret);
     return ret;
 }
 /**
@@ -476,6 +476,7 @@ int replay_run_ioctl(void *a){
     struct kvm_userspace_memory_region *memreg;
     int need_struct = -1;
     struct kvm_regs *regs_test;
+    struct kvm_userspace_memory_region *memreg_test;
 
     // for reading random ioctl structs from the dump
     void *ioctl_struct;
@@ -487,7 +488,8 @@ int replay_run_ioctl(void *a){
     int vcpu_mmap_size;
 
     need_struct = ioctl_need_struct((unsigned long)(arg->ioctl_id));
-    dbg_pr("need_struct\t:\t%d", need_struct);
+    if(need_struct != -1)
+        dbg_pr("need_struct\t:\t%d", need_struct);
     
     if(need_struct != -1){
         //get struct
@@ -514,6 +516,13 @@ int replay_run_ioctl(void *a){
             dbg_pr();
             dbg_pr("REGS==>RAX\t:\t%lu", regs_test->rax);
         }
+        if(need_struct == 4){
+            memreg = (struct kvm_userspace_memory_region *)ioctl_struct;
+            dbg_pr("&memreg : %p", &memreg);
+            dbg_pr("memreg.userspace_addr : %p", memreg->userspace_addr);
+            dbg_pr("memreg.guest_phys_addr : %p", memreg->guest_phys_addr);
+            dbg_pr("memreg.memsize : %d", memreg->memory_size);
+        }
         #endif
 
         do{
@@ -531,14 +540,14 @@ int replay_run_ioctl(void *a){
     
     if(ret != (unsigned long)(arg->result)) ret = -1;
 
-    if((unsigned long)(arg->ioctl_id) == KVM_SET_USER_MEMORY_REGION){
-        dbg_pr("memory set");
-        memreg = (struct kvm_userspace_memory_region*)(arg->ioctl_struct);
-        dbg_pr("&memreg : %p", arg->ioctl_struct);
-        dbg_pr("memreg.userspace_addr : %p", memreg->userspace_addr);
-        dbg_pr("memreg.guest_phys_addr : %p", memreg->guest_phys_addr);
-        dbg_pr("memreg.memsize : %p", memreg->memory_size);
-    }
+    // if((unsigned long)(arg->ioctl_id) == KVM_SET_USER_MEMORY_REGION){
+    //     dbg_pr("memory set");
+    //     memreg = (struct kvm_userspace_memory_region*)(arg->ioctl_struct);
+    //     dbg_pr("&memreg : %p", arg->ioctl_struct);
+    //     dbg_pr("memreg.userspace_addr : %p", memreg->userspace_addr);
+    //     dbg_pr("memreg.guest_phys_addr : %p", memreg->guest_phys_addr);
+    //     dbg_pr("memreg.memsize : %p", memreg->memory_size);
+    // }
 
     if((unsigned long)(arg->ioctl_id) == KVM_CREATE_VCPU){
         vcpu_mmap_size = ioctl(parent_fds[0], KVM_GET_VCPU_MMAP_SIZE, 0);

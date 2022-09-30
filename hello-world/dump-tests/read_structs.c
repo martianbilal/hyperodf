@@ -12,6 +12,8 @@ int main(){
     FILE *infile;
     char filename[] = "/root/kvm-samples/dumps/kvm.structs";
     struct kvm_regs regs;
+    struct kvm_sregs sregs;
+    struct kvm_userspace_memory_region memreg;
 
     /* read data from the file */
     infile = fopen(filename,"r");
@@ -20,12 +22,23 @@ int main(){
         exit(1);
     }
 
-    while(fread(&regs, sizeof(struct kvm_regs), 1, infile)){
-        printf("Read kvm_regs\n");
+    // while(fread(&regs, sizeof(struct kvm_regs), 1, infile)){
+    //     printf("Read kvm_regs\n");
 
-        //printing single register for testing
-        printf("regs.rax\t:\t%p\n", regs.rax);
-    }
+    //     //printing single register for testing
+    //     printf("regs.rax\t:\t%p\n", regs.rax);
+    // }
+
+    fread(&memreg, sizeof(struct kvm_userspace_memory_region), 1, infile);
+    printf("memregs.guest_addr\t:\t%p\n", memreg.guest_phys_addr);
+    printf("memregs.memsize\t:\t%u\n", memreg.memory_size);
+    printf("memregs.user_addr\t:\t%p\n", memreg.userspace_addr);
+    printf("memregs.slot\t:\t%p\n", memreg.slot);
+    fread(&regs, sizeof(struct kvm_regs), 1, infile);
+    fread(&sregs, sizeof(struct kvm_sregs), 1, infile);
+    fread(&regs, sizeof(struct kvm_regs), 1, infile);
+    fread(&sregs, sizeof(struct kvm_sregs), 1, infile);
+    fread(&regs, sizeof(struct kvm_regs), 1, infile);
 
     fclose(infile);
 
