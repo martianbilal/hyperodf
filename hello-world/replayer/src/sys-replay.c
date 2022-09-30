@@ -150,7 +150,7 @@ void replay_print_ioctl_args(void *a){
     #ifdef DBG_PRINT_IOCTL_TAB
     printf("[ioctl entry]\t");
     printf("%p,", args->fd);
-    printf("%p,", args->ioctl_id);
+    printf("%s,", args->ioctl_id);
     printf("%p,", args->ioctl_struct);
     printf("%p\n", args->result);
     #endif
@@ -247,7 +247,7 @@ int replay_read_csv(char *in_file){
                 cache_buf[0] = (void *)atol(token);
                 break;
             case 1:
-                cache_buf[1] = (void *)atol(token);
+                cache_buf[1] = (void *)strdup(token);
                 break;
             case 2:
                 cache_buf[2] = (void *)atol(token);
@@ -266,6 +266,7 @@ int replay_read_csv(char *in_file){
     // [TODO] [START]Shortcircuiting the system for testing the proper parsing of 
     // verbose strace ouptut 
     dbg_pr("\t++exiting for testing++");
+    replay_print_ioctl_list();
     exit(0);
 
     // [TODO] [END]Befor this point 
