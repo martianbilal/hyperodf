@@ -6,15 +6,30 @@ import sys
 helloworlddir = "/root/kvm-samples/hello-world"
 replayerdir = helloworlddir + "/replayer"
 
+
 ioctls = []
+opens = []
+closes = []
+fstats = []
+arch_prctls = []
+
 comma_sep_ioctls = []
 
-def parse_strace(in_file: str):
+def parse_add_open():
+    pass
+
+def parse_add_close():
+    pass
+
+def parse_add_fstat():
+    pass
+
+def parse_add_arch_prctls():
+    pass
+
+
+def parse_add_ioctl():
     comma_sep_ioctl = []
-    with open(in_file, "r") as syscalls:
-        for syscall in syscalls:
-            if "ioctl" in syscall:
-                ioctls.append(syscall)
     for ioctl in ioctls:
         ioctl = ioctl.split("(")[1]
         res = ioctl.split("= ")[1].strip("\n")
@@ -33,7 +48,40 @@ def parse_strace(in_file: str):
         comma_sep_ioctl.append(int(res, 16))
         comma_sep_ioctls.append(comma_sep_ioctl)
         comma_sep_ioctl = []
-        
+
+def parse_strace(in_file: str):
+    with open(in_file, "r") as syscalls:
+        for syscall in syscalls:
+            if "ioctl" in syscall:
+                ioctls.append(syscall)
+
+            if "open" in syscall:
+                opens.append(syscall)
+            
+            if "close" in syscall:
+                closes.append(syscall)
+            
+            if "fstat" in syscall:
+                fstats.append(syscall)
+            
+            if "arch_prctl" in syscall:
+                arch_prctls.append(syscall)
+
+            # write code for adding 
+            # "necessary" syscalls into
+            # their corresponding lists 
+            # [TODO] check the systemcalls
+            #   not handled by fork and used
+            #   by QEMU
+
+    # add a function call for adding all the 
+    # ioctls in the comma_sep_ioctl        
+    parse_add_ioctl();
+    # Add similar functions for rest of the system calls
+    parse_add_open();
+    parse_add_close();
+    parse_add_fstat();
+    parse_add_arch_prctls();
 
 def dump_to_csv(out_file: str):
     # print(comma_sep_ioctls)
