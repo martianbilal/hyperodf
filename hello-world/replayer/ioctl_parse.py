@@ -14,18 +14,38 @@ fstats = []
 arch_prctls = []
 
 comma_sep_ioctls = []
+comma_sep_opens = []
 
 def parse_add_open():
-    pass
+    print("==== open list ===== ")
+    comma_sep_open = []
+    for opn in opens:
+        opn = opn.split("(")[1]
+        res = opn.split("= ")[1].strip("\n")
+        opn = opn.split(")")[0]
+        opn = opn.split(",")
+        opn[1] = opn[1][1:]
+        print(opn)
+        comma_sep_open.append(opn[0])
+        comma_sep_open.append(str(opn[1]))
+        comma_sep_open.append(int(res, 16))
+        comma_sep_opens.append(comma_sep_open)
+        comma_sep_open = []
+
+    print("==== open list ===== ")
 
 def parse_add_close():
-    pass
+    print("==== close list ===== ")
+    print(closes)
+
 
 def parse_add_fstat():
-    pass
+    print("==== fstat list ===== ")
+    print(fstats)
 
 def parse_add_arch_prctls():
-    pass
+    print("==== arch prctl list ===== ")
+    print(arch_prctls)
 
 
 def parse_add_ioctl():
