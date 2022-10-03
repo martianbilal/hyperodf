@@ -21,6 +21,40 @@ int register_sys_result_handler(int syscall, void *func_ptr){
 }
 
 
+
+/**
+ * @brief Invokes appropriate args handler for the given syscall
+ * 
+ * This function is invoked in the parent process 
+ * When we  have intercepted child's system call
+ * and we have not made the next system call
+ * 
+ * @arg syscall : syscall number
+ * @result returns the result of running the syscall handler
+ * 
+*/
+int invoke_sys_call_args_handler(int syscall){
+    int ret = 0; 
+    return ret;
+}
+
+/**
+ * @brief Invokes appropriate result handler for the given syscall
+ * 
+ * This function is invoked in the parent process 
+ * When we  have intercepted results coming in for 
+ * the child's system call from the kernel
+ * 
+ * @arg syscall : syscall number
+ * @result returns the result of running the syscall handler
+ * 
+*/
+int invoke_sys_call_regs_handler(int syscall){
+    int ret = 0;
+    return ret; 
+}
+
+
 void init_trace(__pid_t child_pid){
     waitpid(child_pid, 0, 0); // sync with execvp
     ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_EXITKILL);
@@ -33,6 +67,11 @@ void init_trace(__pid_t child_pid){
         if (waitpid(child_pid, 0, 0) == -1)
             FATAL("%s", strerror(errno));
 
+        // at this point we are stopped before making the next system call 
+        // so now we can print the arguments of the syscall or we can change
+        // these
+
+        
         /* Gather system call arguments */
         struct user_regs_struct regs;
         if (ptrace(PTRACE_GETREGS, child_pid, 0, &regs) == -1)
