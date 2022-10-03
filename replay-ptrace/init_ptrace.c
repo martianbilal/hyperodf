@@ -29,8 +29,26 @@ void init_trace(__pid_t child_pid){
 
 // will also call init_trace for the parent
 // will fork in this process
-int init_child_process(){
+int init_child_process(int argc, char *argv_1, char **argv){
     int ret = 0;
+    __pid_t child_pid = -1;
+
+    child_pid = fork();
+
+    assert(child_pid>=0);
+
+    if(child_pid == 0){
+        /* child */
+        ptrace(PTRACE_TRACEME, 0, 0, 0);
+        // execvp will now wait for the parent to attach and wait for us 
+        execvp(argc, argv_1, argv);
+        // never reach here 
+    }else {
+        /* parent */
+        init_trace(child_pid);
+        
+    }
+
     return ret;
 }
 
@@ -54,7 +72,7 @@ int main(int argc, char **argv){
     register_sys_result_handler(syscall, func_ptr);
 
     dbg_pr("initialize the child process to be traced AND start tracing ");
-    init_child_process(); 
+    init_child_process(argc - 1, argv[1], argv + 1); 
 
     // print something when receive the corresponding system call 
         // -- goes in func_ptr funciton

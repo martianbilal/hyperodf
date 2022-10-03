@@ -1,5 +1,6 @@
 #include <stdio.h>                  // for printing stuff to stdio
 #include <linux/ptrace.h>           // for PTRACE call
+#include <assert.h>
 
 
 #define DBG

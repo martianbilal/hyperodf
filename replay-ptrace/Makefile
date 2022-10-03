@@ -8,6 +8,10 @@ LFLAGS = $(CFLAGS) -L/usr/lib/
 SOURCES = $(wildcard *.c)
 OBJECTS = $(SOURCES:.c=.o)
 
+TST_SOURCES = $(wildcard tests/*.c)
+TST_OBJECTS = $(TST_SOURCES:.c=.o)
+
+
 DEBUG = no
 PROFILE = no
 PEDANTIC = no
@@ -24,16 +28,23 @@ endif
 
 CFLAGS += $(OPTIMIZATION)
 
-all: replay-ptrace
+all: replay-ptrace tests
 
 replay-ptrace: $(OBJECTS)
 	$(CC) $(OBJECTS) $(CFLAGS) -o replay-ptrace
+
+tests: $(TST_OBJECTS)
+	$(CC) $(TST_OBJECTS) $(CFLAGS) -o tests/test
+tests/%.o: tests/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf *.o replay-ptrace
+	rm -rf *.o tests/test
 
 rebuild: clean all
 
