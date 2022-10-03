@@ -7,32 +7,65 @@ helloworlddir = "/root/kvm-samples/hello-world"
 replayerdir = helloworlddir + "/replayer"
 
 
+#
+#   IDs for the syscalls 
+#
+#   0 => ioctl
+#   1 => open
+#   2 => close
+#   3 => fstats
+#   4 => arch_prctls
+#
+
+
+syscalls = []
 ioctls = []
 opens = []
 closes = []
 fstats = []
 arch_prctls = []
 
+
+comma_sep_syscalls = []
 comma_sep_ioctls = []
 comma_sep_opens = []
 
-def parse_add_open():
-    print("==== open list ===== ")
-    comma_sep_open = []
-    for opn in opens:
-        opn = opn.split("(")[1]
-        res = opn.split("= ")[1].strip("\n")
-        opn = opn.split(")")[0]
-        opn = opn.split(",")
-        opn[1] = opn[1][1:]
-        print(opn)
-        comma_sep_open.append(opn[0])
-        comma_sep_open.append(str(opn[1]))
-        comma_sep_open.append(int(res, 16))
-        comma_sep_opens.append(comma_sep_open)
-        comma_sep_open = []
+# def parse_add_open():
+#     print("==== open list ===== ")
+#     comma_sep_open = []
+#     for opn in opens:
+#         opn = opn.split("(")[1]
+#         res = opn.split("= ")[1].strip("\n")
+#         opn = opn.split(")")[0]
+#         opn = opn.split(",")
+#         opn[1] = opn[1][1:]
+#         print(opn)
+#         comma_sep_open.append(opn[0])
+#         comma_sep_open.append(str(opn[1]))
+#         comma_sep_open.append(int(res, 16))
+#         # comma_sep_opens.append(comma_sep_open)
+#         comma_sep_syscalls.append(comma_sep_open)
+#         comma_sep_open = []
 
-    print("==== open list ===== ")
+#     print("==== open list ===== ")
+
+def __parse_add_open(opn):
+    comma_sep_open = []
+    opn = opn.split("(")[1]
+    res = opn.split("= ")[1].strip("\n")
+    opn = opn.split(")")[0]
+    opn = opn.split(",")
+    opn[1] = opn[1][1:]
+    print(opn)
+    # first arg maybe the name of the device
+    # [Bilal] [TODO] find why does it print 
+    # out with three inverted commas on both
+    # sides
+    comma_sep_open.append(opn[0]) 
+    comma_sep_open.append(str(opn[1]))
+    comma_sep_open.append(int(res, 16))
+    # comma_sep_opens.append(comma_sep_open)
+    comma_sep_syscalls.append(comma_sep_open)
 
 def parse_add_close():
     print("==== close list ===== ")
@@ -48,44 +81,58 @@ def parse_add_arch_prctls():
     print(arch_prctls)
 
 
-def parse_add_ioctl():
+def __parse_add_ioctl(ioctl):
     comma_sep_ioctl = []
-    for ioctl in ioctls:
-        ioctl = ioctl.split("(")[1]
-        res = ioctl.split("= ")[1].strip("\n")
-        ioctl = ioctl.split(")")[0]
-        ioctl = ioctl.split(",")
-        ioctl[1] = ioctl[1][1:]
-        ioctl[2] = ioctl[2][1:]
-        print(ioctl)
-        comma_sep_ioctl.append(int(ioctl[0], 16))
-        comma_sep_ioctl.append(str(ioctl[1]))
-        if len(ioctl) == 3:
-            comma_sep_ioctl.append(int(ioctl[2], 16))
-        else:
-            comma_sep_ioctl.append(-1)
-            
-        comma_sep_ioctl.append(int(res, 16))
-        comma_sep_ioctls.append(comma_sep_ioctl)
-        comma_sep_ioctl = []
+    ioctl = ioctl.split("(")[1]
+    res = ioctl.split("= ")[1].strip("\n")
+    ioctl = ioctl.split(")")[0]
+    ioctl = ioctl.split(",")
+    ioctl[1] = ioctl[1][1:]
+    ioctl[2] = ioctl[2][1:]
+    print(ioctl)
+    comma_sep_ioctl.append(int(ioctl[0], 16))
+    comma_sep_ioctl.append(str(ioctl[1]))
+    if len(ioctl) == 3:
+        comma_sep_ioctl.append(int(ioctl[2], 16))
+    else:
+        comma_sep_ioctl.append(-1)
+        
+    comma_sep_ioctl.append(int(res, 16))
+    comma_sep_ioctls.append(comma_sep_ioctl)
+    comma_sep_syscalls.append(comma_sep_ioctl)
+
+
+def parse_add_syscall():
+    for id_entry, syscall in syscalls:
+        if id_entry == 0:
+            # IOCTL
+            __parse_add_ioctl(syscall)
+
+
+        elif id_entry == 1:
+            # OPEN
+            __parse_add_open(syscall)
+
+        
 
 def parse_strace(in_file: str):
-    with open(in_file, "r") as syscalls:
-        for syscall in syscalls:
+    with open(in_file, "r") as __syscalls:
+        for syscall in __syscalls:
             if "ioctl" in syscall:
-                ioctls.append(syscall)
+                syscalls.append((0, syscall))
 
             if "open" in syscall:
-                opens.append(syscall)
+                syscalls.append((1, syscall))
+                # opens.append(syscall)
             
             if "close" in syscall:
-                closes.append(syscall)
+                syscalls.append((2, syscall))
             
             if "fstat" in syscall:
-                fstats.append(syscall)
+                syscalls.append((3, syscall))
             
             if "arch_prctl" in syscall:
-                arch_prctls.append(syscall)
+                syscalls.append((4, syscall))
 
             # write code for adding 
             # "necessary" syscalls into
@@ -96,18 +143,20 @@ def parse_strace(in_file: str):
 
     # add a function call for adding all the 
     # ioctls in the comma_sep_ioctl        
-    parse_add_ioctl();
+    parse_add_syscall();
+    # parse_add_ioctl();
     # Add similar functions for rest of the system calls
-    parse_add_open();
-    parse_add_close();
-    parse_add_fstat();
-    parse_add_arch_prctls();
+    # parse_add_open();
+    # parse_add_close();
+    # parse_add_fstat();
+    # parse_add_arch_prctls();
 
 def dump_to_csv(out_file: str):
-    # print(comma_sep_ioctls)
+    print(comma_sep_syscalls)
     with open(out_file, "w+") as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerows(comma_sep_ioctls)
+        # writer.writerows(comma_sep_ioctls)
+        writer.writerows(comma_sep_syscalls)
 
 def print_usage():
     print("ioctl_parse.py - helper python script for replayer module")

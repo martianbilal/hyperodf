@@ -2,9 +2,11 @@
 #include "read-structs.h"
 
 
-int CURR_IOCTLS_INDEX = 0;
+int CURR_IOCTLS_INDEX = 0;  //ioctl index
+int CURR_SYSCALL_INDEX = 0;     //generic syscall index
 
 ioctl_args **ioctls = NULL;
+sys_call_args **syscalls = NULL;
 
 void *replay_kvm_run;
 
@@ -226,6 +228,33 @@ void replay_extend_ioctls(void *fd, void *ioctl_id, void *ioctl_struct, void *re
 
     return;
 }
+
+
+/// @brief Adds a parsed syscall to syscalls list
+/// @param id 
+/// @param args_list 
+void replay_extend_syscall(void *id, void **args_list){
+    sys_call_args *new_syscall = (sys_call_args*)malloc(sizeof(sys_call_args)); 
+
+    assert(new_syscall != NULL);
+
+    // ->fd = fd;
+    // new_ioctl->ioctl_id = ioctl_id;
+    // new_ioctl->ioctl_struct = ioctl_struct;
+    // new_ioctl->result = result;
+    new_syscall->id = id;
+
+    for(int i = 0; i < max_syscall_args; i++){
+        new_syscall->args_list[i] = args_list[i];
+    }
+
+    syscalls[CURR_SYSCALL_INDEX] = new_syscall;
+    CURR_SYSCALL_INDEX = CURR_SYSCALL_INDEX + 1;
+
+    return;
+}
+
+
 
 int replay_dump_single_ioctl(void *a, FILE *dump){
     ioctl_args *args = (ioctl_args*)a;

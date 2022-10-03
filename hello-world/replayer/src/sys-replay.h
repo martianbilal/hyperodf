@@ -61,6 +61,11 @@
 #define FOREACH_IOCTLS_INDEX                        \
       for (int i = 0; i < CURR_IOCTLS_INDEX; i++)   \
 
+
+#define FOREACH_SYSCALL_INDEX                        \
+      for (int i = 0; i < CURR_SYSCALL_INDEX; i++)   \
+
+
 #define FOREACH_KVM_IOCTL_INDEX                         \
       for (int i = 0; i < max_ioctls_supported; i++)       \
 
@@ -69,6 +74,7 @@
 
 
 #define FOREACH_IOCTL(function) FOREACH_IOCTLS_INDEX{(function)(ioctls[i]);}
+#define FOREACH_SYSCALL(function) FOREACH_SYSCALL_INDEX{(function)(syscalls[i]);}
 
 #define STRINGIFY(x) #x
 
@@ -89,6 +95,10 @@
 
 
 #define max_struct_req 20
+
+#define max_syscall_args 5 // this is the max number of the arguments that 
+                                // a syscall can have
+
 extern unsigned int ioctl_req_struct[];
 extern unsigned int ioctl_struct_sizes[];
 
@@ -110,6 +120,16 @@ typedef struct ioctl_args
 
 // array of ioctl args
 extern ioctl_args **ioctls;
+
+
+typedef struct sys_call_args
+{
+        int id;         /*syscall id*/
+        void *args_list[max_syscall_args];
+} sys_call_args;
+
+extern sys_call_args **syscalls;
+
 
 // environment 
 
