@@ -1,5 +1,24 @@
-#include <stdio.h>                  // for printing stuff to stdio
-#include <linux/ptrace.h>           // for PTRACE call
+/* C standard library */
+#include <errno.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* POSIX */
+#include <unistd.h>
+#include <sys/user.h>
+#include <sys/wait.h>
+
+/* Linux */
+#include <syscall.h>
+#include <sys/reg.h>
+#include <sys/ptrace.h>
+
+/* KVM */
+#include <linux/kvm.h> 
+
+
 #include <assert.h>
 
 
@@ -14,6 +33,14 @@
 
 #define dbg_pr(fmt, ...) \
         do { if(DBG_PRINT) fprintf(stderr, "[replay-ptrace]\t" fmt "\n", ##__VA_ARGS__); } while (0)
+
+#define FATAL(...) \
+    do { \
+        fprintf(stderr, "strace: " __VA_ARGS__); \
+        fputc('\n', stderr); \
+        exit(EXIT_FAILURE); \
+    } while (0)
+
 
 // Array containing all the handlers for syscalls
 extern void **handlers_args;

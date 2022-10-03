@@ -22,7 +22,52 @@ int register_sys_result_handler(int syscall, void *func_ptr){
 
 
 void init_trace(__pid_t child_pid){
+    waitpid(child_pid, 0, 0); // sync with execvp
+    ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_EXITKILL);
+        
+    while(1){
+        /* Enter next system call */
+        if (ptrace(PTRACE_SYSCALL, child_pid, 0, 0) == -1) {
+            FATAL("%s", strerror(errno));
+        }
+        if (waitpid(child_pid, 0, 0) == -1)
+            FATAL("%s", strerror(errno));
 
+        /* Gather system call arguments */
+        struct user_regs_struct regs;
+        if (ptrace(PTRACE_GETREGS, child_pid, 0, &regs) == -1)
+            FATAL("%s", strerror(errno));
+
+        // if (is_syscall_blocked(regs.orig_rax)) {
+        //     regs.orig_rax = -1; // set to invalid system call
+        //     if (ptrace(PTRACE_SETREGS, child_pid, 0, &regs) == -1)
+        //         FATAL("%s", strerror(errno));
+        // }
+
+        /* Special handling per system call (entrance) */
+        switch (regs.orig_rax) {
+            case SYS_exit:
+                exit(regs.rdi);
+            case SYS_exit_group:
+                exit(regs.rdi);
+
+        }
+
+        /* Run system call and stop on exit */
+        if (ptrace(PTRACE_SYSCALL, child_pid, 0, 0) == -1)
+            FATAL("%s", strerror(errno));
+        if (waitpid(child_pid, 0, 0) == -1)
+            FATAL("%s", strerror(errno));
+
+        /* Special handling per system call (exit) */
+        switch (regs.orig_rax) {
+            case -1:
+                if (ptrace(PTRACE_POKEUSER, child_pid, RAX * 8, -EPERM) == -1)
+                    FATAL("%s", strerror(errno));
+                break;
+
+        }
+    }
     return;
 }
 
@@ -41,12 +86,12 @@ int init_child_process(int argc, char *argv_1, char **argv){
         /* child */
         ptrace(PTRACE_TRACEME, 0, 0, 0);
         // execvp will now wait for the parent to attach and wait for us 
-        execvp(argc, argv_1, argv);
+        execvp(argv_1, argv);
         // never reach here 
     }else {
         /* parent */
         init_trace(child_pid);
-        
+
     }
 
     return ret;
