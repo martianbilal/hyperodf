@@ -99,14 +99,19 @@
 #define max_syscall_args 5 // this is the max number of the arguments that 
                                 // a syscall can have
 
+
 extern unsigned int ioctl_req_struct[];
 extern unsigned int ioctl_struct_sizes[];
 
 
+#define max_syscall_supported 5
 #define max_ioctls_supported 12
 extern unsigned int ioctl_ids[];
 extern char *ioctl_strings[];
 
+// used for identifying syscalls across the 
+// replayer project 
+extern char* syscalls_supported[];
 
 typedef struct ioctl_args
 {

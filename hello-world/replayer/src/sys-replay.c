@@ -8,6 +8,14 @@ int CURR_SYSCALL_INDEX = 0;     //generic syscall index
 ioctl_args **ioctls = NULL;
 sys_call_args **syscalls = NULL;
 
+char *syscalls_supported[max_syscall_supported] = {
+    "ioctl",
+    "open",
+    "close",
+    "fstat",
+    "arch_prctl"
+};
+
 void *replay_kvm_run;
 
 FILE *infile;
