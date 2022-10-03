@@ -24,16 +24,16 @@ endif
 
 CFLAGS += $(OPTIMIZATION)
 
-all: project
+all: replay-ptrace
 
-project: $(OBJECTS)
-	$(CC) $(OBJECTS) $(CFLAGS) -o project
+replay-ptrace: $(OBJECTS)
+	$(CC) $(OBJECTS) $(CFLAGS) -o replay-ptrace
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf *.o project
+	rm -rf *.o replay-ptrace
 
 rebuild: clean all
 
