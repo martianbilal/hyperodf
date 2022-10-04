@@ -8,6 +8,8 @@ int CURR_SYSCALL_INDEX = 0;     //generic syscall index
 ioctl_args **ioctls = NULL;
 sys_call_args **syscalls = NULL;
 
+// use for checking the type of the syscall before making 
+// the extend ioctl call 
 char *syscalls_supported[max_syscall_supported] = {
     "ioctl",
     "open",

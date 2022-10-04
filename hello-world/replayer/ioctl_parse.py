@@ -154,6 +154,7 @@ def parse_strace(in_file: str):
 def dump_to_csv(out_file: str):
     print(comma_sep_syscalls)
     with open(out_file, "w+") as csv_file:
+        csv_file.write(str(len(comma_sep_syscalls)) + "\n")
         writer = csv.writer(csv_file)
         # writer.writerows(comma_sep_ioctls)
         writer.writerows(comma_sep_syscalls)
