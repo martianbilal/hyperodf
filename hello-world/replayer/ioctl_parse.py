@@ -74,7 +74,11 @@ def __parse_add_open(opn):
     # [Bilal] [TODO] find why does it print 
     # out with three inverted commas on both
     # sides
-    comma_sep_open.append(opn[0]) 
+    
+    ## [TODO] [DONE] 
+    ## new code was added instead of following code 
+    # comma_sep_open.append(opn[0]) 
+    comma_sep_open.append(opn[0][1:-1]) 
     comma_sep_open.append(str(opn[1]))
     comma_sep_open.append(int(res, 16))
     # comma_sep_opens.append(comma_sep_open)

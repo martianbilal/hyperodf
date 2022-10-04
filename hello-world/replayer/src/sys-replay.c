@@ -694,16 +694,37 @@ int replay_run_ioctl(void *a){
     return ret;
 }
 
-int replay_run_syscall(void *a){
+int replay_run_syscall(void *a, int id){
     int ret = 0;
+    sys_call_args *args = (sys_call_args *)a;
     // handling the syscall 
+    if(args->id == 1){
+        // open
+        // ret = open("/dev/kvm", O_RDWR);
+        dbg_pr("args list 0 for open --- : ----  %s", args->args_list[0] );
+        dbg_pr("args list 1 for open --- : ----  %s", args->args_list[1] );
+        // ret = open((char *)(args->args_list[0]), O_RDWR);
+        
+        if(!(strcmp(args->args_list[1], "O_RDWR")))
+            ret = open((char *)(args->args_list[0]), O_RDWR);
+        else
+            ret = open((char *)(args->args_list[0]), args->args_list[1]);
+
+        child_fds[0] = ret;
+        dbg_pr("child kvm fd : %d", child_fds[0]);
+        dbg_pr("parent kvm fd : %d", parent_fds[0]);
+        assert(child_fds[0] == parent_fds[0]);
+        assert(ret == args->args_list[2]);
+    }
+    return ret;
+
 
     return ret;
 }
 
 /**
  * 
- * flag => is 1 if not an ioctl, 0 otherwise 
+ * flag => is 0 if ioctl, ioctl id otherwise 
  * 
 */
 int __replay_run_syscall(void *a, int flag){
@@ -713,7 +734,7 @@ int __replay_run_syscall(void *a, int flag){
         replay_run_ioctl(a);
     } else {
         //other syscall
-        replay_run_syscall(a);
+        replay_run_syscall(a, flag);
     
     }
     return;
@@ -807,7 +828,7 @@ int replay_child(){
     }
     
     ret = replay_close_parent_fds();
-    ret = replay_reopen_kvm_device();
+    // ret = replay_reopen_kvm_device();
     ret = replay_ioctl_rewind();
     ret = replay_verify_results();
  
