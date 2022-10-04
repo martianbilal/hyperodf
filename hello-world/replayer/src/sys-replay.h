@@ -21,8 +21,11 @@
 
 
 
-
+// []
 #define max_ioctls 100
+#define max_syscalls 100
+
+
 #define max_fds 3
 
 
@@ -38,11 +41,10 @@
 #define DBG_FILE_READING
 // uncomment to load structs read from files
 #define DBG_LOAD_STRUCT
- 
 
 
 // uncomment this to use debug printing
-#define DBG_PRINT 0
+#define DBG_PRINT 1
 
 // #define STANDALONE_BUILD
 
@@ -130,8 +132,8 @@ extern ioctl_args **ioctls;
 
 typedef struct sys_call_args
 {
-        int id;         /*syscall id*/
-        void *args_list[max_syscall_args];
+        int id;                                 /*syscall id*/
+        void *args_list[max_syscall_args];      /*list of syscall arguments cast to void* */
 } sys_call_args;
 
 extern sys_call_args **syscalls;

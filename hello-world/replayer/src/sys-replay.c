@@ -94,7 +94,11 @@ void init_ioctls(void){
     assert(ioctls);
 
     CURR_IOCTLS_INDEX = 0;
+    return;
+}
 
+void init_syscalls(void){
+    syscalls = malloc(sizeof(sys_call_args) * max_syscalls);
     return;
 }
 
@@ -131,6 +135,7 @@ int init_files(){
 void replay_init(){
     
     // init_files();
+    init_syscalls();
     init_ioctls();
     init_env();
 
@@ -243,26 +248,35 @@ void replay_extend_ioctls(void *fd, void *ioctl_id, void *ioctl_struct, void *re
 /// @brief Adds a parsed syscall to syscalls list
 /// @param id 
 /// @param args_list 
-void replay_extend_syscall(void *id, void **args_list){
+void replay_extend_syscall(int id, int n_args, void *args_list[]){
     sys_call_args *new_syscall = (sys_call_args*)malloc(sizeof(sys_call_args)); 
+    dbg_pr("%s called with : id: %d, n_args: %d, args_list: %p", __func__, id, n_args, args_list);
 
     assert(new_syscall != NULL);
-
     // ->fd = fd;
     // new_ioctl->ioctl_id = ioctl_id;
     // new_ioctl->ioctl_struct = ioctl_struct;
     // new_ioctl->result = result;
     new_syscall->id = id;
 
-    for(int i = 0; i < max_syscall_args; i++){
+    for(int i = 0; i < n_args; i++){
         new_syscall->args_list[i] = args_list[i];
     }
+    dbg_pr("NOW for newsyscall: id: %d, n_args: %d, args_list: %p", new_syscall->id, n_args, new_syscall->args_list);
+    dbg_pr("NOW for newsyscall: args[0]: %s, agrgs[1]: %s, args[2]: %d", new_syscall->args_list[0], new_syscall->args_list[1], new_syscall->args_list[2]);
 
     syscalls[CURR_SYSCALL_INDEX] = new_syscall;
     CURR_SYSCALL_INDEX = CURR_SYSCALL_INDEX + 1;
 
     return;
 }
+
+// was created for testing
+// void replay_extend_syscall(int id, int n_args, void **args_list){
+//     dbg_pr("%s called with : id: %d, n_args: %d", id, n_args);
+//     dbg_pr("this function is called!");
+//     return;
+// }
 
 
 
@@ -337,6 +351,17 @@ int replay_read_csv(char *in_file){
     void* cache_buf[4];
     int index = 0;
 
+
+    // for syscalls 
+    int id = 0;
+    int n_args = 0;
+    void **args_list = malloc(sizeof(void *) * max_syscall_args);
+    assert(args_list);
+
+    int num_syscalls = 0;
+    int *syscall_types = NULL;
+    int syscall_size = 0;
+
     printf("%s\n", in_file);
     FILE *in_stream = fopen(in_file, "r");
 
@@ -345,38 +370,104 @@ int replay_read_csv(char *in_file){
     #ifdef DBG_FILE_READING
     printf("\n");
     #endif
+
+    // code for getting the num of syscall 
+    fgets(buffer, MAX_BUFFER, in_stream);
+    token = strtok(buffer, delim);
+    int counter = 0;
+    syscall_size = atol(token);
+    syscall_types = malloc(sizeof(int) * syscall_size);
+    counter = 0;
+    while(token){
+        token = strtok(NULL, delim); 
+
+        // add the token to the syscall array
+        syscall_types[counter] = atol(token);
+
+        counter = counter + 1;
+        if(counter == syscall_size ){
+            //end the loop
+            break;
+        }
+    }
+    // code for getting the list of syscall ids 
+
+
     while(fgets(buffer, MAX_BUFFER, in_stream)){
         if(strlen(buffer)<=1) continue;
         #ifdef DBG_FILE_READING
         printf("[%d] [ioctl entry]\t [size = %ld]\t", index, strlen(buffer));
         printf("%s", buffer);
         #endif
-        index = index + 1;
+        dbg_pr("in %s:%d", __func__, __LINE__);
+        
+        id  = syscall_types[index];
 
         token = strtok(buffer, delim);
         int counter = 0;
         while(token){
-            switch (counter)
-            {
-            case 0:
-                cache_buf[0] = (void *)atol(token);
-                break;
-            case 1:
-                cache_buf[1] = (void *)strdup(token);
-                break;
-            case 2:
-                cache_buf[2] = (void *)atol(token);
-                break;
-            case 3:
-                cache_buf[3] = (void *)atol(token);
-                break;
+            if(id == 0){
+                // ioctl    
+                switch (counter)
+                {
+                case 0:
+                    cache_buf[0] = (void *)atol(token);
+                    break;
+                case 1:
+                    cache_buf[1] = (void *)strdup(token);
+                    break;
+                case 2:
+                    cache_buf[2] = (void *)atol(token);
+                    break;
+                case 3:
+                    cache_buf[3] = (void *)atol(token);
+                    break;
+                }
+            } else {
+                // any other syscall
+                if(id == 1){
+                    // open syscall 
+                    switch (counter)
+                    {
+                    case 0:
+                        args_list[0] = (void *)strdup(token);
+                        break;
+                    case 1:
+                        args_list[1] = (void *)strdup(token);
+                        break;
+                    case 2:
+                        dbg_pr("adding args_list : %d ", atol(token));
+                        args_list[2] = (void *)atol(token);
+                        dbg_pr("args_list[2] = %d", args_list[2]);
+                        break;
+                    }
+                }
+
+                n_args = n_args + 1;
+                
             }
             counter = counter + 1;
             token = strtok(NULL, delim);
         }
-        replay_extend_ioctls(cache_buf[0], cache_buf[1], 
+
+        if(syscall_types[index] == 0){
+            // ioctl
+            replay_extend_ioctls(cache_buf[0], cache_buf[1], 
                         cache_buf[2], cache_buf[3]);
+        } else if (syscall_types[index] == 1){
+            // open
+            dbg_pr("Calling extend_syscall from %s:%d", __func__, __LINE__);
+            dbg_pr("id : %d", id);
+            dbg_pr("n_args : %d", n_args);
+            dbg_pr("args_list : %p", args_list);
+            dbg_pr("0 : %s", args_list[0]);
+            dbg_pr("1 : %s", args_list[1]);
+            dbg_pr("2 : %d", args_list[2]);
+            replay_extend_syscall(id, n_args, args_list);
+        }
         
+        
+        index = index + 1;
     }
     // [TODO] [START]Shortcircuiting the system for testing the proper parsing of 
     // verbose strace ouptut 

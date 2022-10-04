@@ -1,4 +1,4 @@
-CFLAGS = -O1 -g
+CFLAGS = -O0 -g
 INCLUDES = -I./replayer/src
 
 SRCS_REPLAYER = replayer/src/parse-logs.c replayer/src/sys-replay.c replayer/src/read-structs.c
