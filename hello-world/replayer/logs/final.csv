@@ -1,4 +1,4 @@
-16
+16,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 """/dev/kvm""",O_RDWR,3
 3,KVM_GET_API_VERSION,0,18
 3,KVM_CREATE_VM,0,4

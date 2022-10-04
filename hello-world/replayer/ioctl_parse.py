@@ -18,6 +18,19 @@ replayerdir = helloworlddir + "/replayer"
 #
 
 
+#
+#
+#   Arrangement of the output csv file
+#   1st row => [number of syscalls, types/ids of syscalls.....]
+#   2nd row => 1st syscall
+#   3rd row => 2nd syscall
+#   ..... so on .. until .. num of syscall + 1
+#
+#
+#
+#
+
+syscall_types = [] #ids based on the above comment
 syscalls = []
 ioctls = []
 opens = []
@@ -66,6 +79,7 @@ def __parse_add_open(opn):
     comma_sep_open.append(int(res, 16))
     # comma_sep_opens.append(comma_sep_open)
     comma_sep_syscalls.append(comma_sep_open)
+    syscall_types.append(1)
 
 def parse_add_close():
     print("==== close list ===== ")
@@ -100,6 +114,7 @@ def __parse_add_ioctl(ioctl):
     comma_sep_ioctl.append(int(res, 16))
     comma_sep_ioctls.append(comma_sep_ioctl)
     comma_sep_syscalls.append(comma_sep_ioctl)
+    syscall_types.append(0)
 
 
 def parse_add_syscall():
@@ -154,7 +169,11 @@ def parse_strace(in_file: str):
 def dump_to_csv(out_file: str):
     print(comma_sep_syscalls)
     with open(out_file, "w+") as csv_file:
-        csv_file.write(str(len(comma_sep_syscalls)) + "\n")
+        csv_file.write(str(len(comma_sep_syscalls)))
+        # write the syscall_types list to the opened file
+        for i in syscall_types:
+            csv_file.write("," + str(i))
+        csv_file.write("\n")
         writer = csv.writer(csv_file)
         # writer.writerows(comma_sep_ioctls)
         writer.writerows(comma_sep_syscalls)
