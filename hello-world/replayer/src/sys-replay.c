@@ -7,6 +7,7 @@ int CURR_SYSCALL_INDEX = 0;     //generic syscall index
 
 ioctl_args **ioctls = NULL;
 sys_call_args **syscalls = NULL;
+int *syscall_types = NULL;
 
 // use for checking the type of the syscall before making 
 // the extend ioctl call 
@@ -359,7 +360,6 @@ int replay_read_csv(char *in_file){
     assert(args_list);
 
     int num_syscalls = 0;
-    int *syscall_types = NULL;
     int syscall_size = 0;
 
     printf("%s\n", in_file);
@@ -694,10 +694,68 @@ int replay_run_ioctl(void *a){
     return ret;
 }
 
+int replay_run_syscall(void *a){
+    int ret = 0;
+    // handling the syscall 
+
+    return ret;
+}
+
+/**
+ * 
+ * flag => is 1 if not an ioctl, 0 otherwise 
+ * 
+*/
+int __replay_run_syscall(void *a, int flag){
+    int ret = 0;
+    if(!flag){
+        // ioctl
+        replay_run_ioctl(a);
+    } else {
+        //other syscall
+        replay_run_syscall(a);
+    
+    }
+    return;
+}
+
+
+void foreach_entry(int (*func)(void *a, int i)){
+    int ioctl_i = 0;
+    int syscall_i = 0;
+
+    __FOREACH_SYSCALL_INDEX{
+        if(!syscall_types[i]){
+            //ioctl
+            func(ioctls[ioctl_i], syscall_types[i]);
+            ioctl_i = ioctl_i + 1;
+
+        } else {
+            // other syscall
+            func(syscalls[syscall_i], syscall_types[i]);
+            syscall_i = syscall_i + 1;
+        }
+    }
+
+    dbg_pr("At end of foreach_entry --- ");
+    dbg_pr("syscall__i\t:\t%d ", syscall_i);
+    dbg_pr("ioctl_i\t:\t%d ", ioctl_i);
+    return;
+}
+
 int replay_ioctl_rewind(){
     int ret = 0;
 
-    FOREACH_IOCTL(replay_run_ioctl);
+    // [TODO] this loop only runs for each ioctl 
+    // needs something which runs in a hybrid way
+    // for ioctls and rest of the syscalls
+
+    foreach_entry(__replay_run_syscall);
+    dbg_pr("sizeof ioctl_args : %d", sizeof(ioctl_args));
+    dbg_pr("sizeof syscall_args : %d", sizeof(sys_call_args));
+
+
+    // FOREACH_IOCTL(replay_run_ioctl);
 
     return ret;
 }

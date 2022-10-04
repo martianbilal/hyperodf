@@ -67,12 +67,17 @@
 #define FOREACH_SYSCALL_INDEX                        \
       for (int i = 0; i < CURR_SYSCALL_INDEX; i++)   \
 
+#define __FOREACH_SYSCALL_INDEX                                                 \
+      for (int i = 0; i < (CURR_SYSCALL_INDEX  + CURR_IOCTLS_INDEX); i++)       \
+
+
 
 #define FOREACH_KVM_IOCTL_INDEX                         \
       for (int i = 0; i < max_ioctls_supported; i++)       \
 
 
 #define FOREACH_KVM_IOCTL_STR(function) FOREACH_KVM_IOCTL_INDEX{(function)(ioctl_strings[i]);}
+
 
 
 #define FOREACH_IOCTL(function) FOREACH_IOCTLS_INDEX{(function)(ioctls[i]);}
@@ -137,7 +142,7 @@ typedef struct sys_call_args
 } sys_call_args;
 
 extern sys_call_args **syscalls;
-
+extern  int     *syscall_types;
 
 // environment 
 
