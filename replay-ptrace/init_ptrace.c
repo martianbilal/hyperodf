@@ -67,6 +67,8 @@ void init_trace(__pid_t child_pid){
         if (waitpid(child_pid, 0, 0) == -1)
             FATAL("%s", strerror(errno));
 
+
+
         // at this point we are stopped before making the next system call 
         // so now we can print the arguments of the syscall or we can change
         // these
@@ -76,6 +78,8 @@ void init_trace(__pid_t child_pid){
         struct user_regs_struct regs;
         if (ptrace(PTRACE_GETREGS, child_pid, 0, &regs) == -1)
             FATAL("%s", strerror(errno));
+
+        dbg_pr("a syscall was made with id\t:\t%lld", regs.rax);
 
         // if (is_syscall_blocked(regs.orig_rax)) {
         //     regs.orig_rax = -1; // set to invalid system call
@@ -105,6 +109,9 @@ void init_trace(__pid_t child_pid){
                     FATAL("%s", strerror(errno));
                 break;
 
+            case KVM_CREATE_VM:
+                dbg_pr("KVM : create VM");
+                break;
         }
     }
     return;
