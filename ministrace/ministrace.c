@@ -129,12 +129,74 @@ void print_syscall_args(pid_t child, int num) {
     }
 }
 
+
+typedef struct syscall_args_change{
+    int n_args;
+    int *args_indices; 
+    void *args_values;
+}syscall_args_change;
+
+
+
+// index into this array to get info about 
+// corresponding syscall
+syscall_args_change *list_syscall_args;
+
+
+
+int change_syscall_args(pid_t child_pid, int syscal_req){
+    int ret = 0; 
+    syscall_args_change args;
+    // for the child pid 
+    
+    // check a table for finding an appropriate value of the sycall args
+    args = list_syscall_args[syscal_req];
+    // also need to see which args need to be changed 
+    
+
+    // based on the value in the table change the value of the arg 
+
+    
+
+
+
+
+
+
+
+    return ret; 
+}
+
+
+int  change_candidates[5] = {
+    16,
+    -1,
+    -1,
+    -1,
+    -1,
+};
+
 void print_syscall(pid_t child, int syscall_req) {
     int num;
     num = get_reg(child, orig_eax);
     assert(errno == 0);
 
     fprintf(stderr, "%s(", syscall_name(num));
+
+    // can check the syscall at this point 
+    // check a table to see if this syscall is a candidate for changing the sytem call arguments
+    for(int i = 0; i < 5; i++){
+        if(num == change_candidates[i]){
+            printf("ioctl called => %d\n", num);
+            break;
+            // change_syscall_args(child, num);
+        }
+    }
+    // change the syscall args at this point if belongs to something we know of 
+    
+
+
+
     print_syscall_args(child, num);
     fprintf(stderr, ") = ");
 
@@ -161,6 +223,11 @@ int do_trace(pid_t child, int syscall_req) {
         if (wait_for_syscall(child) != 0)
             break;
 
+
+
+        // this also checks if we need to change the sycall 
+        // args and changes them accordingly 
+        // [TODO] bring the code outside in future 
         print_syscall(child, syscall_req);
 
         if (wait_for_syscall(child) != 0)

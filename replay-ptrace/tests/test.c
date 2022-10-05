@@ -21,7 +21,7 @@ int main(){
     int kvm_dev = 0;
     kvm_dev = open("/dev/kvm", O_RDWR);
     printf("KVM DEV : %d\n", kvm_dev);
-    ioctl(kvm_dev, KVM_CREATE_VM);
+    ioctl(kvm_dev, KVM_CREATE_VM, 0); 
     close(kvm_dev);
     printf("HELLO KVM TESTS === PTRACE\n");
     
