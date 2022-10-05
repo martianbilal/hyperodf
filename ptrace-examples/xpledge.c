@@ -113,7 +113,7 @@ main(int argc, char **argv)
                 printf("OPEN CALLED\n");
                 break;
             case SYS_openat:
-                printf("OPENAT CALLED\n");
+                printf("OPENAT CALLED :: %p\n", *((char **)regs.rsi));
                 break;
         }
 

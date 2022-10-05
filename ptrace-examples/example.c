@@ -9,6 +9,8 @@ main(void)
 {
     unsigned x;
 
+
+
     /* Open /dev/urandom, which should succeed */
     FILE *urandom = fopen("/dev/urandom", "r");
     if (!urandom) {

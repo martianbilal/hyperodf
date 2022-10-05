@@ -20,6 +20,7 @@ int main(){
     int ret = 0;
     int kvm_dev = 0;
     kvm_dev = open("/dev/kvm", O_RDWR);
+    printf("KVM DEV : %d\n", kvm_dev);
     close(kvm_dev);
     printf("HELLO KVM TESTS === PTRACE\n");
     
