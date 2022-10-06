@@ -24,12 +24,20 @@
 
 #define offsetof(a, b) __builtin_offsetof(a,b)
 #define get_reg(child, name) __get_reg(child, offsetof(struct user, regs.name))
+#define set_reg(child, value, name) __set_reg(child, value, offsetof(struct user, regs.name))
 
 long __get_reg(pid_t child, int off) {
     long val = ptrace(PTRACE_PEEKUSER, child, off);
     assert(errno == 0);
     return val;
 }
+
+long __set_reg(pid_t child, int value, int off) {
+    long val = ptrace(PTRACE_POKEUSER, child, off, value);
+    assert(errno == 0);
+    return val;
+}
+
 
 int wait_for_syscall(pid_t child) {
     int status;
@@ -54,6 +62,31 @@ const char *syscall_name(int scn) {
     }
     snprintf(buf, sizeof buf, "sys_%d", scn);
     return buf;
+}
+
+
+
+
+
+long set_syscall_arg(pid_t child, int new_val, int which) {
+    switch (which) {
+#ifdef __amd64__
+    case 0: return set_reg(child, new_val, rdi);
+    case 1: return set_reg(child, new_val, rsi);
+    case 2: return set_reg(child, new_val, rdx);
+    case 3: return set_reg(child, new_val, r10);
+    case 4: return set_reg(child, new_val, r8);
+    case 5: return set_reg(child, new_val, r9);
+#else
+    case 0: return set_reg(child, new_val, ebx);
+    case 1: return set_reg(child, new_val, ecx);
+    case 2: return set_reg(child, new_val, edx);
+    case 3: return set_reg(child, new_val, esi);
+    case 4: return set_reg(child, new_val, edi);
+    case 5: return set_reg(child, new_val, ebp);
+#endif
+    default: return -1L;
+    }
 }
 
 long get_syscall_arg(pid_t child, int which) {
@@ -106,12 +139,27 @@ void print_syscall_args(pid_t child, int num) {
     int i;
     char *strval;
 
+    // syscalls:
+    // syscalls is an aray of syscall_entry 
+    // syscall entry:
+    // each syscall entry has the args_types, num_arsg, and name
+    
+    // num: 
+    // this is the value of the syscall used by the kernel
+
+    // extrac a valid syscall entry from syscalls
+
     if (num <= MAX_SYSCALL_NUM && syscalls[num].name) {
         ent = &syscalls[num];
         nargs = ent->nargs;
     }
     for (i = 0; i < nargs; i++) {
+        // get the ith arg of the syscall that is stopped
+        // [Pointer] modified get_syscall_arg function to 
+        // to modify the args to a syscall
         long arg = get_syscall_arg(child, i);
+
+
         int type = ent ? ent->args[i] : ARG_PTR;
         switch (type) {
         case ARG_INT:
