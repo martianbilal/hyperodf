@@ -9,6 +9,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
+// #include <linux/user.h>   /* For user_regs_struct
+
 
 #include "syscalls.h"
 #include "syscallents.h"
@@ -143,26 +145,43 @@ typedef struct syscall_args_change{
 syscall_args_change *list_syscall_args;
 
 
+int init_list_syscall_args(){
+    int ret = 0;
+    // this is a dummy function = replace it with actual rotuine that 
+    // updates this list 
+    list_syscall_args = malloc(sizeof(syscall_args_change) * 50);
 
+    return ret;
+}
 int change_syscall_args(pid_t child_pid, int syscal_req){
     int ret = 0; 
+    struct user_regs_struct regs;
     syscall_args_change args;
-    // for the child pid 
+    int orig_val = 0;
+    orig_val = get_reg(child_pid, orig_eax);
+    //printf("ioctl : [%d], regs.orig_eax: [%p]\n", syscal_req, orig_val);
     
+    // for the child pid 
+
+
+
     // check a table for finding an appropriate value of the sycall args
     args = list_syscall_args[syscal_req];
-    // also need to see which args need to be changed 
+
+//printf("ioctl : [%d], regs.orig_eax: [%d]", syscal_req, orig_val);
+    fflush(stdout);
     
+    regs.orig_rax = -1;
+    // also need to see which args need to be changed 
+    ptrace(
+        PTRACE_SETREGS,
+        child_pid,
+        0,
+        &regs
+    );
+
 
     // based on the value in the table change the value of the arg 
-
-    
-
-
-
-
-
-
 
     return ret; 
 }
@@ -176,26 +195,53 @@ int  change_candidates[5] = {
     -1,
 };
 
+
+int modify_syscall_args(pid_t child, int syscall_req){
+    int ret = 0;
+    int num = 0;
+    
+    num = get_reg(child, orig_eax);
+    assert(errno == 0);
+
+
+    // can check the syscall at this point 
+    // check a table to see if this syscall is a candidate for changing the sytem call arguments
+    for(int i = 0; i < 5; i++){
+        if(num == change_candidates[i]){
+            //printf("ioctl called => %d\n", num);
+            change_syscall_args(child, num);
+            break;
+        }
+    }
+    // change the syscall args at this point if belongs to something we know of 
+
+
+
+    return ret;
+}
+
+int modify_syscall_retval(pid_t child, int syscall_num){
+    int ret = 0;
+    int num = get_reg(child, orig_eax);
+    struct user_regs_struct regs;
+    for(int i = 0; i < 5; i++){
+        if(num == change_candidates[i]){
+            //printf("ioctl called => %d\n", num);
+            ptrace(PTRACE_GETREGS, child, 0, &regs);
+            regs.rax = 343;
+            ptrace(PTRACE_SETREGS, child, 0, &regs);
+            break;
+        }
+    }
+    return ret;
+}
+
 void print_syscall(pid_t child, int syscall_req) {
     int num;
     num = get_reg(child, orig_eax);
     assert(errno == 0);
 
     fprintf(stderr, "%s(", syscall_name(num));
-
-    // can check the syscall at this point 
-    // check a table to see if this syscall is a candidate for changing the sytem call arguments
-    for(int i = 0; i < 5; i++){
-        if(num == change_candidates[i]){
-            printf("ioctl called => %d\n", num);
-            break;
-            // change_syscall_args(child, num);
-        }
-    }
-    // change the syscall args at this point if belongs to something we know of 
-    
-
-
 
     print_syscall_args(child, num);
     fprintf(stderr, ") = ");
@@ -218,23 +264,21 @@ int do_trace(pid_t child, int syscall_req) {
     int retval;
     waitpid(child, &status, 0);
     assert(WIFSTOPPED(status));
+    init_list_syscall_args();
     ptrace(PTRACE_SETOPTIONS, child, 0, PTRACE_O_TRACESYSGOOD);
     while(1) {
         if (wait_for_syscall(child) != 0)
             break;
 
-
-
-        // this also checks if we need to change the sycall 
-        // args and changes them accordingly 
-        // [TODO] bring the code outside in future 
         print_syscall(child, syscall_req);
+        // modify_syscall_args(child, syscall_req);
 
         if (wait_for_syscall(child) != 0)
             break;
 
         retval = get_reg(child, eax);
         assert(errno == 0);
+        modify_syscall_retval(child, syscall_req);
 
         fprintf(stderr, "%d\n", retval);
     }
