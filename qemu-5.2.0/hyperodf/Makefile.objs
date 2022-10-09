@@ -1,2 +1,4 @@
 obj-y += \
-hello.o
+hello.o \
+use_replayer.o \
+post_fork_hanlde.o 

@@ -23,6 +23,7 @@
  */
 
 #include "hyperodf/hello.c"
+#include "hyperodf/use_replayer.c"
 
 #include "qemu/osdep.h"
 #include "qemu-common.h"
@@ -3544,15 +3545,15 @@ void handle_load_snapshot(void *opaque){
             exit( EXIT_FAILURE );
         } 
         printf("[DEBUG] time before the load_snapshot : %lf\n", (cpu->start_forkall_master.tv_sec + (cpu->start_forkall_master.tv_nsec / 1E9)));
-        // if(load_snapshot_memory("newtest", NULL) == 0){
-        //     vm_start();
-        //     if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
-        //         perror( "clock gettime" );
-        //         exit( EXIT_FAILURE );
-        //     }
-        //     printf("[DEBUG] time after the load_snapshot : %lf\n", (cpu->end_forkall_master.tv_sec + (cpu->end_forkall_master.tv_nsec / 1E9)));
-        // }
-        vm_start();
+        if(load_snapshot_memory("newtest", NULL) == 0){
+            vm_start();
+            if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
+                perror( "clock gettime" );
+                exit( EXIT_FAILURE );
+            }
+            printf("[DEBUG] time after the load_snapshot : %lf\n", (cpu->end_forkall_master.tv_sec + (cpu->end_forkall_master.tv_nsec / 1E9)));
+        }
+        // vm_start();
     }
     return;
 }
@@ -3950,6 +3951,7 @@ void qemu_init(int argc, char **argv, char **envp)
     ENVP = envp; 
     ARGC = argc;
     hello();
+    use_replayer_hello();
     os_set_line_buffering();
 
     error_init(argv[0]);

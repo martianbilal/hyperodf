@@ -1,7 +1,6 @@
 #include <assert.h>
 #include "qemu/osdep.h"
 #include "sysemu/sysemu.h"
-#include "cpu.h"
 #include "qemu/main-loop.h"
 
 #include "hyperodf/post_fork_handle.h"

@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
+#include <linux/kvm.h>      /* For comparing with the ioctls*/
 // #include <linux/user.h>   /* For user_regs_struct
 
 
@@ -271,15 +272,33 @@ int modify_syscall_args(pid_t child, int syscall_req){
 int modify_syscall_retval(pid_t child, int syscall_num){
     int ret = 0;
     int num = get_reg(child, orig_eax);
+    int ioctl_id = 0;
     struct user_regs_struct regs;
-    for(int i = 0; i < 5; i++){
-        if(num == change_candidates[i]){
-            //printf("ioctl called => %d\n", num);
-            ptrace(PTRACE_GETREGS, child, 0, &regs);
-            regs.rax = 343;
-            ptrace(PTRACE_SETREGS, child, 0, &regs);
-            break;
-        }
+    // for(int i = 0; i < 5; i++){
+    //     if(num == change_candidates[i]){
+    //         //printf("ioctl called => %d\n", num);
+    //         // printing the second argument to an ioctl
+    //         ptrace(PTRACE_GETREGS, child, 0, &regs);
+
+    //         regs.rax = 343;
+    //         ptrace(PTRACE_SETREGS, child, 0, &regs);
+    //         break;
+    //     }
+    // }
+
+    if(num == change_candidates[0]){
+        // ioctl
+        //printf("ioctl called => %d\n", num);
+        // printing the second argument to an ioctl
+        ioctl_id = get_reg(child, rsi);
+        printf("== [DEBUG] this is the ioctl id : %p, and this is the kvm fd used for : %d ==\n", ioctl_id, get_reg(child, rdi));
+        printf("KVM_CREATE_VM : %p\n", KVM_CREATE_VM);
+        fflush(stdout);
+
+        ptrace(PTRACE_GETREGS, child, 0, &regs);
+
+        regs.rax = 343;
+        ptrace(PTRACE_SETREGS, child, 0, &regs);
     }
     return ret;
 }

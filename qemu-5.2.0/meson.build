@@ -1485,6 +1485,7 @@ subdir('qom')
 subdir('authz')
 subdir('crypto')
 subdir('ui')
+subdir('hyperodf')
 
 
 if enable_modules
