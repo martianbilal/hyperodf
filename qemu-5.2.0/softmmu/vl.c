@@ -24,6 +24,7 @@
 
 #include "hyperodf/hello.c"
 #include "hyperodf/use_replayer.c"
+#include "hyperodf/replayer/src/sys-replay.c"
 
 #include "qemu/osdep.h"
 #include "qemu-common.h"
@@ -3950,8 +3951,15 @@ void qemu_init(int argc, char **argv, char **envp)
     ARGV = argv;
     ENVP = envp; 
     ARGC = argc;
+    
+    //[BILAL] function calls for testing the added modules
     hello();
+    replay_hello();
+    replay_init();
+    replay_attach_strace(getpid(), "/root/kvm-samples/qemu-5.2.0/hyperodf/replayer/logs/qemu.log");
+
     use_replayer_hello();
+
     os_set_line_buffering();
 
     error_init(argv[0]);
