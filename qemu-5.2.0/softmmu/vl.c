@@ -24,7 +24,7 @@
 
 #include "hyperodf/hello.c"
 #include "hyperodf/use_replayer.c"
-#include "hyperodf/replayer/src/sys-replay.c"
+#include "replayer/src/sys-replay.c"
 
 #include "qemu/osdep.h"
 #include "qemu-common.h"
@@ -3956,7 +3956,7 @@ void qemu_init(int argc, char **argv, char **envp)
     hello();
     replay_hello();
     replay_init();
-    replay_attach_strace(getpid(), "/root/kvm-samples/qemu-5.2.0/hyperodf/replayer/logs/qemu.log");
+    replay_attach_strace(getpid(), "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log");
 
     use_replayer_hello();
 

@@ -1486,6 +1486,7 @@ subdir('authz')
 subdir('crypto')
 subdir('ui')
 subdir('hyperodf')
+subdir('replayer')
 
 
 if enable_modules
