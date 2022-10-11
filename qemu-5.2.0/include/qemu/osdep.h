@@ -685,6 +685,11 @@ char *qemu_get_host_name(Error **errp);
  */
 size_t qemu_get_host_physmem(void);
 
+
+
+// uncomment this for using the replayer module with QEMU
+#define USE_REPLAYER
+
 #endif
 
 // #ifndef DBG

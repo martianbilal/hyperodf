@@ -3417,12 +3417,16 @@ int kvm_cpu_exec(CPUState *cpu)
                 printf("Received the call for fork\n");
                 #endif
                 printf("[Debug] vapic_restore : %p\n", VAPIC_RESTORE );
+                
+
+                #ifdef USE_REPLAYER
                 replay_detach_strace();
                 // replay_generate_csv_logs()
 
                 // replay_read_csv() 
 
                 // replay_print_ioctl_list()
+                #endif
 
                 do {
                     ret = ioctl(cpu->kvm_fd , KVM_DEBUG, NULL);
