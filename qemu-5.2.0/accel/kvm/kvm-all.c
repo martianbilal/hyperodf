@@ -13,6 +13,8 @@
  *
  */
 
+#include "replayer/src/sys-replay.h"
+
 #include <time.h>
 #include <sys/time.h>
 #include "qemu/osdep.h"
@@ -3421,11 +3423,11 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 #ifdef USE_REPLAYER
                 replay_detach_strace();
-                // replay_generate_csv_logs()
+                replay_generate_csv_logs("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log", "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv");
 
-                // replay_read_csv() 
+                replay_read_csv("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv"); 
 
-                // replay_print_ioctl_list()
+                // replay_print_ioctl_list();
                 #endif
 
                 do {
@@ -3529,9 +3531,12 @@ int kvm_cpu_exec(CPUState *cpu)
                             printf("[DEBUG] [PARENT] s->fd -> %d\n", s->fd );
                             printf("[DEBUG] [PARENT]  s->vmfd -> %d\n", s->vmfd );
                             #endif
+
                             close(cpu->kvm_fd);
                             close(s->fd);
                             close(s->vmfd);
+                            replay_child();
+
                             s->fd = open("/dev/kvm", 2); 
                             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
                             kvm_irqchip_create(s);

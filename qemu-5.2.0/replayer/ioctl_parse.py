@@ -3,7 +3,16 @@ import csv
 import sys
 
 
-helloworlddir = "/root/kvm-samples/hello-world"
+
+
+
+# All the place where you might need
+# to change the addresses manually are 
+# marked by CHANGE
+
+
+#CHANGE here
+helloworlddir = "/root/kvm-samples/qemu-5.2.0"
 replayerdir = helloworlddir + "/replayer"
 
 
@@ -137,6 +146,7 @@ def parse_add_syscall():
 def parse_strace(in_file: str):
     with open(in_file, "r") as __syscalls:
         for syscall in __syscalls:
+            print(f"syscall : {syscall}")
             if "ioctl" in syscall:
                 syscalls.append((0, syscall))
 
@@ -191,8 +201,9 @@ def print_usage():
     return
 
 def main():
-    in_file =  "simple.log"
-    out_file = "simple.csv"
+    #CHANGE here 
+    in_file =  "qemu.log"
+    out_file = "qemu.csv"
 
     if len(sys.argv) < 3:
         print_usage();
@@ -201,9 +212,13 @@ def main():
     print("[Replayer] Helper script for parsing")
     in_file = sys.argv[1]
     out_file = sys.argv[2]
+    print(f"in_file : {in_file}");
+    print(f"out_file : {out_file}");
+    
     
     print("[Replayer] Parsing trace file")
     parse_strace(in_file)
+    print("[Replayer] Parsed trace file")
 
     # parse_verbose_strace(in_file)
     print("[Replayer] Dumping results to CSV file")

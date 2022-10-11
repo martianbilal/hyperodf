@@ -22,7 +22,9 @@ char *syscalls_supported[max_syscall_supported] = {
 void *replay_kvm_run;
 
 FILE *infile;
-char INFILE_NAME[] = "/root/kvm-samples/dumps/kvm.structs";
+
+// HyperODF [Bilal] CHANGE Here 
+char INFILE_NAME[] = "/root/qemu-5.2.0/dumps/kvm.structs";
 
 
 // KVM ioctls that require a struct
@@ -104,10 +106,12 @@ void init_syscalls(void){
 }
 
 void init_env(void){
-    snprintf(proj_root,128,"/root/kvm-samples/hello-world");
+
+    // [Bilal] CHANGE here
+    snprintf(proj_root,128,"/root/kvm-samples/qemu-5.2.0");
     snprintf(log_directory, 128, "%s/replayer/logs", proj_root);
-    snprintf(raw_logs, 128, "%s/final.log", log_directory);
-    snprintf(csv_logs, 128, "%s/final.csv", log_directory);
+    snprintf(raw_logs, 128, "%s/qemu.log", log_directory);
+    snprintf(csv_logs, 128, "%s/qemu.csv", log_directory);
 
     for(int i = 0; i < max_fds; i++){
         parent_fds[i] = 0;
