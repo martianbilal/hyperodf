@@ -24,7 +24,7 @@ void *replay_kvm_run;
 FILE *infile;
 
 // HyperODF [Bilal] CHANGE Here 
-char INFILE_NAME[] = "/root/qemu-5.2.0/dumps/kvm.structs";
+char INFILE_NAME[] = "/root/kvm-samples/qemu-5.2.0/dumps/kvm.structs";
 
 
 // KVM ioctls that require a struct
@@ -828,7 +828,7 @@ int replay_verify_results(){
 /// @return 0 on success, -1 on failure
 int replay_child(){
     int ret = 0;
-
+    dbg_pr("Calling %s\n", __func__);
 
     ret = replay_get_parent_fds();
 

@@ -69,7 +69,7 @@ const unsigned int syscall_trap_sig = SIGTRAP | 0x80;
 
 
 // HyperODF [Bilal] CHANGE Here
-char KVM_DUMP_FILE[] = "/root/qemu-5.2.0/dumps/kvm.structs";
+char KVM_DUMP_FILE[] = "/root/kvm-samples/qemu-5.2.0/dumps/kvm.structs";
 FILE *kvm_outfile;
 
 

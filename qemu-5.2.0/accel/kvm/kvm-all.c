@@ -3422,10 +3422,10 @@ int kvm_cpu_exec(CPUState *cpu)
                 
 
                 #ifdef USE_REPLAYER
-                replay_detach_strace();
-                replay_generate_csv_logs("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log", "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv");
+                // replay_detach_strace();
+                // replay_generate_csv_logs("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log", "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv");
 
-                replay_read_csv("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv"); 
+                // replay_read_csv("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv"); 
 
                 // replay_print_ioctl_list();
                 #endif
@@ -3522,6 +3522,8 @@ int kvm_cpu_exec(CPUState *cpu)
                             // vm_stop(RUN_STATE_RESTORE_VM);
                             // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
+                            sleep(100);
+
                             qemu_cond_init(&cpu->vcpu_recreated_cond);
                             // qemu_mutex_init(&cpu->vcpu_recreated_mutex);
                             cpu->is_child = true;
@@ -3532,9 +3534,9 @@ int kvm_cpu_exec(CPUState *cpu)
                             printf("[DEBUG] [PARENT]  s->vmfd -> %d\n", s->vmfd );
                             #endif
 
-                            close(cpu->kvm_fd);
-                            close(s->fd);
-                            close(s->vmfd);
+                            // close(cpu->kvm_fd);
+                            // close(s->fd);
+                            // close(s->vmfd);
                             replay_child();
 
                             s->fd = open("/dev/kvm", 2); 
