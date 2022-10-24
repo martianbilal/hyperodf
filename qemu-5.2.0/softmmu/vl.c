@@ -3963,7 +3963,7 @@ void qemu_init(int argc, char **argv, char **envp)
     #ifdef USE_REPLAYER
     replay_hello();
     replay_init();
-    // replay_attach_strace(getpid(), "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log");
+    replay_attach_strace(getpid(), "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log");
     #endif    
 
     use_replayer_hello();

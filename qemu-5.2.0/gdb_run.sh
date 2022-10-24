@@ -8,7 +8,8 @@ gdb -q --args /usr/local/bin/qemu-system-x86_64 \
   -net nic,model=e1000 \
   -enable-kvm \
   -nographic \
+  --trace "kvm_*" \
   -s \
   -monitor unix:qemu-monitor-socket,server,nowait \
   -pidfile vm.pid \
-  2>&1 | tee vm.log
+  2> err.log | tee vm.log

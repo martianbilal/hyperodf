@@ -1,5 +1,6 @@
 #include "read-structs.h"
 #include "sys-replay.h"
+#include "replay-debug.h"
 
 
 int CURR_IOCTLS_INDEX = 0;  //ioctl index
@@ -365,6 +366,8 @@ int replay_read_csv(char *in_file){
 
     int num_syscalls = 0;
     int syscall_size = 0;
+
+    replay_print_backtrace();
 
     printf("%s\n", in_file);
     FILE *in_stream = fopen(in_file, "r");

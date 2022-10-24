@@ -3422,10 +3422,10 @@ int kvm_cpu_exec(CPUState *cpu)
                 
 
                 #ifdef USE_REPLAYER
-                // replay_detach_strace();
-                // replay_generate_csv_logs("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log", "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv");
+                replay_detach_strace();
+                replay_generate_csv_logs("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log", "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv");
 
-                // replay_read_csv("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv"); 
+                replay_read_csv("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv"); 
 
                 // replay_print_ioctl_list();
                 #endif
