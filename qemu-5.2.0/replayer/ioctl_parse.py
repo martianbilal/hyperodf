@@ -117,14 +117,24 @@ def __parse_add_ioctl(ioctl):
     ioctl[1] = ioctl[1][1:]
     ioctl[2] = ioctl[2][1:]
     print(ioctl)
+    
+    # [TODO] [Urgent] add code for specially handling the cases
+    # where last arg is string 
     comma_sep_ioctl.append(int(ioctl[0], 16))
+        
     comma_sep_ioctl.append(str(ioctl[1]))
     if len(ioctl) == 3:
-        comma_sep_ioctl.append(int(ioctl[2], 16))
+        try:
+            comma_sep_ioctl.append(int(ioctl[2], 16))
+        except: 
+            comma_sep_ioctl.append(str(ioctl[2]))
     else:
         comma_sep_ioctl.append(-1)
         
-    comma_sep_ioctl.append(int(res, 16))
+    if len(res) == 1: 
+        comma_sep_ioctl.append(int(res, 16))
+    else: 
+        comma_sep_ioctl.append(int(res.split()[0], 16))
     comma_sep_ioctls.append(comma_sep_ioctl)
     comma_sep_syscalls.append(comma_sep_ioctl)
     syscall_types.append(0)
@@ -146,7 +156,7 @@ def parse_add_syscall():
 def parse_strace(in_file: str):
     with open(in_file, "r") as __syscalls:
         for syscall in __syscalls:
-            print(f"syscall : {syscall}")
+            # print(f"syscall : {syscall}")
             if "ioctl" in syscall:
                 syscalls.append((0, syscall))
 
@@ -212,8 +222,8 @@ def main():
     print("[Replayer] Helper script for parsing")
     in_file = sys.argv[1]
     out_file = sys.argv[2]
-    print(f"in_file : {in_file}");
-    print(f"out_file : {out_file}");
+    # print(f"in_file : {in_file}");
+    # print(f"out_file : {out_file}");
     
     
     print("[Replayer] Parsing trace file")
