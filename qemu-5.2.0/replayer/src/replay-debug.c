@@ -43,3 +43,16 @@ void replay_print_backtrace(){
     print_backtrace();
     return;
 }
+
+double replay_current_time(){
+        struct timespec curr; 
+        if( clock_gettime( CLOCK_REALTIME, &curr) == -1 ) {
+                perror( "clock gettime" );
+                exit( EXIT_FAILURE );
+        }
+
+        printf("%s called\n", __func__);
+
+        return curr.tv_sec + curr.tv_nsec;
+
+}

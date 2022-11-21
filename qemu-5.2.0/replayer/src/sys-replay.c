@@ -357,6 +357,8 @@ int replay_read_csv(char *in_file){
     void* cache_buf[4];
     int index = 0;
 
+    dbg_pr("\nStarting csv reading : %lf\n", replay_current_time());
+
 
     // for syscalls 
     int id = 0;
@@ -372,7 +374,12 @@ int replay_read_csv(char *in_file){
     printf("%s\n", in_file);
     FILE *in_stream = fopen(in_file, "r");
 
-    assert(in_stream);
+    printf("%p\n", in_stream);
+
+    if(in_stream == NULL) {
+        printf("fopen result : %p\n", in_stream);
+        exit(1);
+    }
 
     #ifdef DBG_FILE_READING
     printf("\n");
@@ -382,14 +389,19 @@ int replay_read_csv(char *in_file){
     fgets(buffer, MAX_BUFFER, in_stream);
     token = strtok(buffer, delim);
     int counter = 0;
-    syscall_size = atol(token);
+    syscall_size = atoi(token);
     syscall_types = malloc(sizeof(int) * syscall_size);
     counter = 0;
+    dbg_pr("syscall_size : %d", syscall_size);
+
+    dbg_pr("starting the type parsing loop");
     while(token){
-        token = strtok(NULL, delim); 
+        // token = strtok(NULL, delim); 
 
         // add the token to the syscall array
-        syscall_types[counter] = atol(token);
+        dbg_pr("syscall_types[%d] : %d", counter, 0);
+        syscall_types[counter] = 0;
+        dbg_pr("done with syscall_types[%d] : %d", counter, 0);
 
         counter = counter + 1;
         if(counter == syscall_size ){
@@ -398,6 +410,10 @@ int replay_read_csv(char *in_file){
         }
     }
     // code for getting the list of syscall ids 
+
+
+
+    dbg_pr("starting syscall parsing");
 
 
     while(fgets(buffer, MAX_BUFFER, in_stream)){
@@ -482,8 +498,11 @@ int replay_read_csv(char *in_file){
     // dbg_pr("KVM_GET_REGS : %p", KVM_GET_REGS);
     // dbg_pr("KVM_GET_REGS - DESTRINGIF¥: %p", replay_get_ioctl_id("KVM_GET_REGS"));
     replay_update_ioctls();
+    dbg_pr("Done with csv reading : %lf", replay_current_time());
+    
     replay_print_ioctl_list();
     // exit(0);
+    
 
     // [TODO] [END]Befor this point 
     
@@ -502,7 +521,10 @@ int replay_attach_strace(int pid, char* out_file){
     // snprintf(strace_cmd, 128, "strace --raw=all -e trace=ioctl -p %d -o %s",
     //         pid, out_file);
     dbg_pr("strace test file\t:\t%s", out_file);
-    snprintf(strace_cmd, 256, "/root/kvm-samples/htrace/src/strace -e trace=ioctl  --abbrev=none -p %d -o %s",
+    // snprintf(strace_cmd, 256, "/root/kvm-samples/htrace/src/strace -f -e trace=ioctl  --abbrev=none -p %d -o %s",
+    
+    // [Bilal] started to log all the strace event
+    snprintf(strace_cmd, 256, "/root/kvm-samples/htrace/src/strace -f --abbrev=none -p %d -o %s",
             pid, out_file);
 
     ret = fork();
@@ -566,16 +588,35 @@ int replay_get_parent_fd(void *a){
         ret = 0;
         break;
 
-    case KVM_CREATE_VCPU:
-        /* code */
-        parent_fds[2] = (unsigned long)arg->result;
+    case KVM_GET_CLOCK:
+        if(parent_fds[1] == 0)
+            parent_fds[1] = (unsigned long)arg->fd;
         ret = 0;
         break;
-    
+
+    case KVM_CREATE_VCPU:
+        /* code */
+        if(parent_fds[2] == 0)
+            parent_fds[2] = (unsigned long)arg->result;
+        ret = 0;
+        break;
+
+    case KVM_SET_VAPIC_ADDR:
+        /* code */
+        if(parent_fds[2] == 0)
+            parent_fds[2] = (unsigned long)arg->fd;
+        ret = 0;
+        break;
+
+
     default:
         ret = -1;
         break;
     }
+
+    // temp 
+    // parent_fds[1] = 17;
+    // parent_fds[2] = 21;
 
     return ret; 
 }
@@ -704,6 +745,7 @@ int replay_run_ioctl(void *a){
                     MAP_PRIVATE, parent_fds[2], 0);
         dbg_pr("[module]\t%p",replay_kvm_run);
     }
+    dbg_pr("current time : %lf\n", replay_current_time());
 
     return ret;
 }
@@ -764,6 +806,7 @@ void foreach_entry(int (*func)(void *a, int i)){
             //ioctl
             func(ioctls[ioctl_i], syscall_types[i]);
             ioctl_i = ioctl_i + 1;
+            dbg_pr("ioctl_i : %d" , ioctl_i);
 
         } else {
             // other syscall
@@ -789,7 +832,7 @@ int replay_ioctl_rewind(){
     dbg_pr("sizeof ioctl_args : %d", sizeof(ioctl_args));
     dbg_pr("sizeof syscall_args : %d", sizeof(sys_call_args));
 
-
+    dbg_pr("DONE with the rewind of the syscalls\n");
     // FOREACH_IOCTL(replay_run_ioctl);
 
     return ret;
@@ -832,6 +875,7 @@ int replay_verify_results(){
 int replay_child(){
     int ret = 0;
     dbg_pr("Calling %s\n", __func__);
+    dbg_pr("Time at start of %s : %lf", __func__, replay_current_time());
 
     ret = replay_get_parent_fds();
 
@@ -840,11 +884,19 @@ int replay_child(){
             return -1;
         }
     }
+    replay_print_parent_fds();
     
+    replay_print_child_fds();
+    
+    dbg_pr("Calling close_parent_fds\n");
+
     ret = replay_close_parent_fds();
     // ret = replay_reopen_kvm_device();
+    dbg_pr("Calling ioctl_rewind\n");
     ret = replay_ioctl_rewind();
+    dbg_pr("Calling verif_results\n");
     ret = replay_verify_results();
+    dbg_pr("Time at end of %s : %lf", __func__, replay_current_time());
  
 
     return ret;

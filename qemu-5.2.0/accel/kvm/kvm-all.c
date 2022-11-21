@@ -3424,8 +3424,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 #ifdef USE_REPLAYER
                 replay_detach_strace();
                 replay_generate_csv_logs("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log", "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv");
-
+                DEBUG_PRINTF("Done with generating logs");
                 replay_read_csv("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv"); 
+                DEBUG_PRINTF("Done with reading csv");
 
                 // replay_print_ioctl_list();
                 #endif
@@ -3522,7 +3523,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             // vm_stop(RUN_STATE_RESTORE_VM);
                             // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-                            sleep(100);
+                            sleep(3);
 
                             qemu_cond_init(&cpu->vcpu_recreated_cond);
                             // qemu_mutex_init(&cpu->vcpu_recreated_mutex);
@@ -3537,7 +3538,11 @@ int kvm_cpu_exec(CPUState *cpu)
                             // close(cpu->kvm_fd);
                             // close(s->fd);
                             // close(s->vmfd);
+                            #ifdef USE_REPLAYER
+                            dbg_pr("Time before calling replay_child :  %lf ", replay_current_time());
                             replay_child();
+                            dbg_pr("Time after calling replay_child :  %lf ", replay_current_time());
+                            #endif
 
                             s->fd = open("/dev/kvm", 2); 
                             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
@@ -4134,7 +4139,11 @@ int kvm_vm_ioctl(KVMState *s, int type, ...)
     va_start(ap, type);
     arg = va_arg(ap, void *);
     va_end(ap);
+    
 
+    if(type == KVM_CREATE_VCPU){
+        dbg_pr("CREATING THE VCPU");
+    }
     trace_kvm_vm_ioctl(type, arg);
     ret = ioctl(s->vmfd, type, arg);
     if (ret == -1) {

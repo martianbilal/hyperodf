@@ -109,6 +109,9 @@ def parse_add_arch_prctls():
 
 
 def __parse_add_ioctl(ioctl):
+    print(ioctl)
+    if "unfinished" in ioctl or "resumed" in ioctl: 
+        return
     comma_sep_ioctl = []
     ioctl = ioctl.split("(")[1]
     res = ioctl.split("= ")[1].strip("\n")
@@ -116,18 +119,19 @@ def __parse_add_ioctl(ioctl):
     ioctl = ioctl.split(",")
     ioctl[1] = ioctl[1][1:]
     ioctl[2] = ioctl[2][1:]
-    print(ioctl)
     
     # [TODO] [Urgent] add code for specially handling the cases
     # where last arg is string 
-    comma_sep_ioctl.append(int(ioctl[0], 16))
+    comma_sep_ioctl.append(int(ioctl[0], 10))
         
     comma_sep_ioctl.append(str(ioctl[1]))
     if len(ioctl) == 3:
         try:
             comma_sep_ioctl.append(int(ioctl[2], 16))
         except: 
-            comma_sep_ioctl.append(str(ioctl[2]))
+            # [Debugging]
+            comma_sep_ioctl.append(-1)
+            # comma_sep_ioctl.append(str(ioctl[2]))
     else:
         comma_sep_ioctl.append(-1)
         
@@ -191,7 +195,8 @@ def parse_strace(in_file: str):
     # parse_add_arch_prctls();
 
 def dump_to_csv(out_file: str):
-    print(comma_sep_syscalls)
+    # print(comma_sep_syscalls)
+    print("[Replayer] starting dumping to csv")
     with open(out_file, "w+") as csv_file:
         csv_file.write(str(len(comma_sep_syscalls)))
         # write the syscall_types list to the opened file
@@ -218,6 +223,8 @@ def main():
     if len(sys.argv) < 3:
         print_usage();
         exit()
+    
+    
     
     print("[Replayer] Helper script for parsing")
     in_file = sys.argv[1]

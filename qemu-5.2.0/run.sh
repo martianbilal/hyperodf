@@ -4,7 +4,7 @@
   # -append "console=ttyS0 root=/dev/vda earlyprintk=serial net.ifnames=0" \
   # -drive file=$IMAGE/stretch_backup.qcow2,id=tst,if=none \
   # -device virtio-blk-pci,scsi=off,drive=tst \
-
+# strace --abbrev=none -f -o simple.log 
 /usr/local/bin/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \
