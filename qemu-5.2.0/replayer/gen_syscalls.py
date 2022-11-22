@@ -44,11 +44,11 @@ Modify it to look like this (for easier parsing in C):
     |                                               |
 |      and then update the list of args             |
 +++++++++++++++++++++++++++++++++++++++++++++++++++++
-| arg_type | arg_len | arg_is_ptr                   |
-| arg_type | arg_len | arg_is_ptr                   |
-| arg_type | arg_len | arg_is_ptr                   |
-| arg_type | arg_len | arg_is_ptr                   |
-| arg_type | arg_len | arg_is_ptr                   |
+| arg_type              | arg_len                   |
+| arg_type              | arg_len                   |
+| arg_type              | arg_len                   |
+| arg_type              | arg_len                   |
+| arg_type              | arg_len                   |
 +++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
