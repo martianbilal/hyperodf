@@ -88,6 +88,8 @@ LINUX_SRC_PARSING_ARCH_SPECIFIC = {
 }
 
 
+ARCH_SIZEOF_INT = "sizeof(int)"
+
 # - Existing src -
 GENERATED_HEADER_INCLUDE_TYPES_HEADER = "trace/internal/syscall_types.h"
 
@@ -287,15 +289,18 @@ def generate_src_files(kernel_version: str, cpu_arch: str,
 
             print("  [%s] = {" % (generate_syscall_macro_name(syscall_name, syscall_abi),), file=out_cfile)
             print("    .name  = \"%s\"," % (syscall_name,), file=out_cfile)
+            print("    .func  = %s," % (syscall_name,), file=out_cfile) # lib wrapper for syscall
             print("    .nargs = %d," % (len(parsed_syscall_args,)), file=out_cfile)
             out_cfile.write(   "    .args  = {")
             out_cfile.write(", ".join([parse_syscall_arg_type(t) for t in parsed_syscall_args] + ["-1"] * (6 - len(parsed_syscall_args))))  # `-1` means N/A
+            out_cfile.write("},\n")
+            out_cfile.write(   "    .lens  = {")
+            out_cfile.write(", ".join([parse_syscall_arg_len(t) for t in parsed_syscall_args] + ["-1"] * (6 - len(parsed_syscall_args))))  # `-1` means N/A
             out_cfile.write("}},\n")
         print("};", file=out_cfile)
 
         if syscalls_with_no_parsed_args:
             print("WARNING: Some syscalls have missing args", file=sys.stderr)
-
 
 def parse_syscall_arg_type(arg_str: str) -> GENERATED_HEADER_STRUCT_ARG_TYPE_ENUM:
     if re.search(r'^(const\s*)?char\s*(__user\s*)?\*\s*$', arg_str):
@@ -303,6 +308,22 @@ def parse_syscall_arg_type(arg_str: str) -> GENERATED_HEADER_STRUCT_ARG_TYPE_ENU
     if arg_str.endswith('*'):
         return GENERATED_HEADER_STRUCT_ARG_TYPE_ENUM.PTR
     return GENERATED_HEADER_STRUCT_ARG_TYPE_ENUM.INT
+
+def parse_syscall_arg_len(arg_str: str) -> str:
+    if arg_str.endswith('*'):
+        if re.search(r'^(const\s*)?char\s*(__user\s*)?\*\s*$', arg_str):
+            return "sizeof(char *)"
+        if "void __user *" in arg_str:
+            size_arg = "void *"
+            return "sizeof(%s)" % (size_arg,)
+        else:
+            size_arg = arg_str.replace('const ', '').replace('__user ', '').replace('*', '')
+        return "sizeof(%s)" % (size_arg,) 
+    
+    
+    return ARCH_SIZEOF_INT
+
+
 # ----------------------------------------- ----------------------------------------- ----------------------------------------- -----------------------------------------
 
 
