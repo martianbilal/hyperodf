@@ -42,6 +42,7 @@ SYS_FUNC(uname)
 		PRINT_FIELD_CSTRING(uname, domainname);
 #endif
 		tprint_struct_end();
+		print_struct_to_file(&uname, sizeof(struct utsname), kvm_outfile);
 	}
 
 	return 0;

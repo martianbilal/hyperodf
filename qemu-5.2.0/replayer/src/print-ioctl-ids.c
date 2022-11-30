@@ -2,12 +2,11 @@
 #include <linux/kvm.h>
 #include <assert.h>
 
-#define KVM_IOCTL_NR 51
+#define KVM_IOCTL_NR 50
 
 #define STRINGIFY(x) #x
 
 int kvm_ids[KVM_IOCTL_NR] = {
-    KVM_RUN,
     KVM_GET_API_VERSION,
     KVM_CREATE_VM,
     KVM_ENABLE_CAP,
@@ -61,7 +60,6 @@ int kvm_ids[KVM_IOCTL_NR] = {
 };
 
 char *kvm_ids_strings[KVM_IOCTL_NR] = {
-    "KVM_RUN",
     "KVM_GET_API_VERSION",
     "KVM_CREATE_VM",
     "KVM_ENABLE_CAP",
@@ -126,13 +124,9 @@ int main(int argc, char *argv[]) {
     fptr = fopen(argv[1], "w");
     assert(fptr);
     
-
-    fprintf(fptr, "{\n");
     for(int i = 0; i < KVM_IOCTL_NR; i++){
-        // fprintf(fptr, "%s,%p\n", kvm_ids_strings[i], kvm_ids[i]);
-        fprintf(fptr, "\t\'%s\' : %p,\n", kvm_ids_strings[i], kvm_ids[i]);
+        fprintf(fptr, "%s,%p\n", kvm_ids_strings[i], kvm_ids[i]);
     }
-    fprintf(fptr, "}\n");
 
     fclose(fptr);
     

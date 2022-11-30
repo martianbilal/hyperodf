@@ -1071,6 +1071,7 @@ print_sockaddr(struct tcb *tcp, const void *const buf, const int addrlen)
 	}
 
 	tprint_struct_end();
+	print_struct_to_file(&sa, sizeof(struct sockaddr), kvm_outfile);
 }
 
 int

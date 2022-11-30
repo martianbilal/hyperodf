@@ -53,6 +53,7 @@ SYS_FUNC(sysinfo)
 		tprint_struct_next();
 		PRINT_FIELD_U(si, mem_unit);
 		tprint_struct_end();
+		print_struct_to_file(&si, sizeof(struct sysinfo), kvm_outfile);
 	}
 
 	return 0;

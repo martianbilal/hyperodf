@@ -224,6 +224,22 @@ def parse_found_syscall_code_fragment(syscall_code_fragment: str) -> tuple:
 
 
 # ----------------------------------------- ----------------------------------------- ----------------------------------------- -----------------------------------------
+def generate_syscall_dict(kernel_version: str, cpu_arch: str,
+                             arch_compat_abi: str,
+                             target_dir: str, src_filename: str,
+                             syscalls_parsed_from_tbl: dict, syscalls_parsed_from_scr: dict) -> None:
+    print(f"Writing parsed syscalls to {os.path.abspath(target_dir)}")
+    with open(os.path.join(target_dir, src_filename + "Dict" + ".py"), 'w') as out_header:
+        print("syscall_ids = {", file=out_header)
+        for num in sorted(syscalls_parsed_from_tbl.keys()):
+                syscall_name = syscalls_parsed_from_tbl[num].name
+                syscall_abi = syscalls_parsed_from_tbl[num].abi
+                print(f"\t\'{'COMPAT_' if syscall_abi == arch_compat_abi else ''}{syscall_name}\' : {num},", file=out_header) 
+                # print(f"#define {generate_syscall_macro_name(syscall_name, syscall_abi).ljust(30)} {num}", file=out_header)
+        print("}", file=out_header)
+        
+
+
 def generate_src_files(kernel_version: str, cpu_arch: str,
                              arch_compat_abi: str,
                              target_dir: str, src_filename: str,
@@ -353,6 +369,11 @@ def main(args):
 
     target_dir = args[1] if len(args) == 2 else GENERATED_SRC_FILES_DEFAULT_OUTPUT_DIR
     generate_src_files(
+            kernel_version, cpu_arch,
+            arch_compat_abi,
+            target_dir, GENERATED_SRC_FILENAME,
+            syscalls_parsed_from_tbl, syscalls_parsed_from_scr)
+    generate_syscall_dict(
             kernel_version, cpu_arch,
             arch_compat_abi,
             target_dir, GENERATED_SRC_FILENAME,

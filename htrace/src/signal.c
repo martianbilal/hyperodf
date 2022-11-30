@@ -619,6 +619,7 @@ decode_new_sigaction(struct tcb *const tcp, const kernel_ulong_t addr)
 	}
 #endif
 	tprint_struct_end();
+	print_struct_to_file(&sa, sizeof(struct new_sigaction), kvm_outfile);
 }
 
 SYS_FUNC(rt_sigaction)
