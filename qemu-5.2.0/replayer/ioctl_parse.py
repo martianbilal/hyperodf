@@ -774,14 +774,19 @@ def parse_strace_new(in_file: str):
             # syscall_args = re.rsplit(r"\) ", syscall_args)[0]
             # syscall_args = re.split(r"\).*=", syscall_args)[0]
             syscall_args = syscall_args.strip()
-            print(syscall_args)
+            # print(syscall_args)
             
 	
             syscall_args = re.sub(r", \[.*\]", ", stub_arr", syscall_args)
             syscall_args = re.sub(r", {.*}", ", stub", syscall_args)
-
+            for macro_name in macro_ids.keys(): 
+                if macro_name in syscall_args:
+                    print(macro_name)
+                    syscall_args = syscall_args.replace(macro_name, str(macro_ids[macro_name]))
+                    # syscall_args = re.sub(f"{macro_name}", macro_ids[macro_name], syscall_args)
+			
             syscall_args = syscall_args.split(",")
-            
+            print(syscall_args)
             			
             for i in range(len(syscall_args)):
                 syscall_args[i] = syscall_args[i].strip()
@@ -808,7 +813,7 @@ def parse_strace_new(in_file: str):
                 csv_row.append(-1)
             
             # add result
-            print(syscall.split("= ")[1].rsplit(" ")[0].strip())
+            # print(syscall.split("= ")[1].rsplit(" ")[0].strip())
             try:
                 csv_row.append(int(syscall.split("= ")[1].rsplit(" ")[0].strip(), 10))
             except:
