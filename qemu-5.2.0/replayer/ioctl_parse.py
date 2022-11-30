@@ -6,6 +6,72 @@ import re
 
 
 
+macro_ids = {
+	'MFD_CLOEXEC' : 1,
+	'SEEK_END' : 2,
+	'SIGHUP' : 1,
+	'IPPROTO_TCP' : 6,
+	'SECCOMP_SET_MODE_FILTER' : 1,
+	'O_NONBLOCK' : 2048,
+	'MFD_ALLOW_SEALING' : 2,
+	'O_WRONLY' : 1,
+	'SEEK_SET' : 0,
+	'F_GETFD' : 1,
+	'SOCK_STREAM' : 1,
+	'PR_MCE_KILL_EARLY' : 1,
+	'ARCH_SET_FS' : 4098,
+	'SIGTERM' : 15,
+	'F_OFD_SETLK' : 37,
+	'AF_NETLINK' : 16,
+	'SIG_BLOCK' : 0,
+	'O_RDONLY' : 0,
+	'SIGQUIT' : 3,
+	'PR_SET_TIMERSLACK' : 29,
+	'SIGCONT' : 18,
+	'F_SETFD' : 2,
+	'O_CLOEXEC' : 524288,
+	'SIG_UNBLOCK' : 1,
+	'SIG_SETMASK' : 2,
+	'SO_OOBINLINE' : 10,
+	'FD_CLOEXEC' : 1,
+	'SIGCHLD' : 17,
+	'O_DIRECTORY' : 65536,
+	'O_CREAT' : 64,
+	'IPPROTO_IP' : 0,
+	'SIGUSR1' : 10,
+	'O_LARGEFILE' : 32768,
+	'NETLINK_ROUTE' : 0,
+	'F_SETFL' : 4,
+	'O_RDWR' : 2,
+	'RLIMIT_STACK' : 3,
+	'MFD_HUGETLB' : 4,
+	'AF_INET' : 2,
+	'SOL_SOCKET' : 1,
+	'SOL_TCP' : 6,
+	'SOCK_NONBLOCK' : 2048,
+	'SOCK_DGRAM' : 2,
+	'F_SETLK' : 6,
+	'SO_REUSEADDR' : 2,
+	'SOCK_CLOEXEC' : 524288,
+	'SIGPIPE' : 13,
+	'SEEK_CUR' : 1,
+	'TCP_NODELAY' : 1,
+	'AF_UNIX' : 1,
+	'IPV' : 0,
+	'EFD_NONBLOCK' : 2048,
+	'SOCK_RAW' : 3,
+	'F_GETFL' : 3,
+	'PR_MCE_KILL_SET' : 1,
+	'SIGINT' : 2,
+	'PR_MCE_KILL' : 33,
+	'F_OFD_GETLK' : 36,
+	'SECCOMP_FILTER_FLAG_TSYNC' : 1,
+	'EFD_CLOEXEC' : 524288,
+	'SOL_IPV6' : 41,
+}
+
+
+
 ioctl_ids = {
 	'KVM_RUN' : 0xae80,
 	'KVM_GET_API_VERSION' : 0xae00,
@@ -675,7 +741,7 @@ csv_dump = []
 
 filters = ['write', 'futex', 'KVM_RUN', 'IRQ_LINE_STATUS', 'brk', 'madvise', 'munmap', 'mmap', 'access', 'fstat', 'resumed', 'munmap', 'sleep', 'poll', '.so.', 'mprotect', 'ENOENT', 'read', 'KVM_CHECK_EXTENSION', '---', '+++']
 filters = filters + ['detached', 'clone', 'getpid', 'SIGBUS', 'TCGETS', 'TCSETS', 'KVM_SET_NESTED_STATE', 'KVM_GET_NESTED_STATE', 'sysinfo', 'stat', 'uname']
-filters = filters + ['unfinished', 'gettid']
+filters = filters + ['unfinished', 'gettid', 'SIGRTMIN']
 def parse_strace_new(in_file: str):
     r = re.compile(r'(?:[^,{]|\{[^}]*\})+')
     with open(in_file, "r") as __syscalls:
@@ -752,7 +818,19 @@ def parse_strace_new(in_file: str):
                     csv_row.append(syscall.split("= ")[1].rsplit(" ")[0].strip())
                     
             csv_dump.append(csv_row)
-            
+   
+def dump_to_csv_new(out_file: str):
+    # print(comma_sep_syscalls)
+    print("[Replayer] [new] starting dumping to csv")
+    with open(out_file, "w+") as csv_file:
+        csv_file.write(str(len(csv_dump)))
+        # write the syscall_types list to the opened file
+        # for i in syscall_types:
+        #     csv_file.write("," + str(i))
+        csv_file.write("\n")
+        writer = csv.writer(csv_file)
+        # writer.writerows(comma_sep_ioctls)
+        writer.writerows(csv_dump)         
 
 def main():
     #CHANGE here 
@@ -777,12 +855,12 @@ def main():
     parse_strace_new(in_file)
     print("[Replayer] Parsed trace file")
     
-    with open(out_file, 'w+') as dump_file:
-        for row in csv_dump:
-            print(row, file=dump_file)
+    # with open(out_file, 'w+') as dump_file:
+    #     for row in csv_dump:
+    #         print(row, file=dump_file)
     # parse_verbose_strace(in_file)
     print("[Replayer] Dumping results to CSV file")
-    # dump_to_csv(out_file)
+    dump_to_csv_new(out_file)
     print("[Replayer] Done!!")
 
 
