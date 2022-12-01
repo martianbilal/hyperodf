@@ -295,23 +295,23 @@ int main(int argc, char **argv)
     type_register_static(&nohotplug_type);
     type_register_static(&nondevice_type);
 
-    g_test_add_func("/qdev/properties/static/default/subprocess",
-                    test_static_prop_subprocess);
-    g_test_add_func("/qdev/properties/static/default",
-                    test_static_prop);
+    // g_test_add_func("/qdev/properties/static/default/subprocess",
+    //                 test_static_prop_subprocess);
+    // g_test_add_func("/qdev/properties/static/default",
+    //                 test_static_prop);
 
-    g_test_add_func("/qdev/properties/static/global/subprocess",
-                    test_static_globalprop_subprocess);
-    g_test_add_func("/qdev/properties/static/global",
-                    test_static_globalprop);
+    // g_test_add_func("/qdev/properties/static/global/subprocess",
+    //                 test_static_globalprop_subprocess);
+    // g_test_add_func("/qdev/properties/static/global",
+    //                 test_static_globalprop);
 
-    g_test_add_func("/qdev/properties/dynamic/global/subprocess",
-                    test_dynamic_globalprop_subprocess);
-    g_test_add_func("/qdev/properties/dynamic/global",
-                    test_dynamic_globalprop);
+    // g_test_add_func("/qdev/properties/dynamic/global/subprocess",
+    //                 test_dynamic_globalprop_subprocess);
+    // g_test_add_func("/qdev/properties/dynamic/global",
+    //                 test_dynamic_globalprop);
 
-    g_test_add_func("/qdev/properties/global/subclass",
-                    test_subclass_global_props);
+    // g_test_add_func("/qdev/properties/global/subclass",
+    //                 test_subclass_global_props);
 
     g_test_run();
 

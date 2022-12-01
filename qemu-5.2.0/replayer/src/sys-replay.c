@@ -102,7 +102,7 @@ void init_ioctls(void){
 }
 
 void init_syscalls(void){
-    syscalls = malloc(sizeof(sys_call_args) * max_syscalls);
+    syscalls = malloc(sizeof(sys_call_args) * MAX_SYSCALLS);
     return;
 }
 
@@ -901,6 +901,8 @@ int replay_child(){
 
     return ret;
 }
+
+
 
 
 int replay_main(){

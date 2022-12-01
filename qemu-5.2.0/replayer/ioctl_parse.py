@@ -794,7 +794,7 @@ def parse_strace_new(in_file: str):
             # get numerical ioctl ID 
             if 'ioctl' in syscall:
                 syscall_args[1] = ioctl_ids[syscall_args[1]]
-            
+
             
             # print(syscall_ids[syscall_name], syscall_args)
             csv_row = [syscall_ids[syscall_name]]

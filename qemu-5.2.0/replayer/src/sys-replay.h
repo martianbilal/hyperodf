@@ -23,7 +23,8 @@
 
 // []
 #define max_ioctls 100
-#define max_syscalls 100
+#define MAX_SYSCALLS 1000
+#define MAX_ARGS 6
 
 
 #define max_fds 3
@@ -165,6 +166,24 @@ extern unsigned long child_fds[max_fds];
 
 extern char INFILE_NAME[];
 extern FILE* infile;
+
+
+union argument
+{
+        /* data */
+        int     int_arg;
+        char    *str_arg;
+        int     *int_ptr_arg;
+        void    *anything;
+};
+
+
+typedef struct execution_trace_row {
+        uint32_t id;
+        union argument execution_args[MAX_ARGS];
+} execution_trace_row;
+
+execution_trace_row execution_table[MAX_SYSCALLS];
 
 
 void hello_test();
