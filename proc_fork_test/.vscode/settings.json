@@ -1,0 +1,6 @@
+{
+    "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
+    "cmake.generator": "ninja",
+    "cmake.mergedCompileCommands": "Yes",
+    "cmake.loadCompileCommands": true
+}

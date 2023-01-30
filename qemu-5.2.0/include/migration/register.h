@@ -10,9 +10,9 @@
  * the COPYING file in the top-level directory.
  *
  */
-
+  
 #ifndef MIGRATION_REGISTER_H
-#define MIGRATION_REGISTER_H
+#define MIGRATION_REGISsTER_H
 
 #include "hw/vmstate-if.h"
 
