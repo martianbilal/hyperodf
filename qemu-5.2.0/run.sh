@@ -1,6 +1,6 @@
 #!/bin/sh
-# make 
-# make install
+make -j 128
+make install
   # -append "console=ttyS0 root=/dev/vda earlyprintk=serial net.ifnames=0" \
   # -drive file=$IMAGE/stretch_backup.qcow2,id=tst,if=none \
   # -device virtio-blk-pci,scsi=off,drive=tst \

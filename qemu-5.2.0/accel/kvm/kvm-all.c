@@ -3609,11 +3609,11 @@ int kvm_cpu_exec(CPUState *cpu)
                             #endif
                         }
                         cpu->should_wait = false;
-                        vm_stop(RUN_STATE_RESTORE_VM);
+                        // vm_stop(RUN_STATE_RESTORE_VM);
 
-                        printf("[Debug] we are setting the load_snapshot event! \n");
-                        event_notifier_test_and_clear(&(cpu->load_event));
-                        event_notifier_set(&(cpu->load_event));
+                        // printf("[Debug] we are setting the load_snapshot event! \n");
+                        // event_notifier_test_and_clear(&(cpu->load_event));
+                        // event_notifier_set(&(cpu->load_event));
                         break;
                     }
                     sleep(0);
