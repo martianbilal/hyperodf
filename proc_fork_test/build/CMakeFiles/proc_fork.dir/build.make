@@ -91,6 +91,7 @@ proc_fork_EXTERNAL_OBJECTS =
 proc_fork: CMakeFiles/proc_fork.dir/main.c.o
 proc_fork: CMakeFiles/proc_fork.dir/build.make
 proc_fork: /usr/lib/x86_64-linux-gnu/libpthread.so
+proc_fork: /usr/lib/x86_64-linux-gnu/libaio.so
 proc_fork: CMakeFiles/proc_fork.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/bilal/test/proc_fork_test/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking C executable proc_fork"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/proc_fork.dir/link.txt --verbose=$(VERBOSE)

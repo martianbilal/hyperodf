@@ -29,4 +29,8 @@ fcntl.h
 -
 sys/time.h
 -
+aio.h
+-
+errno.h
+-
 

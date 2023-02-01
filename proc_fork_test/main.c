@@ -1,3 +1,4 @@
+#include <asm-generic/errno-base.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,8 +13,15 @@
 
 #include <sys/time.h>	// for timers
 
+#include <aio.h>		// for asynchronous IO
+#include <libaio.h>		// for asynchronous IO
 
+#include <errno.h>		// for errno
+
+
+#define BUF_SIZE 100
 #define FILE_NAME "test_file.txt"
+
 
 
 pthread_t tid[2];
@@ -332,6 +340,134 @@ int test_timer_create(){
 
 
 int test_aio(){
+	pid_t child_pid;
+    struct aiocb aio_cb;
+    char buf[BUF_SIZE];
+
+	printf("test aio\n");
+    // Open the file for writing
+    int fd = open(FILE_NAME, O_RDWR | O_CREAT, 0666);
+    if (fd == -1) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+
+	// changing buffer
+	memset(buf, 'a', BUF_SIZE);
+
+    // Create the AIO context
+    memset(&aio_cb, 0, sizeof(struct aiocb));
+    aio_cb.aio_fildes = fd;
+    aio_cb.aio_buf = buf;
+    aio_cb.aio_nbytes = BUF_SIZE;
+    aio_cb.aio_offset = 0;
+
+    // Start the AIO operation
+    if (aio_write(&aio_cb) == -1) {
+        perror("Error starting AIO write");
+        exit(1);
+    }
+
+    child_pid = fork();
+    if (child_pid == 0) {
+        // This is the child process
+        // Check if the AIO context and operation are shared
+        if (aio_error(&aio_cb) == EINPROGRESS) {
+            printf("AIO context and operation are shared in the child process\n");
+        } else {
+            printf("AIO context and operation are not shared in the child process\n");
+        }
+    } else if (child_pid > 0) {
+        // This is the parent process
+        int status;
+        waitpid(child_pid, &status, 0);
+        printf("Child process finished\n");
+    } else {
+        // fork() failed
+        perror("fork error");
+        exit(1);
+    }
+
+    close(fd);
+    return 0;
+
+}
+#define BUFSIZE 100
+
+int test_io_setup(){
+	int fd, ret;
+    io_context_t ctx;
+    struct iocb *iocb = NULL;
+    struct io_event event;
+    char buf[BUFSIZE];
+
+	iocb = (struct iocb *)malloc(sizeof(struct iocb));
+
+
+	// following two lines of code would be used for setting up the io context in the child process 
+    memset(&ctx, 0, sizeof(io_context_t));
+    ret = io_setup(10, &ctx);
+    if (ret < 0) {
+        perror("io_setup");
+        return 1;
+    }
+
+    fd = open("test.txt", O_RDONLY | O_CREAT, 0666);
+    if (fd == -1) {
+        perror("open");
+        return 1;
+    }
+
+    io_prep_pread(iocb, fd, buf, BUFSIZE, 0);
+    ret = io_submit(ctx, 1, &iocb);
+    if (ret != 1) {
+        perror("io_submit");
+        return 1;
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror("fork");
+        return 1;
+    }
+
+    if (pid == 0) {
+        /* child process */
+        // sleep(1);
+        ret = io_getevents(ctx, 0, 1, &event, NULL);
+		printf("ret: %d\n", ret);
+        if (ret == 0) {
+            printf("In the child process, there are no pending I/O events\n");
+        } else if (ret == -EAGAIN) {
+            printf("In the child process, there are still pending I/O events\n");
+        } else if (ret == -EINVAL) {
+			printf("In the child process, the context ID is invalid\n");
+		} else {
+			printf("pid : %d\n", getpid());
+			printf("buf: %s\n", buf);
+            perror("io_getevents");
+        }
+        exit(0);
+    } else {
+        /* parent process */
+        int status;
+        waitpid(pid, &status, 0);
+        ret = io_getevents(ctx, 0, 1, &event, NULL);
+		printf("ret: %d\n", ret);
+        if (ret == 0) {
+            printf("In the parent process, there are no pending I/O events\n");
+        } else if (ret == -EAGAIN) {
+            printf("In the parent process, there are still pending I/O events\n");
+        } else {
+			printf("pid : %d\n", getpid());
+			printf("buf: %s\n", buf);
+            perror("io_getevents");
+        }
+    }
+
+    io_destroy(ctx);
+    close(fd);
 	return 0;
 }
 
@@ -346,6 +482,8 @@ int main(void)
 	// test_file_IO();
 	// test_fcntl();
 	// test_itimer();
+	// test_aio();
+	// test_io_setup();
 
 
 
@@ -361,12 +499,12 @@ int main(void)
 
 	// pthread_join(tid[0], NULL);
 	// pthread_join(tid[1], NULL);
+	
 
 	return 0;
 }
 
 /**
-
 
 +---------+--------+
 | Resouce | Shared |

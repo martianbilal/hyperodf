@@ -1,4 +1,0 @@
-break main.c:29
-break main.c:36
-
-set exec-wrapper The wrapper for running programs is \

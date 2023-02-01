@@ -14,6 +14,9 @@
 # EXTERNAL cache entries
 ########################
 
+//Path to a library.
+AIO_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libaio.so
+
 //Build the testing tree.
 BUILD_TESTING:BOOL=ON
 
@@ -301,12 +304,6 @@ proc_fork_BINARY_DIR:STATIC=/home/bilal/test/proc_fork_test/build
 
 //Value Computed by CMake
 proc_fork_SOURCE_DIR:STATIC=/home/bilal/test/proc_fork_test
-
-//Value Computed by CMake
-proc_fork_test_BINARY_DIR:STATIC=/home/bilal/test/proc_fork_test/build
-
-//Value Computed by CMake
-proc_fork_test_SOURCE_DIR:STATIC=/home/bilal/test/proc_fork_test
 
 
 ########################
