@@ -12,7 +12,7 @@
  */
   
 #ifndef MIGRATION_REGISTER_H
-#define MIGRATION_REGISsTER_H
+#define MIGRATION_REGISTER_H
 
 #include "hw/vmstate-if.h"
 

@@ -179,11 +179,11 @@ union argument
 
 
 typedef struct execution_trace_row {
-        uint32_t id;
+        uint    id;
         union argument execution_args[MAX_ARGS];
 } execution_trace_row;
 
-execution_trace_row execution_table[MAX_SYSCALLS];
+// execution_trace_row execution_table[MAX_SYSCALLS];
 
 
 void hello_test();

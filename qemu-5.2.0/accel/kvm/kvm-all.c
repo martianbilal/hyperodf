@@ -3492,6 +3492,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // event_notifier_test_and_clear(&(cpu->fork_event));
                 cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
+                vm_stop(RUN_STATE_PAUSED);
                 ret = 0; 
                 // break;
                 while(1) {
