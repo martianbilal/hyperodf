@@ -128,7 +128,7 @@ void test_mlockall(){
 		perror("munlockall");
 		exit(1);
 	}
-	printf("[pid:%d]munlockall success\n", pid);
+	printf("[pid:%d]munlockall success : ret : %d\n", pid, ret);
 	return;
 }
 
@@ -277,7 +277,11 @@ void timer_handler(int signum)
 }
 
 void print_itimer(struct itimerval *timer){
+	// comment out the following line to set the timer same as the parent timer
+	// setitimer(ITIMER_REAL, timer, NULL);
+
 	getitimer(ITIMER_REAL, timer);
+
 	printf("\n\n[%d]", getpid());
 	printf("timer.it_value.tv_sec: %ld\n", (*timer).it_value.tv_sec);
 	printf("timer.it_value.tv_usec: %ld\n", (*timer).it_value.tv_usec);
@@ -287,7 +291,7 @@ void print_itimer(struct itimerval *timer){
 
 
 int test_itimer(){
-	    struct itimerval timer;
+	struct itimerval timer;
     int pid;
 
     /* Install the signal handler */
@@ -477,7 +481,7 @@ int main(void)
 	int error;
 	
     // test_semop();
-	// test_mlockall();
+	test_mlockall();
 	// test_sigpending();
 	// test_file_IO();
 	// test_fcntl();

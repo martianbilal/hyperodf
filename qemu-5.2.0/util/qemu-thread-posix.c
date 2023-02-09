@@ -533,7 +533,7 @@ void qemu_thread_create(QemuThread *thread, const char *name,
     pthread_attr_t attr;
     QemuThreadArgs *qemu_thread_args;
 
-    printf("---> qemu thread create called <------");
+    printf("---> qemu thread create called <------\n");
 
     err = pthread_attr_init(&attr);
     if (err) {
