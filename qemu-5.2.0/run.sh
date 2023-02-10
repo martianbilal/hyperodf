@@ -1,4 +1,5 @@
 #!/bin/sh
+kill -9 $(pgrep qemu)
 make -j 128
 make install
   # -append "console=ttyS0 root=/dev/vda earlyprintk=serial net.ifnames=0" \

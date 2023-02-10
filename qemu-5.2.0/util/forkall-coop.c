@@ -442,7 +442,8 @@ pid_t ski_forkall_master(){
 	// Now that we got the state of all threads 
 	int pid = -1;
 	while(pid != 0)
-	if((pid = fork())){
+	// if((pid = fork())){
+	if((pid = 38429)){
 		// Parent
 		ski_log_forkall("Parent (child pid = %d)\n", pid);
 		return pid;

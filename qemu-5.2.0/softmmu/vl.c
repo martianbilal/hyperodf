@@ -3620,13 +3620,13 @@ void handle_fork(void *opaque){
         
         assert(qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()); 
         
-        if (migration_is_blocked(NULL)) {
-            return false;
-        }
+        // if (migration_is_blocked(NULL)) {
+        //     return false;
+        // }
 
-        if (!replay_can_snapshot()) {
-            return false;
-        }
+        // if (!replay_can_snapshot()) {
+        //     return false;
+        // }
 
         // vm_stop(RUN_STATE_SAVE_VM);
 
@@ -3634,20 +3634,20 @@ void handle_fork(void *opaque){
         printf("[debug] stopped the vm\n");
         #endif
         
-        runstate_is_running();
+        // runstate_is_running();
 
-        bdrv_drain_all_begin();
+        // bdrv_drain_all_begin();
         // cpu_synchronize_all_states();
         // cpu_stop_current();
         // // job_cancel_sync_all();
         // bdrv_close_all();
-        bdrv_drain_all_end();
+        // bdrv_drain_all_end();
         // if (!bdrv_all_can_snapshot(has_devices, devices, errp)) {
         //     return false;
         // }
 
 
-        aio_context_acquire(qemu_get_aio_context());
+        // aio_context_acquire(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
         // fork_save_vm_state(cpu, prefork_state);
         // close(9);
@@ -3660,7 +3660,7 @@ void handle_fork(void *opaque){
         printf("Done with the save snapshot!");
         #endif  
         
-        aio_context_release(qemu_get_aio_context());
+        // aio_context_release(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
         // close("snapshot.qcow2");
         // sleep(30);
@@ -3683,12 +3683,13 @@ void handle_fork(void *opaque){
 
         // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-        kvm_set_old_env(cpu);
-        gdbserver_cleanup();
+        // kvm_set_old_env(cpu);
+        // gdbserver_cleanup();
         // gdbserver_fork_linux();
 
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
+        // ret = 9823423;
         // [Bilal] [Measure] clock time on return from forkall master
         if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
             perror( "clock gettime" );
@@ -3703,7 +3704,7 @@ void handle_fork(void *opaque){
             printf("Failed to fork\n");
         } else if (ret == 0) {
             // [Bilal] [Measure] clock time on hypercall
-            printf("[DEBUG] load snapshot is called!\n");
+            printf("[DEBUG] [%d] load snapshot is called!\n", getpid());
             fflush(stdout);
             if( clock_gettime( CLOCK_REALTIME, &(cpu->stop_universal)) == -1 ) {
                 perror( "clock gettime" );
@@ -3891,7 +3892,7 @@ void handle_fork(void *opaque){
             // load_snapshot("newtest", NULL);
             return; 
         } else {
-            waitpid(ret, &status, 0);
+            // waitpid(ret, &status, 0);
             // qemu_cleanup();
             // load_snapshot("newtest", NULL);
             dump_cpu_state(cpu, "pre-fork.dat");
