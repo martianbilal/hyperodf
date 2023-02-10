@@ -3437,9 +3437,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 FORK_COUNTER = FORK_COUNTER + 1;
                 if(FORK_COUNTER > 1){
                     ret = 0;
-                    kvm_update_rip(cpu, 0);
-                    kvm_update_rip(cpu, 0);
-                    kvm_update_rip(cpu, 0);
+                    // kvm_update_rip(cpu, 0);
+                    // kvm_update_rip(cpu, 0);
+                    // kvm_update_rip(cpu, 0);
                     printf("[Debug] vmfork called!\n");
                     vm_start();
                     break;
@@ -3492,7 +3492,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // event_notifier_test_and_clear(&(cpu->fork_event));
                 cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
-                vm_stop(RUN_STATE_PAUSED);
+                // vm_stop(RUN_STATE_PAUSED);
                 ret = 0; 
                 // break;
                 while(1) {
