@@ -38,6 +38,14 @@ readDisk:
     ; popa
     ret
 
+; reading timer values 
+readTimer:
+    pusha
+    mov ah, 0x00
+    int 0x1a
+    popa
+    ret
+
 BOOT_DISK: 
     db 0
 

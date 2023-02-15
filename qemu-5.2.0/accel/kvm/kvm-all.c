@@ -15,6 +15,7 @@
 
 #include "replayer/src/sys-replay.h"
 
+#include <math.h>
 #include <time.h>
 #include <sys/time.h>
 #include "qemu/osdep.h"
@@ -25,6 +26,7 @@
 #include <time.h>
 
 #include <linux/kvm.h>
+#include <unistd.h>
 
 #include "qemu/atomic.h"
 #include "qemu/option.h"
@@ -2755,7 +2757,7 @@ int cpu_get_pre_fork_state(CPUState *cpu, struct cpu_prefork_state *state, int v
     } while (ret == -EINTR);
     attr = "tsc_khz";
     if(ret < 0) goto err;
-    state->tsc_khz = tsc_khz;
+    state->tsc_khz = &tsc_khz;
     #ifdef DBG
         printf("[debug] prefork-tsc : %d", tsc_khz);    
     #endif
@@ -3190,6 +3192,91 @@ static void kvm_post_fork_fixup(CPUState *cpu, struct cpu_prefork_state *prefork
     return;
 }
 
+struct vcpu_exception {
+    __u8 injected;
+    __u8 nr;
+    __u8 has_error_code;
+    __u8 pending;
+    __u32 error_code;
+} exception;
+struct vcpu_interrupt {
+    __u8 injected;
+    __u8 nr;
+    __u8 soft;
+    __u8 shadow;
+} interrupt;
+struct vcpu_nmi {
+    __u8 injected;
+    __u8 pending;
+    __u8 masked;
+    __u8 pad;
+} nmi;
+struct vcpu_smi{
+    __u8 smm;
+    __u8 pending;
+    __u8 smm_inside_nmi;
+    __u8 latched_init;
+} smi;
+
+
+static void print_exception(struct vcpu_exception *exce, char prefix[]){
+    printf("%sexception has error code: %d\n", prefix, exce->has_error_code);
+    printf("%sexception error_code: %d\n", prefix, exce->error_code);
+    printf("%sexception nr: %d\n", prefix, exce->nr);
+    printf("%sexception injected: %d\n", prefix, exce->injected);
+    printf("%sexception pending: %d\n", prefix, exce->pending);
+    return;
+}
+
+
+static void print_interrupt(struct vcpu_interrupt *interrupt, char prefix[]){
+    printf("%sinterrupt soft: %d\n", prefix, interrupt->soft);
+    printf("%sinterrupt shadow: %d\n", prefix, interrupt->shadow);
+    printf("%sinterrupt injected: %d\n", prefix, interrupt->injected);
+    printf("%sinterrupt nr: %d\n", prefix, interrupt->nr);
+    return;
+}
+
+static void print_nmi(struct vcpu_nmi *nmi, char prefix[]){
+    printf("%snmi injected: %d\n", prefix, nmi->injected);
+    printf("%snmi pending: %d\n", prefix, nmi->pending);
+    printf("%snmi masked: %d\n", prefix, nmi->masked);
+    printf("%snmi pad: %d\n", prefix, nmi->pad);
+    return;
+}
+
+static void print_smi(struct vcpu_smi *smi, char prefix[]){
+    printf("%ssmi smm: %d\n", prefix, smi->smm);
+    printf("%ssmi smm_inside_nmi: %d\n", prefix, smi->smm_inside_nmi);
+    printf("%ssmi pending: %d\n", prefix, smi->pending);
+    printf("%ssmi latched_init: %d\n", prefix, smi->latched_init);
+    return;
+}
+
+static void print_vcpu_events(int vcpu_fd){
+    struct kvm_vcpu_events *events;
+    events = g_new0(struct kvm_vcpu_events, 1);
+    int ret = ioctl(vcpu_fd, KVM_GET_VCPU_EVENTS, events);
+    if(ret < 0){
+        printf("KVM GET VCPU EVENTS FAILED!! \n");
+        fflush(stdout);
+    }
+    printf("[%d]KVM GET VCPU EVENTS: \n", getpid());
+
+
+    printf("exception has payload: %d\n", events->exception_has_payload);
+    printf("exception payload: %llu\n", events->exception_payload);
+    printf("flags: %d\n", events->flags);
+    printf("events reserved: %s\n", events->reserved);
+    printf("events sipi vector: %d\n", events->sipi_vector);
+
+    // print structs 
+    print_exception((struct vcpu_exception *)(&(events->exception)), "\t");
+    print_interrupt((struct vcpu_interrupt*)(&(events->interrupt)), "\t");
+    print_nmi((struct vcpu_nmi*)(&(events->nmi)), "\t");
+    print_smi((struct vcpu_smi*)(&(events->smi)), "\t");
+    return;
+}
 
 static void debug_maps_dump(){
     #ifdef DEBUG
@@ -3397,7 +3484,7 @@ int kvm_cpu_exec(CPUState *cpu)
                     gettimeofday(&t, NULL);
                     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
                     timestamps[3] = milliseconds;
-                    
+                        
                     #ifdef TIMESTAMP_PRINT
                     printf("\n=====>>>>>Timestamp when Parent calls cpu_exec: %lld\n", timestamps[0]);
                     printf("Timestamp when QEMU Forks: %lld\n", timestamps[1]);
@@ -3411,7 +3498,7 @@ int kvm_cpu_exec(CPUState *cpu)
             }
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
-                
+                // print_vcpu_events(cpu->kvm_fd);
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 
@@ -3437,11 +3524,14 @@ int kvm_cpu_exec(CPUState *cpu)
                 FORK_COUNTER = FORK_COUNTER + 1;
                 if(FORK_COUNTER > 1){
                     ret = 0;
-                    // kvm_update_rip(cpu, 0);
-                    // kvm_update_rip(cpu, 0);
-                    // kvm_update_rip(cpu, 0);
-                    printf("[Debug] vmfork called!\n");
-                    vm_start();
+                    printf("%c", *(((char *)run) + run->io.data_offset));
+
+                    // printf("[Debug] vmfork called!\n");
+                    printf("[Debug] Fork Counter : %d\n", FORK_COUNTER);
+                    goto skip_jump;
+                    // exit(0);
+                    // continue;
+                    // vm_start();
                     break;
                 }
                 DEBUG_PRINTF("[DEBUG] parent dump\n");
@@ -3526,7 +3616,9 @@ int kvm_cpu_exec(CPUState *cpu)
 
                             sleep(3);
 
-                            qemu_cond_init(&cpu->vcpu_recreated_cond);
+                            // [BILAL] NOT NEEDED
+                            // qemu_cond_init(&cpu->vcpu_recreated_cond);
+                            
                             // qemu_mutex_init(&cpu->vcpu_recreated_mutex);
                             cpu->is_child = true;
 
@@ -3547,10 +3639,13 @@ int kvm_cpu_exec(CPUState *cpu)
 
                             s->fd = open("/dev/kvm", 2); 
                             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
-                            kvm_irqchip_create(s);
-                            qemu_init_cpu_list();
-                            cpu->halt_cond = g_malloc0(sizeof(QemuCond));
-                            qemu_cond_init(cpu->halt_cond);
+                            // kvm_irqchip_create(s);
+                            
+                            // [BILAL] NOT NEEDED
+                            // qemu_init_cpu_list();
+                            // cpu->halt_cond = g_malloc0(sizeof(QemuCond));
+                            // qemu_cond_init(cpu->halt_cond);
+                            
                             // kvm_init_msrs(X86_CPU(cpu));
 
                             kvm_vcpu_post_fork(cpu, prefork_state);
@@ -3611,7 +3706,7 @@ int kvm_cpu_exec(CPUState *cpu)
                         cpu->should_wait = false;
                         // vm_stop(RUN_STATE_RESTORE_VM);
                         vm_start();
-
+                        // print_vcpu_events(cpu->kvm_fd);
                         // printf("[Debug] we are setting the load_snapshot event! \n");
                         // event_notifier_test_and_clear(&(cpu->load_event));
                         // event_notifier_set(&(cpu->load_event));
@@ -3709,7 +3804,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 qemu_mutex_unlock_iothread();
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
                 dumpKVMState(s, "./ParentKVMDump", "Parent VM");
-child_spawn: 
+                // child_spawn: 
                 start_fork();
                 // qemu_mutex_lock_iothread();
                 // qemu_cleanup();
@@ -4029,6 +4124,7 @@ child_spawn:
                 break;
             
             }
+skip_jump:
             if(run->io.direction == KVM_EXIT_IO_IN){
                 // printf("Port: %d\n", run->io.port);
                 // printf("READ VALUE Before handle : %s ",(((char *)run) + run->io.data_offset));

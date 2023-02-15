@@ -6,6 +6,7 @@ make install
   # -drive file=$IMAGE/stretch_backup.qcow2,id=tst,if=none \
   # -device virtio-blk-pci,scsi=off,drive=tst \
 # strace --abbrev=none -f -o simple.log 
+  # -loadvm init_vm \
 /usr/local/bin/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \

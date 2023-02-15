@@ -27,3 +27,6 @@
   -D vm.asm.log \
   -monitor unix:qemu-monitor-socket,server,nowait \
   2>&1 | tee vm.log
+  
+  reset;
+  cat vm.log;

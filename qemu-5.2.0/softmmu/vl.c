@@ -90,6 +90,7 @@
 #include "qemu/config-file.h"
 #include "qemu-options.h"
 #include "qemu/main-loop.h"
+#include <unistd.h>
 #ifdef CONFIG_VIRTFS
 #include "fsdev/qemu-fsdev.h"
 #endif
@@ -130,6 +131,9 @@
 // #define DBG
 // #define DBG_CMP_DRIVE_SNAPSHOT
 #define SET_VCPU_IN_MAIN
+
+
+// #define PARENT_RESUME
 
 
 // uncomment this macro for using the replayer module 
@@ -3151,7 +3155,7 @@ int dump_cpu_state(CPUState *cpu, char *filename){
     fwrite (cpu, sizeof(CPUState), 1, outfile);
     
     if(fwrite != 0)
-		printf("[log] dumped cpu content to %s!\n", filename);
+		printf("[log] [%d] dumped cpu content to %s!\n", getpid(), filename);
 	else
 		printf("[log] failed cpu dump to %s!\n", filename);
 
@@ -3892,7 +3896,9 @@ void handle_fork(void *opaque){
             // load_snapshot("newtest", NULL);
             return; 
         } else {
-            // waitpid(ret, &status, 0);
+            #ifndef PARENT_RESUME
+            waitpid(ret, &status, 0);
+            #endif
             // qemu_cleanup();
             // vm_start();
             // load_snapshot("newtest", NULL);
