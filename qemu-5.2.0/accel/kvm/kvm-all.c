@@ -3648,9 +3648,9 @@ int kvm_cpu_exec(CPUState *cpu)
                             
                             // kvm_init_msrs(X86_CPU(cpu));
 
-                            kvm_vcpu_post_fork(cpu, prefork_state);
-                            kvm_init_vcpu(cpu, NULL);
                             // kvm_vcpu_post_fork(cpu, prefork_state);
+                            kvm_init_vcpu(cpu, NULL);
+                            kvm_vcpu_post_fork(cpu, prefork_state);
                             // kvm_cpu_synchronize_state(cpu);
                             kvm_arch_put_registers(cpu, 3);
                             // 3# kvm_arch_reset_vcpu(cpu);

@@ -400,6 +400,8 @@ static void *tcg_rr_cpu_thread_fn(void *arg)
 
 static void *tcg_cpu_thread_fn(void *arg)
 {
+    int did_fork;
+    int is_child;
     CPUState *cpu = arg;
 
     assert(tcg_enabled());
@@ -419,11 +421,9 @@ static void *tcg_cpu_thread_fn(void *arg)
 
     qemu_mutex_unlock_iothread();
     while (1) {
-            int did_fork;
-			int is_child;
+            
 
-			ski_forkall_slave(&did_fork, &is_child);
-			if(did_fork){
+			if(!did_fork){
 				// SKI: This at least contains a race...
 				CPUState *cpu = arg;
 				//printf("SKI: trying to setup the IPI handler\n");
@@ -452,6 +452,8 @@ static void *tcg_cpu_thread_fn(void *arg)
             qemu_mutex_unlock_iothread();
             r = tcg_cpu_exec(cpu);
             qemu_mutex_lock_iothread();
+			ski_forkall_slave(&did_fork, &is_child);
+
             switch (r) {
             case EXCP_DEBUG:
                 cpu_handle_guest_debug(cpu);
