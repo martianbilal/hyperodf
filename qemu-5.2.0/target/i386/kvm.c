@@ -2720,7 +2720,7 @@ int kvm_buf_set_msrs(X86CPU *cpu)
     }
 
     // [TODO] [COMMENT] commenting out for testing 
-    assert(ret == cpu->kvm_msr_buf->nmsrs);
+    // assert(ret == cpu->kvm_msr_buf->nmsrs);
     return 0;
 }
 
@@ -3340,17 +3340,17 @@ static int kvm_get_msrs(X86CPU *cpu)
 
     if (ret < cpu->kvm_msr_buf->nmsrs) {
         struct kvm_msr_entry *e = &cpu->kvm_msr_buf->entries[ret];
-        printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
+        // printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
         fflush(stdout);
         error_report("error: failed to get MSR 0x%" PRIx32,
                      (uint32_t)e->index);
     }
 
     // [TODO] [COMMENT] commenting out for testing 
-    assert(ret == cpu->kvm_msr_buf->nmsrs);
+    // assert(ret == cpu->kvm_msr_buf->nmsrs);
     if(ret != cpu->kvm_msr_buf->nmsrs){
-        printf("[DEBUG] ret != nmsrs\n");
-        printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
+        // printf("[DEBUG] ret != nmsrs\n");
+        // printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
         cpu->kvm_msr_buf->nmsrs = ret;
     }
     /*

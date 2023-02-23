@@ -22,10 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "hyperodf/hello.c"
-#include "hyperodf/use_replayer.c"
-#include "replayer/src/sys-replay.c"
-
 #include "qemu/osdep.h"
 #include "qemu-common.h"
 #include "qemu/units.h"
@@ -90,7 +86,7 @@
 #include "qemu/config-file.h"
 #include "qemu-options.h"
 #include "qemu/main-loop.h"
-#include <unistd.h>
+#include "util/forkall-coop.h"
 #ifdef CONFIG_VIRTFS
 #include "fsdev/qemu-fsdev.h"
 #endif
@@ -131,13 +127,6 @@
 // #define DBG
 // #define DBG_CMP_DRIVE_SNAPSHOT
 #define SET_VCPU_IN_MAIN
-
-
-// #define PARENT_RESUME
-
-
-// uncomment this macro for using the replayer module 
-
 
 static const char *SNAPSHOT_DISK_NAME = "prefork_state";
 static const char *data_dir[16];
@@ -3155,7 +3144,7 @@ int dump_cpu_state(CPUState *cpu, char *filename){
     fwrite (cpu, sizeof(CPUState), 1, outfile);
     
     if(fwrite != 0)
-		printf("[log] [%d] dumped cpu content to %s!\n", getpid(), filename);
+		printf("[log] dumped cpu content to %s!\n", filename);
 	else
 		printf("[log] failed cpu dump to %s!\n", filename);
 
@@ -3553,8 +3542,9 @@ void handle_load_snapshot(void *opaque){
             perror( "clock gettime" );
             exit( EXIT_FAILURE );
         } 
-        printf("[DEBUG] time before the load_snapshot : %lf\n", (cpu->start_forkall_master.tv_sec + (cpu->start_forkall_master.tv_nsec / 1E9)));
-        if(load_snapshot_memory("newtest", NULL) == 0){
+        vm_stop(RUN_STATE_RESTORE_VM);
+        
+        if(load_snapshot_memory("test", NULL) == 0){
             vm_start();
             if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
                 perror( "clock gettime" );
@@ -3562,7 +3552,11 @@ void handle_load_snapshot(void *opaque){
             }
             printf("[DEBUG] time after the load_snapshot : %lf\n", (cpu->end_forkall_master.tv_sec + (cpu->end_forkall_master.tv_nsec / 1E9)));
         }
-        // vm_start();
+        else{
+            vm_start();
+            
+            printf("Error in loading the snapshot\n");
+        }
     }
     return;
 }
@@ -3624,13 +3618,13 @@ void handle_fork(void *opaque){
         
         assert(qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()); 
         
-        // if (migration_is_blocked(NULL)) {
-        //     return false;
-        // }
+        if (migration_is_blocked(NULL)) {
+            return false;
+        }
 
-        // if (!replay_can_snapshot()) {
-        //     return false;
-        // }
+        if (!replay_can_snapshot()) {
+            return false;
+        }
 
         // vm_stop(RUN_STATE_SAVE_VM);
 
@@ -3693,7 +3687,7 @@ void handle_fork(void *opaque){
 
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
-        // ret = 9823423;
+        ski_forkall_patch_thread_references();
         // [Bilal] [Measure] clock time on return from forkall master
         if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
             perror( "clock gettime" );
@@ -3708,12 +3702,13 @@ void handle_fork(void *opaque){
             printf("Failed to fork\n");
         } else if (ret == 0) {
             // [Bilal] [Measure] clock time on hypercall
-            printf("[DEBUG] [%d] load snapshot is called!\n", getpid());
+            printf("[DEBUG] load snapshot is called!\n");
             fflush(stdout);
             if( clock_gettime( CLOCK_REALTIME, &(cpu->stop_universal)) == -1 ) {
                 perror( "clock gettime" );
                 exit( EXIT_FAILURE );
             } 
+           
             
             #ifdef DBG_CMP_DRIVE_SNAPSHOT
             // vm_stop(RUN_STATE_RESTORE_VM);
@@ -3840,7 +3835,7 @@ void handle_fork(void *opaque){
 
             // return;
             
-            qemu_mutex_unlock_iothread();
+            // qemu_mutex_unlock_iothread();
             // qemu_init_child(ARGC, ARGV, ENVP 
 
             // qemu_opts_foreach(qemu_find_opts("drive"), drive_init_func,
@@ -3879,7 +3874,7 @@ void handle_fork(void *opaque){
             #ifdef DBG 
                 printf("We have loaded the snapshot!\n"); 
             #endif 
-            qemu_mutex_lock_iothread();
+            // qemu_mutex_lock_iothread();
 
             // printf("[DEBUG] load snapshot is called!\n");
             // fflush(stdout);
@@ -3896,11 +3891,8 @@ void handle_fork(void *opaque){
             // load_snapshot("newtest", NULL);
             return; 
         } else {
-            #ifndef PARENT_RESUME
             waitpid(ret, &status, 0);
-            #endif
             // qemu_cleanup();
-            // vm_start();
             // load_snapshot("newtest", NULL);
             dump_cpu_state(cpu, "pre-fork.dat");
             // load_snapshot("newtest", NULL);
@@ -3963,19 +3955,8 @@ void qemu_init(int argc, char **argv, char **envp)
     ARGV = argv;
     ENVP = envp; 
     ARGC = argc;
-    
-    //[BILAL] function calls for testing the added modules
-    hello();
-    
-    
-    #ifdef USE_REPLAYER
-    replay_hello();
-    replay_init();
-    replay_attach_strace(getpid(), "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log");
-    #endif    
 
-    use_replayer_hello();
-
+    // used only for changing the buffering type of the stdout
     os_set_line_buffering();
 
     error_init(argv[0]);

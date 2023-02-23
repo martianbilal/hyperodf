@@ -92,6 +92,8 @@ int ski_forkall_timeval_subtract(struct timeval *result, struct timeval *t2, str
 int ski_forkall_thread_pool_ready_check();
 void ski_forkall_thread_pool_ready();
 void ski_forkall_thread_pool_not_ready();
+void ski_forkall_patch_thread_references();
+
 
 void ski_forkall_hypercall_ready();
 

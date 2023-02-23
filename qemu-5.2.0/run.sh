@@ -1,8 +1,10 @@
 #!/bin/sh
 set +o noclobber
 # kill -9 $(pgrep qemu)
-pkill qemu
-make -j 128
+cd build ;
+make -j 128 ;
+cd .. ;
+pkill -9 qemu
 # make install
   # -append "console=ttyS0 root=/dev/vda earlyprintk=serial net.ifnames=0" \
   # -drive file=$IMAGE/stretch_backup.qcow2,id=tst,if=none \

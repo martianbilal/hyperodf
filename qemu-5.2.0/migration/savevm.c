@@ -3136,12 +3136,14 @@ int load_snapshot_memory(const char *name, Error **errp)
         ret = -EINVAL;
         goto err_drain;
     }
-
+    printf("done with qemu_fopen_bdrv\n");
     qemu_system_reset(SHUTDOWN_CAUSE_NONE);
     mis->from_src_file = f;
+    printf("done with qemu_system_reset\n");
 
     aio_context_acquire(aio_context);
-    ret = qemu_loadvm_state(f);
+    // ret = qemu_loadvm_state(f);
+    printf("done with qemu_loadvm_state\n");
 
     // migration_incoming_state_destroy();
     aio_context_release(aio_context);

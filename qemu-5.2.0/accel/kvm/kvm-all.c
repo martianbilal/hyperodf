@@ -38,6 +38,7 @@
 #include "hw/pci/msix.h"
 #include "hw/s390x/adapter.h"
 #include "exec/gdbstub.h"
+#include "sysemu/cpu-timers.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/runstate.h"
 #include "sysemu/cpus.h"
@@ -3574,15 +3575,15 @@ int kvm_cpu_exec(CPUState *cpu)
                 // [DEBUG] [BILAL] Adding this to test if the disk snapshot can be 
                 // reloaded in the child VM
 
+                cpu_synchronize_all_pre_loadvm();
+                vm_stop(RUN_STATE_PAUSED);
                 event_notifier_test_and_clear(&(cpu->fork_event));
                 event_notifier_set(&(cpu->fork_event));
                 // qemu_mutex_lock_iothread();
                 // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
                 // event_notifier_test_and_clear(&(cpu->fork_event));
-                cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
-                // vm_stop(RUN_STATE_PAUSED);
                 ret = 0; 
                 // break;
                 while(1) {
@@ -3636,28 +3637,31 @@ int kvm_cpu_exec(CPUState *cpu)
                             replay_child();
                             dbg_pr("Time after calling replay_child :  %lf ", replay_current_time());
                             #endif
-
+                            close(s->fd);
+                            close(s->vmfd);
                             s->fd = open("/dev/kvm", 2); 
                             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
-                            // kvm_irqchip_create(s);
+                            kvm_irqchip_create(s);
                             
                             // [BILAL] NOT NEEDED
-                            // qemu_init_cpu_list();
+                            qemu_init_cpu_list();
                             // cpu->halt_cond = g_malloc0(sizeof(QemuCond));
                             // qemu_cond_init(cpu->halt_cond);
                             
                             // kvm_init_msrs(X86_CPU(cpu));
 
-                            kvm_vcpu_post_fork(cpu, prefork_state);
                             kvm_init_vcpu(cpu, NULL);
+                            cpu_timers_init();
+                            kvm_vcpu_post_fork(cpu, prefork_state);
                             // kvm_vcpu_post_fork(cpu, prefork_state);
                             // kvm_cpu_synchronize_state(cpu);
-                            kvm_arch_put_registers(cpu, 3);
+                            cpu_synchronize_all_post_init();
+                            // kvm_arch_put_registers(cpu, 3);
                             // 3# kvm_arch_reset_vcpu(cpu);
                             // prefork_state->regs.rip = 0xfff0;
                             // 4# kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
     
-                            kvm_arch_get_registers(cpu);
+                            // kvm_arch_get_registers(cpu);
                             run = cpu->kvm_run;
                             s = cpu->kvm_state;
                             #ifdef DBG_FDS
@@ -3665,10 +3669,20 @@ int kvm_cpu_exec(CPUState *cpu)
                             printf("[DEBUG] [CHILD] s->fd -> %d\n", s->fd );
                             printf("[DEBUG] [CHILD]  s->vmfd -> %d\n", s->vmfd );
                             #endif
+                           
+                            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+                            qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
+                            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+                            cpu->vcpu_recreated = true;
+                            printf("[Debug] we are setting the load_snapshot event! \n");
+                            event_notifier_test_and_clear(&(cpu->load_event));
+                            event_notifier_set(&(cpu->load_event));
+                            break;
                             kvm_post_fork_fixup(cpu, prefork_state);
                             stupid_stub_function(cpu);
                             // [Bilal] fixup function 
                             // vm_start();
+                            
 
                             // dump_cpu_state(cpu, "post-fork.dat");
                             // stupid_stub_function(cpu);
@@ -3681,13 +3695,11 @@ int kvm_cpu_exec(CPUState *cpu)
                                 perror( "clock gettime" );
                                 exit( EXIT_FAILURE );
                             } 
-                            cpu->vcpu_recreated = true;
+                           
                             // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
                             // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
                             // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-                            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-                            qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
-                            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+                            
                             // cpu->vcpu_dirty = false;
                             // qemu_mutex_lock_iothread();
                             // return ret;
@@ -3702,14 +3714,15 @@ int kvm_cpu_exec(CPUState *cpu)
                             #ifdef DBG_TEST_RIP_PARENT_EXCLUSIVE
                             exit(0);
                             #endif
+                            // vm_stop(RUN_STATE_RESTORE_VM);
+                            
                         }
                         cpu->should_wait = false;
                         // vm_stop(RUN_STATE_RESTORE_VM);
-                        vm_start();
+                        // vm_start();
+                        // vm_stop(RUN_STATE_RESTORE_VM);
                         // print_vcpu_events(cpu->kvm_fd);
-                        // printf("[Debug] we are setting the load_snapshot event! \n");
-                        // event_notifier_test_and_clear(&(cpu->load_event));
-                        // event_notifier_set(&(cpu->load_event));
+                        
                         break;
                     }
                     sleep(0);
@@ -4124,7 +4137,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 break;
             
             }
-skip_jump:
+// skip_jump:
             if(run->io.direction == KVM_EXIT_IO_IN){
                 // printf("Port: %d\n", run->io.port);
                 // printf("READ VALUE Before handle : %s ",(((char *)run) + run->io.data_offset));
@@ -4138,6 +4151,7 @@ skip_jump:
             if(run->io.direction == KVM_EXIT_IO_IN){
                 // printf("READ VALUE : %s, io size: %d, io count: %d\n",(((char *)run) + run->io.data_offset), run->io.size, run->io.count);
             }
+skip_jump:
             // #endif
             ret = 0;
             break;
