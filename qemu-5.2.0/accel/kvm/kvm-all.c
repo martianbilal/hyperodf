@@ -611,7 +611,6 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
     printf("[debug] kvm_init_vcpu started!");
     fflush(stdout);
     #endif
-
     trace_kvm_init_vcpu(cpu->cpu_index, kvm_arch_vcpu_id(cpu));
 
     if(cpu->is_child){
@@ -3522,20 +3521,20 @@ int kvm_cpu_exec(CPUState *cpu)
                             // qemu_cond_init(cpu->halt_cond);
                             // kvm_init_msrs(X86_CPU(cpu));
                             kvm_vcpu_post_fork(cpu, prefork_state);
-
                             kvm_init_vcpu(cpu, NULL);
+
                             // kvm_vcpu_post_fork(cpu, prefork_state);
                             // kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
                             // kvm_arch_reset_vcpu(cpu);
                             // prefork_state->regs.rip = 0xfff0;
-                            // kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
+                            kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             // kvm_arch_get_registers(cpu);
                             #ifdef DBG_FDS
                             printf("[DEBUG] [CHILD] cpu->kvm_fd -> %d\n", cpu->kvm_fd );
                             printf("[DEBUG] [CHILD] s->fd -> %d\n", s->fd );
                             printf("[DEBUG] [CHILD]  s->vmfd -> %d\n", s->vmfd );
                             #endif
-                            kvm_post_fork_fixup(cpu, prefork_state);
+                            // kvm_post_fork_fixup(cpu, prefork_state);
                             stupid_stub_function(cpu);
                             // [Bilal] fixup function 
                             // vm_start();
