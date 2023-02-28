@@ -1,6 +1,6 @@
 #!/bin/sh
-# make 
-# make install
+make 
+make install
 /usr/local/bin/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \
