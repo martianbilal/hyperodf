@@ -3029,7 +3029,7 @@ int load_snapshot(const char *name, Error **errp)
         goto err_drain;
     }
 
-    qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+    // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
     mis->from_src_file = f;
 
     aio_context_acquire(aio_context);
