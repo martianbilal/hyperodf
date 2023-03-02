@@ -533,7 +533,6 @@ void qemu_thread_create(QemuThread *thread, const char *name,
     pthread_attr_t attr;
     QemuThreadArgs *qemu_thread_args;
 
-    printf("---> qemu thread create called <------");
 
     err = pthread_attr_init(&attr);
     if (err) {
@@ -558,7 +557,7 @@ void qemu_thread_create(QemuThread *thread, const char *name,
     qemu_thread_args->start_routine = start_routine;
     qemu_thread_args->arg = arg;
 
-    printf("This is the name of the name of the thread: %s\n", qemu_thread_args->name);
+    // printf("This is the name of the name of the thread: %s\n", qemu_thread_args->name);
 
 
     if(USE_HYPERODF && strcmp(qemu_thread_args->name, "call_rcu") != 0 ){

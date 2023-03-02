@@ -35,6 +35,7 @@
 #include "migration/misc.h"
 #include "migration/register.h"
 #include "migration/global_state.h"
+#include "qemu/queue.h"
 #include "ram.h"
 #include "qemu-file-channel.h"
 #include "qemu-file.h"
@@ -3034,6 +3035,14 @@ int load_snapshot(const char *name, Error **errp)
 
     aio_context_acquire(aio_context);
     ret = qemu_loadvm_state(f);
+    // SaveStateEntry *se;
+    // QTAILQ_FOREACH(se, &savevm_state.handlers, entry){
+    //     if(se->vmsd){
+    //         if(se->vmsd->post_load){
+    //             se->vmsd->post_load(f, se->version_id);
+    //         }
+    //     }
+    // }
 
     migration_incoming_state_destroy();
     aio_context_release(aio_context);

@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
     int ret;
 
     g_test_init(&argc, &argv, NULL);
-
+    return g_test_run();
     qmp_schema_init(&schema);
     add_query_tests(&schema);
 

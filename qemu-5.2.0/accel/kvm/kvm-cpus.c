@@ -16,6 +16,7 @@
 #include "qemu/osdep.h"
 #include "qemu/error-report.h"
 #include "qemu/main-loop.h"
+#include "qemu/thread.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/runstate.h"
 #include "sysemu/cpus.h"
@@ -51,7 +52,9 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu->system_reset = false;
     
     rcu_register_thread();
-    ski_forkall_thread_add_self_tid();
+    if(USE_HYPERODF){
+        ski_forkall_thread_add_self_tid();
+    }
 
 
     qemu_mutex_lock_iothread();

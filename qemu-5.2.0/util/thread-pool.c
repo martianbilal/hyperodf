@@ -78,7 +78,9 @@ static void *worker_thread(void *opaque)
 {
     ThreadPool *pool = opaque;
 
-    ski_forkall_thread_add_self_tid();
+    if(USE_HYPERODF){
+        ski_forkall_thread_add_self_tid();
+    }
 
     qemu_mutex_lock(&pool->lock);
     pool->pending_threads--;
