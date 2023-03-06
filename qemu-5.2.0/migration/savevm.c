@@ -36,6 +36,7 @@
 #include "migration/register.h"
 #include "migration/global_state.h"
 #include "qemu/queue.h"
+#include "qemu/typedefs.h"
 #include "ram.h"
 #include "qemu-file-channel.h"
 #include "qemu-file.h"
@@ -63,6 +64,7 @@
 #include "migration/colo.h"
 #include "qemu/bitmap.h"
 #include "net/announce.h"
+#include <string.h>
 
 #define DBG
 
@@ -148,7 +150,7 @@ static ssize_t block_get_buffer(void *opaque, uint8_t *buf, int64_t pos,
                                 size_t size, Error **errp)
 {
     #ifdef DBG
-    printf("%s is called\n", __func__); 
+    // printf("%s is called\n", __func__); 
     #endif
     return bdrv_load_vmstate(opaque, buf, pos, size);
 }
@@ -884,13 +886,69 @@ void vmstate_unregister(VMStateIf *obj, const VMStateDescription *vmsd,
     }
 }
 
+#ifndef QEMU_FILE
+#define QEMU_FILE
+
+#define IO_BUF_SIZE 32768
+#define MAX_IOV_SIZE MIN_CONST(IOV_MAX, 64)
+struct QEMUFile {
+    const QEMUFileOps *ops;
+    const QEMUFileHooks *hooks;
+    void *opaque;
+
+    int64_t bytes_xfer;
+    int64_t xfer_limit;
+
+    int64_t pos; /* start of buffer when writing, end of buffer
+                    when reading */
+    int buf_index;
+    int buf_size; /* 0 when writing */
+    uint8_t buf[IO_BUF_SIZE];
+
+    DECLARE_BITMAP(may_free, MAX_IOV_SIZE);
+    struct iovec iov[MAX_IOV_SIZE];
+    unsigned int iovcnt;
+
+    int last_error;
+    Error *last_error_obj;
+    /* has the file has been shutdown */
+    bool shutdown;
+};
+#endif
+
+static void qemu_file_set_buf_index(QEMUFile *f, int index)
+{
+    f->buf_index = index;
+}
+
+static void qemu_file_set_pos(QEMUFile *f, int64_t pos)
+{
+    f->pos = pos;
+}
+
+
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
 {
+    int ret = 0;
+    printf("idstr : %s\tpos : %ld\n", se->idstr, f->pos);
+    // if(strcmp("ram", se->idstr) == 0){
+    //     printf("ram load skipping\n");
+    //     qemu_file_set_buf_index(f, 12425);
+    //     qemu_file_set_pos(f, 191837378);
+
+    //     return 0;
+    // }
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
-        return se->ops->load_state(f, se->opaque, se->load_version_id);
+        ret = se->ops->load_state(f, se->opaque, se->load_version_id);
+        printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
+
+        return ret;
     }
-    return vmstate_load_state(f, se->vmsd, se->opaque, se->load_version_id);
+    ret = vmstate_load_state(f, se->vmsd, se->opaque, se->load_version_id);
+    printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
+
+    return ret;
 }
 
 static void vmstate_save_old_style(QEMUFile *f, SaveStateEntry *se, QJSON *vmdesc)
