@@ -916,15 +916,15 @@ struct QEMUFile {
 };
 #endif
 
-static void qemu_file_set_buf_index(QEMUFile *f, int index)
-{
-    f->buf_index = index;
-}
+// static void qemu_file_set_buf_index(QEMUFile *f, int index)
+// {
+//     f->buf_index = index;
+// }
 
-static void qemu_file_set_pos(QEMUFile *f, int64_t pos)
-{
-    f->pos = pos;
-}
+// static void qemu_file_set_pos(QEMUFile *f, int64_t pos)
+// {
+//     f->pos = pos;
+// }
 
 
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
@@ -1290,6 +1290,16 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
 
     trace_savevm_state_iterate();
     QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
+        // if(strcmp(se->idstr, "ram") == 0){
+        //     printf("[skip] ram in savevm_state_iterate\n");
+        //     continue;
+        // }
+        // if(strcmp(se->idstr, "timer") == 0){
+        //     printf("[skip] timer in savevm_state_iterate\n");
+        //     continue;
+        // }
+
+
         if (!se->ops || !se->ops->save_live_iterate) {
             continue;
         }
@@ -1313,6 +1323,11 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
         }
         if (qemu_file_rate_limit(f)) {
             return 0;
+        }
+        printf("Saving %s\n", se->idstr);
+        if(strcmp(se->idstr, "ram") == 0){
+            printf("[skip] ram in savevm_state_iterate\n");
+            continue;
         }
         trace_savevm_section_start(se->idstr, se->section_id);
 
@@ -1403,6 +1418,7 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
                 continue;
             }
         }
+        printf("Saving %s\n", se->idstr);
         trace_savevm_section_start(se->idstr, se->section_id);
 
         save_section_header(f, se, QEMU_VM_SECTION_END);
@@ -1441,6 +1457,12 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
             trace_savevm_section_skip(se->idstr, se->section_id);
             continue;
         }
+        printf("[precopy_noniter]Saving %s\n", se->idstr);
+        if(strcmp(se->idstr, "vmmouse") == 0) {
+            printf("[SKIP]vmmouse skipped\n");
+            continue;
+        }
+
 
         trace_savevm_section_start(se->idstr, se->section_id);
 
