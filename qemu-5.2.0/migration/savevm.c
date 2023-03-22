@@ -65,6 +65,7 @@
 #include "qemu/bitmap.h"
 #include "net/announce.h"
 #include <string.h>
+#include <time.h>
 
 #define DBG
 
@@ -930,7 +931,7 @@ struct QEMUFile {
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
 {
     int ret = 0;
-    printf("idstr : %s\tpos : %ld\n", se->idstr, f->pos);
+    // printf("idstr : %s\tpos : %ld\n", se->idstr, f->pos);
     // if(strcmp("ram", se->idstr) == 0){
     //     printf("ram load skipping\n");
     //     qemu_file_set_buf_index(f, 12425);
@@ -938,16 +939,25 @@ static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
 
     //     return 0;
     // }
+    struct timespec start, end;
+    double time_taken;
+
+    clock_gettime(CLOCK_REALTIME, &start);
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
         ret = se->ops->load_state(f, se->opaque, se->load_version_id);
-        printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
-
+        // printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
+        clock_gettime(CLOCK_REALTIME, &end);
+        time_taken = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)1000000000L;
+        printf("Time taken to load %s : %lf\n", se->idstr, time_taken);
+        
         return ret;
     }
     ret = vmstate_load_state(f, se->vmsd, se->opaque, se->load_version_id);
-    printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
-
+    // printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
+    clock_gettime(CLOCK_REALTIME, &end);
+    time_taken = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)1000000000L;
+    printf("Time taken to load %s : %lf\n", se->idstr, time_taken);
     return ret;
 }
 
@@ -1290,10 +1300,10 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
 
     trace_savevm_state_iterate();
     QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
-        // if(strcmp(se->idstr, "ram") == 0){
-        //     printf("[skip] ram in savevm_state_iterate\n");
-        //     continue;
-        // }
+        if(strcmp(se->idstr, "ram") == 0){
+            printf("[skip] ram in savevm_state_iterate\n");
+            continue;
+        }
         // if(strcmp(se->idstr, "timer") == 0){
         //     printf("[skip] timer in savevm_state_iterate\n");
         //     continue;
@@ -1418,7 +1428,14 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
                 continue;
             }
         }
-        printf("Saving %s\n", se->idstr);
+
+        // [important : this is the one taking most amount of time]
+        // [note] [Bilal] this skip brings the time to 70ms
+        printf("[precopy_iter]Saving %s\n", se->idstr);
+        // if(strcmp(se->idstr, "ram") == 0){
+        //     printf("[skip] ram in precopy iter\n");
+        //     continue;
+        // }
         trace_savevm_section_start(se->idstr, se->section_id);
 
         save_section_header(f, se, QEMU_VM_SECTION_END);
@@ -1434,6 +1451,7 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
 
     return 0;
 }
+#define BILLION  1000000000L;
 
 static
 int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
@@ -1444,6 +1462,8 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
     int vmdesc_len;
     SaveStateEntry *se;
     int ret;
+    struct timespec start, end;
+    double time_taken;
 
     vmdesc = qjson_new();
     json_prop_int(vmdesc, "page_size", qemu_target_page_size());
@@ -1457,13 +1477,13 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
             trace_savevm_section_skip(se->idstr, se->section_id);
             continue;
         }
-        printf("[precopy_noniter]Saving %s\n", se->idstr);
+        // printf("[precopy_noniter]Saving %s\n", se->idstr);
         if(strcmp(se->idstr, "vmmouse") == 0) {
             printf("[SKIP]vmmouse skipped\n");
             continue;
         }
-
-
+        // measure the time taken using the clock_gettime()
+        clock_gettime(CLOCK_REALTIME, &start);
         trace_savevm_section_start(se->idstr, se->section_id);
 
         json_start_object(vmdesc, NULL);
@@ -1480,6 +1500,9 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
         save_section_footer(f, se);
 
         json_end_object(vmdesc);
+        clock_gettime(CLOCK_REALTIME, &end);
+        time_taken = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)BILLION;
+        printf("[precopy_noniter]Saving %s took %f seconds\n", se->idstr, time_taken);
     }
 
     if (inactivate_disks) {

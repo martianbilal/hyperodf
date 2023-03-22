@@ -3525,13 +3525,21 @@ static void qemu_pre_save_snapshot_cleanup(void){
 static void qemu_pre_load_snapshot_setup(void){
     return;
 }
+#define BILLION  1000000000L;
 
 void handle_load_snapshot(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
     struct KVMState* s = cpu->kvm_state;
     int result; 
+    struct timespec start, stop;
+    double accum;
 
     printf("[Debug] handle_load_snapshot is called! \n");
+    if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
+    {
+        perror( "clock gettime" );
+        return EXIT_FAILURE;
+    }
 
     // vm_stop(RUN_STATE_RESTORE_VM);
     result = event_notifier_test_and_clear(&(cpu->load_event));
@@ -3541,6 +3549,14 @@ void handle_load_snapshot(void *opaque){
             vm_start();
         }
     }
+    if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
+    {
+        perror( "clock gettime" );
+        return EXIT_FAILURE;
+    }
+    accum = ( stop.tv_sec - start.tv_sec )
+    + (double)( stop.tv_nsec - start.tv_nsec ) / (double)BILLION;
+    printf( "Time spent in the load_snapshot:  %lf\n", accum );
     return;
 }
 
