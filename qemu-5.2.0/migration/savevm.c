@@ -1478,10 +1478,10 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
             continue;
         }
         // printf("[precopy_noniter]Saving %s\n", se->idstr);
-        if(strcmp(se->idstr, "vmmouse") == 0) {
-            printf("[SKIP]vmmouse skipped\n");
-            continue;
-        }
+        // if(strcmp(se->idstr, "ram") != 0 && strcmp(se->idstr, "cpu") != 0) {
+        //     printf("[SKIP]%s skipped\n", se->idstr);
+        //     continue;
+        // }
         // measure the time taken using the clock_gettime()
         clock_gettime(CLOCK_REALTIME, &start);
         trace_savevm_section_start(se->idstr, se->section_id);

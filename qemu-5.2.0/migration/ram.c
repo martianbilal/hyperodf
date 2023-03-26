@@ -2664,7 +2664,7 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
         /* flush all remaining blocks regardless of rate limiting */
         while (true) {
             int pages;
-            break;
+            // break;
 
             pages = ram_find_and_save_block(rs, !migration_in_colo_state());
             /* no more blocks to sent */
@@ -3638,6 +3638,7 @@ static int ram_load(QEMUFile *f, void *opaque, int version_id)
 {
     int ret = 0;
     static uint64_t seq_iter;
+    // return 0;
     /*
      * If system is running in postcopy mode, page inserts to host memory must
      * be atomic
