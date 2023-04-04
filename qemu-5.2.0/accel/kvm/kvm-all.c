@@ -503,7 +503,10 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot, boo
     KVMState *s = kvm_state;
     struct kvm_userspace_memory_region mem;
     int ret;
- 
+    
+    // log that this function has been called : 
+    printf("[MEMLISTEN]kvm_set_user_memory_region called\n"); 
+
     mem.slot = slot->slot | (kml->as_id << 16);
     mem.guest_phys_addr = slot->start_addr;
     mem.userspace_addr = (unsigned long)slot->ram;

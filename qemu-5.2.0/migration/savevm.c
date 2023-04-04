@@ -3153,6 +3153,7 @@ int load_snapshot(const char *name, Error **errp)
     print_memory_region_tree(address_space_memory.root, 0);
     print_memory_region_tree(address_space_io.root, 0);
     ret = qemu_loadvm_state(f);
+    mtree_info(true, true, true, false);
     print_memory_region_tree(address_space_memory.root, 0);
     print_memory_region_tree(address_space_io.root, 0);
     // SaveStateEntry *se;
