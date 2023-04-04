@@ -1245,6 +1245,25 @@ void ram_block_dump(Monitor *mon)
     }
 }
 
+void ram_block_dump_hyperodf(void){
+    RAMBlock *block;
+    char *psize;
+    printf("==============RAM Block Dump================\n");
+    RCU_READ_LOCK_GUARD();
+    printf("%24s %8s  %18s %18s %18s\n",
+                   "Block Name", "PSize", "Offset", "Used", "Total");
+    RAMBLOCK_FOREACH(block) {
+        psize = size_to_str(block->page_size);
+        printf("%24s %8s  0x%" PRIx64 " 0x%" PRIx64
+                       " 0x%" PRIx64 "\n", block->idstr, psize,
+                       (uint64_t)block->offset,
+                       (uint64_t)block->used_length,
+                       (uint64_t)block->max_length);
+        g_free(psize);
+    }
+    return;
+}
+
 #ifdef __linux__
 /*
  * FIXME TOCTTOU: this iterates over memory backends' mem-path, which

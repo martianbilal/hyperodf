@@ -5599,6 +5599,7 @@ void qemu_init(int argc, char **argv, char **envp)
 
     accel_setup_post(current_machine);
     os_setup_post();
+    save_snapshot("newtest", NULL);
 
     return;
 }
@@ -5817,7 +5818,6 @@ void qemu_init_child(int argc, char **argv, char **envp)
             }
         }
     }
-
     if (userconfig) {
         if (qemu_read_default_config_file() < 0) {
             exit(1);

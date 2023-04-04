@@ -50,6 +50,7 @@
 #include "exec/memory.h"
 #include "exec/target_page.h"
 #include "exec/address-spaces.h"
+#include "exec/ramlist.h"
 
 #include "trace.h"
 #include "qemu/iov.h"
@@ -947,6 +948,12 @@ static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
     clock_gettime(CLOCK_REALTIME, &start);
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
+        if(strcmp("ram", se->idstr) == 0){
+            printf("ram load skipping\n");
+            return 0;
+        }
+
+
         ret = se->ops->load_state(f, se->opaque, se->load_version_id);
         // printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
         clock_gettime(CLOCK_REALTIME, &end);
@@ -3150,12 +3157,15 @@ int load_snapshot(const char *name, Error **errp)
     mis->from_src_file = f;
 
     aio_context_acquire(aio_context);
-    print_memory_region_tree(address_space_memory.root, 0);
-    print_memory_region_tree(address_space_io.root, 0);
+    // print_memory_region_tree(address_space_memory.root, 0);
+    // print_memory_region_tree(address_space_io.root, 0);
+    mtree_info(true, true, true, false);
+    ram_block_dump_hyperodf();
     ret = qemu_loadvm_state(f);
     mtree_info(true, true, true, false);
-    print_memory_region_tree(address_space_memory.root, 0);
-    print_memory_region_tree(address_space_io.root, 0);
+    ram_block_dump_hyperodf();
+    // print_memory_region_tree(address_space_memory.root, 0);
+    // print_memory_region_tree(address_space_io.root, 0);
     // SaveStateEntry *se;
     // QTAILQ_FOREACH(se, &savevm_state.handlers, entry){
     //     if(se->vmsd){
