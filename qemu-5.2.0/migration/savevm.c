@@ -49,6 +49,8 @@
 #include "sysemu/cpus.h"
 #include "exec/memory.h"
 #include "exec/target_page.h"
+#include "exec/address-spaces.h"
+
 #include "trace.h"
 #include "qemu/iov.h"
 #include "qemu/main-loop.h"
@@ -3055,6 +3057,17 @@ void qmp_xen_load_devices_state(const char *filename, Error **errp)
     }
     migration_incoming_state_destroy();
 }
+#define KiB (1024ULL)
+static void print_memory_region_tree(MemoryRegion *mr, int depth) {
+    printf("%*s%s (%s) size=%" PRId64 "KB addr=0x%" PRIx64 "\n", 
+            depth * 2, " ", mr->name, mr->ram_block ? "ROM" : "RAM",
+            mr->size / KiB, mr->addr);
+
+    MemoryRegion *sub_mr;
+    QTAILQ_FOREACH(sub_mr, &mr->subregions, subregions_link) {
+        print_memory_region_tree(sub_mr, depth + 1);
+    }
+}
 
 int load_snapshot(const char *name, Error **errp)
 {
@@ -3137,7 +3150,11 @@ int load_snapshot(const char *name, Error **errp)
     mis->from_src_file = f;
 
     aio_context_acquire(aio_context);
+    print_memory_region_tree(address_space_memory.root, 0);
+    print_memory_region_tree(address_space_io.root, 0);
     ret = qemu_loadvm_state(f);
+    print_memory_region_tree(address_space_memory.root, 0);
+    print_memory_region_tree(address_space_io.root, 0);
     // SaveStateEntry *se;
     // QTAILQ_FOREACH(se, &savevm_state.handlers, entry){
     //     if(se->vmsd){
