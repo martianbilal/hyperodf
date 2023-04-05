@@ -948,10 +948,10 @@ static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
     clock_gettime(CLOCK_REALTIME, &start);
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
-        if(strcmp("ram", se->idstr) == 0){
-            printf("ram load skipping\n");
-            return 0;
-        }
+        // if(strcmp("ram", se->idstr) == 0){
+        //     printf("ram load skipping\n");
+        //     return 0;
+        // }
 
 
         ret = se->ops->load_state(f, se->opaque, se->load_version_id);

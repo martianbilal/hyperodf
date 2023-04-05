@@ -31,6 +31,7 @@
 #include "qemu/thread.h"
 #include "qemu/event_notifier.h"
 #include "qemu/plugin.h"
+#include "qemu/typedefs.h"
 #include "qom/object.h"
 
 typedef int (*WriteCoreDumpFunction)(const void *buf, size_t size,
@@ -455,6 +456,7 @@ struct CPUState {
 #endif
     
     EventNotifier fork_event; 
+    EventNotifier save_event;
     EventNotifier load_event;
     
     /* TODO Move common fields from CPUArchState here. */

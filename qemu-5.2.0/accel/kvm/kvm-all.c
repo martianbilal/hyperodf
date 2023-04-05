@@ -3425,6 +3425,9 @@ int kvm_cpu_exec(CPUState *cpu)
                     ret = 0; 
                     break;
                 }
+                printf("[Debug] we are setting the load_snapshot event! \n");
+                // event_notifier_test_and_clear(&(cpu->save_event));
+                // event_notifier_set(&(cpu->save_event));
                 DEBUG_PRINTF("[DEBUG] parent dump\n");
                 debug_maps_dump();
                 // [TEST] [VERIFY] 

@@ -3527,6 +3527,39 @@ static void qemu_pre_load_snapshot_setup(void){
 }
 #define BILLION  1000000000L;
 
+void handle_save_snapshot(void *opaque){
+    CPUState *cpu = (CPUState*)opaque; 
+    struct KVMState* s = cpu->kvm_state;
+    int result; 
+    struct timespec start, stop;
+    double accum;
+
+    printf("[Debug] handle_save_snapshot is called! \n");
+    if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
+    {
+        perror( "clock gettime" );
+        return EXIT_FAILURE;
+    }
+
+    // vm_stop(RUN_STATE_SAVE_VM);
+    result = event_notifier_test_and_clear(&(cpu->save_event));
+    if(result == 1 ) {
+        printf("[Debug] Save_snapshot event;\n");
+        if(save_snapshot("newtest", NULL) == 0){
+            vm_start();
+        }
+    }
+    if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
+    {
+        perror( "clock gettime" );
+        return EXIT_FAILURE;
+    }
+    accum = ( stop.tv_sec - start.tv_sec )
+        + (double)( stop.tv_nsec - start.tv_nsec )
+        / (double)BILLION;
+    printf( "save_snapshot took %.5lf seconds\n", accum );
+}
+
 void handle_load_snapshot(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
     struct KVMState* s = cpu->kvm_state;
@@ -5574,9 +5607,15 @@ void qemu_init(int argc, char **argv, char **envp)
     if(result < 0) {
         printf("Failed to init notifier\n");
     }
+    
     result = event_notifier_init(&(cpu->load_event), 0); 
     if(result < 0) {
         printf("Failed to init notifier\n");
+    }
+
+    result = event_notifier_init(&(cpu->save_event), 0); 
+    if(result < 0) {
+        printf("Failed to init notifier[save_event]\n");
     }
 
     printf("Event RFD : %d\n", cpu->fork_event.rfd);
@@ -5596,10 +5635,12 @@ void qemu_init(int argc, char **argv, char **envp)
     // printf("success :: make the pipe system call \n");
     qemu_set_fd_handler(cpu->fork_event.rfd, handle_fork, NULL, cpu);
     qemu_set_fd_handler(cpu->load_event.rfd, handle_load_snapshot, NULL, cpu);
+    qemu_set_fd_handler(cpu->save_event.rfd, handle_save_snapshot, NULL, cpu);
 
     accel_setup_post(current_machine);
     os_setup_post();
     save_snapshot("newtest", NULL);
+    load_snapshot("newtest", NULL);
 
     return;
 }
