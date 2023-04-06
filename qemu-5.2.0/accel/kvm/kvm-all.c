@@ -3425,9 +3425,16 @@ int kvm_cpu_exec(CPUState *cpu)
                     ret = 0; 
                     break;
                 }
-                printf("[Debug] we are setting the load_snapshot event! \n");
+                // vm_stop(RUN_STATE_SAVE_VM);
+
+                printf("[Debug] we are setting the save_snapshot event! \n");
                 // event_notifier_test_and_clear(&(cpu->save_event));
                 // event_notifier_set(&(cpu->save_event));
+                qemu_mutex_lock_iothread();
+                save_snapshot("newtest", NULL);
+                qemu_mutex_unlock_iothread();
+                save_snapshot_event = 1;
+                // vm_start();
                 DEBUG_PRINTF("[DEBUG] parent dump\n");
                 debug_maps_dump();
                 // [TEST] [VERIFY] 

@@ -86,6 +86,7 @@
 #include "qemu/config-file.h"
 #include "qemu-options.h"
 #include "qemu/main-loop.h"
+#include <stdbool.h>
 #ifdef CONFIG_VIRTFS
 #include "fsdev/qemu-fsdev.h"
 #endif
@@ -121,6 +122,7 @@
 #include "qemu/guest-random.h"
 #include "block/qcow2.h"
 #include <signal.h>
+#include "util/forkall-coop.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 // #define DBG
@@ -1745,7 +1747,7 @@ static bool main_loop_should_exit(void)
     if (qemu_powerdown_requested()) {
         qemu_system_powerdown();
     }
-    if (qemu_vmstop_requested(&r)) {
+    if (qemu_vmstop_requested(&r) && !save_snapshot_event) {
         vm_stop(r);
     }
     return false;
@@ -1754,9 +1756,10 @@ static bool main_loop_should_exit(void)
 void qemu_main_loop(void)
 {
 #ifdef CONFIG_PROFILER
-    int64_t ti;
+    int64_t ti;1
 #endif
     while (!main_loop_should_exit()) {
+    // while (true) {
 #ifdef CONFIG_PROFILER
         ti = profile_getclock();
 #endif
@@ -3541,7 +3544,7 @@ void handle_save_snapshot(void *opaque){
         return EXIT_FAILURE;
     }
 
-    // vm_stop(RUN_STATE_SAVE_VM);
+    vm_stop(RUN_STATE_SAVE_VM);
     result = event_notifier_test_and_clear(&(cpu->save_event));
     if(result == 1 ) {
         printf("[Debug] Save_snapshot event;\n");
@@ -5639,8 +5642,8 @@ void qemu_init(int argc, char **argv, char **envp)
 
     accel_setup_post(current_machine);
     os_setup_post();
-    save_snapshot("newtest", NULL);
-    load_snapshot("newtest", NULL);
+    // save_snapshot("newtest", NULL);
+    // load_snapshot("newtest", NULL);
 
     return;
 }

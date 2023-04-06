@@ -28,6 +28,8 @@ int ski_forkall_round = 0;
 int ski_forkall_hypercall_done = 0;
 int ski_forkall_thread_pool_ready_fork = 0; 
 
+int save_snapshot_event = 1;
+
 
 #pragma GCC push_options
 #pragma GCC optimize 0
