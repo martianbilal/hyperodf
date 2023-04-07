@@ -1747,7 +1747,8 @@ static bool main_loop_should_exit(void)
     if (qemu_powerdown_requested()) {
         qemu_system_powerdown();
     }
-    if (qemu_vmstop_requested(&r) && !save_snapshot_event) {
+    // if (qemu_vmstop_requested(&r) && !save_snapshot_event) {
+    if (qemu_vmstop_requested(&r)) {
         vm_stop(r);
     }
     return false;
@@ -3544,7 +3545,6 @@ void handle_save_snapshot(void *opaque){
         return EXIT_FAILURE;
     }
 
-    vm_stop(RUN_STATE_SAVE_VM);
     result = event_notifier_test_and_clear(&(cpu->save_event));
     if(result == 1 ) {
         printf("[Debug] Save_snapshot event;\n");
@@ -3582,6 +3582,7 @@ void handle_load_snapshot(void *opaque){
     if(result == 1 ) {
         printf("[Debug] Load_snapshot event;\n");
         if(load_snapshot("newtest", NULL) == 0){
+            save_snapshot_event = 0;
             vm_start();
         }
     }
@@ -5642,7 +5643,7 @@ void qemu_init(int argc, char **argv, char **envp)
 
     accel_setup_post(current_machine);
     os_setup_post();
-    // save_snapshot("newtest", NULL);
+    save_snapshot("newtest", NULL);
     // load_snapshot("newtest", NULL);
 
     return;

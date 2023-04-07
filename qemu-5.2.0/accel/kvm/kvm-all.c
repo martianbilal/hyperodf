@@ -3315,7 +3315,9 @@ int kvm_cpu_exec(CPUState *cpu)
         }
         #endif
 
-
+        // if(save_snapshot_event){
+        //     goto fork_from_here;
+        // }
         // printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
         
@@ -3416,6 +3418,17 @@ int kvm_cpu_exec(CPUState *cpu)
                 #ifndef DBG_MEASURE
                 printf("Received the call for fork\n");
                 #endif
+                save_snapshot_event = 1;
+                // vm_stop(RUN_STATE_SAVE_VM);
+                // printf("[Debug] we are setting the save_snapshot event! \n");
+                // event_notifier_test_and_clear(&(cpu->save_event));
+                // event_notifier_set(&(cpu->save_event));
+                // qemu_mutex_lock_iothread();
+                // save_snapshot("newtest", NULL);
+                // qemu_mutex_unlock_iothread();
+                // break;
+                // vm_start();
+            // fork_from_here:
 
                 do {
                     ret = ioctl(cpu->kvm_fd , KVM_DEBUG, NULL);
@@ -3427,14 +3440,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 }
                 // vm_stop(RUN_STATE_SAVE_VM);
 
-                printf("[Debug] we are setting the save_snapshot event! \n");
-                // event_notifier_test_and_clear(&(cpu->save_event));
-                // event_notifier_set(&(cpu->save_event));
-                qemu_mutex_lock_iothread();
-                save_snapshot("newtest", NULL);
-                qemu_mutex_unlock_iothread();
-                save_snapshot_event = 1;
-                // vm_start();
+                
                 DEBUG_PRINTF("[DEBUG] parent dump\n");
                 debug_maps_dump();
                 // [TEST] [VERIFY] 
@@ -3595,6 +3601,7 @@ int kvm_cpu_exec(CPUState *cpu)
                         break;
                     }
                     sleep(0);
+                    // break;
 
                 }
                 break;

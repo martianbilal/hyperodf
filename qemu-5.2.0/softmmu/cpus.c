@@ -43,6 +43,7 @@
 #include "sysemu/cpu-timers.h"
 #include "hw/boards.h"
 #include "hw/hw.h"
+#include "util/forkall-coop.h"
 
 #ifdef CONFIG_LINUX
 
@@ -247,7 +248,7 @@ void cpu_interrupt(CPUState *cpu, int mask)
 static int do_vm_stop(RunState state, bool send_stop)
 {
     int ret = 0;
-
+    
     if (runstate_is_running()) {
         runstate_set(state);
         cpu_disable_ticks();

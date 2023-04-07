@@ -67,6 +67,7 @@
 #include "migration/colo.h"
 #include "qemu/bitmap.h"
 #include "net/announce.h"
+#include "util/forkall-coop.h"
 #include <string.h>
 #include <time.h>
 
@@ -2905,6 +2906,7 @@ int save_snapshot(const char *name, Error **errp)
     }
     vm_stop(RUN_STATE_SAVE_VM);
 
+
     bdrv_drain_all_begin();
 
     aio_context_acquire(aio_context);
@@ -3159,11 +3161,11 @@ int load_snapshot(const char *name, Error **errp)
     aio_context_acquire(aio_context);
     // print_memory_region_tree(address_space_memory.root, 0);
     // print_memory_region_tree(address_space_io.root, 0);
-    mtree_info(true, true, true, false);
-    ram_block_dump_hyperodf();
+    // mtree_info(true, true, true, false);
+    // ram_block_dump_hyperodf();
     ret = qemu_loadvm_state(f);
-    mtree_info(true, true, true, false);
-    ram_block_dump_hyperodf();
+    // mtree_info(true, true, true, false);
+    // ram_block_dump_hyperodf();
     // print_memory_region_tree(address_space_memory.root, 0);
     // print_memory_region_tree(address_space_io.root, 0);
     // SaveStateEntry *se;
