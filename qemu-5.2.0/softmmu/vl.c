@@ -3530,6 +3530,7 @@ static void qemu_pre_load_snapshot_setup(void){
     return;
 }
 #define BILLION  1000000000L;
+static int save_snapshot_now = 1;
 
 void handle_save_snapshot(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
@@ -3538,6 +3539,11 @@ void handle_save_snapshot(void *opaque){
     struct timespec start, stop;
     double accum;
 
+    if(save_snapshot_now != 1){
+        return;
+    } else {
+        save_snapshot_now = 0;
+    }
     printf("[Debug] handle_save_snapshot is called! \n");
     if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
     {
@@ -5643,7 +5649,7 @@ void qemu_init(int argc, char **argv, char **envp)
 
     accel_setup_post(current_machine);
     os_setup_post();
-    save_snapshot("newtest", NULL);
+    // save_snapshot("newtest", NULL);
     // load_snapshot("newtest", NULL);
 
     return;

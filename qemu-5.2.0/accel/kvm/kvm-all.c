@@ -505,7 +505,7 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot, boo
     int ret;
     
     // log that this function has been called : 
-    printf("[MEMLISTEN]kvm_set_user_memory_region called\n"); 
+    // printf("[MEMLISTEN]kvm_set_user_memory_region called\n"); 
 
     mem.slot = slot->slot | (kml->as_id << 16);
     mem.guest_phys_addr = slot->start_addr;
@@ -3236,7 +3236,7 @@ int kvm_cpu_exec(CPUState *cpu)
     struct QDict *bs_opts;
     int result; 
     DPRINTF("kvm_cpu_exec()\n");
-
+    int i = 0;
 
 
     
@@ -3320,6 +3320,8 @@ int kvm_cpu_exec(CPUState *cpu)
         // }
         // printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        i = i + 1;
+        
         
 
         attrs = kvm_arch_post_run(cpu, run);
@@ -3354,6 +3356,24 @@ int kvm_cpu_exec(CPUState *cpu)
             ret = -1;
             break;
         }
+        // printf("KVM_RUN returned with i : %d\n", i);
+        if(i == 140000){
+            // qemu_mutex_lock_iothread();
+            // save_snapshot("newtest", NULL);
+            // qemu_mutex_unlock_iothread();
+            event_notifier_test_and_clear(&(cpu->save_event));
+            event_notifier_set(&(cpu->save_event));
+            i = i + 1;
+        }
+        // if(i == 140002){
+        //     // qemu_mutex_lock_iothread();
+        //     // save_snapshot("newtest", NULL);
+        //     // qemu_mutex_unlock_iothread();
+        //     event_notifier_test_and_clear(&(cpu->load_event));
+        //     event_notifier_set(&(cpu->load_event));
+
+        //     i = i + 1;
+        // }
 
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
         switch (run->exit_reason) {
@@ -3411,7 +3431,8 @@ int kvm_cpu_exec(CPUState *cpu)
             }
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
-                
+                // [TEMP]
+                break;
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 
