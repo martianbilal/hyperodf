@@ -30,6 +30,9 @@ int ski_forkall_thread_pool_ready_fork = 0;
 
 int save_snapshot_event = 0;
 
+int snapshot_in_progress = 0;
+int sanpshot_complete = 0;
+
 
 #pragma GCC push_options
 #pragma GCC optimize 0

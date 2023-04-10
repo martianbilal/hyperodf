@@ -3319,6 +3319,12 @@ int kvm_cpu_exec(CPUState *cpu)
         //     goto fork_from_here;
         // }
         // printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
+        // skip KVM_RUN if we have received the hypercall but we have not completed the 
+        // save_snapshot function.. if we are done with the save_snapshot function then
+        // we can call the KVM_RUN again
+        // if(!save_snapshot_event){
+        //     run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        // }
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
         i = i + 1;
         
@@ -3357,12 +3363,14 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         }
         // printf("KVM_RUN returned with i : %d\n", i);
-        if(i == 140000){
+        if(i == 141000){
             // qemu_mutex_lock_iothread();
             // save_snapshot("newtest", NULL);
             // qemu_mutex_unlock_iothread();
+            // vm_stop(RUN_STATE_PAUSED);
             event_notifier_test_and_clear(&(cpu->save_event));
             event_notifier_set(&(cpu->save_event));
+            // vm_start();
             i = i + 1;
         }
         // if(i == 140002){
@@ -3432,7 +3440,7 @@ int kvm_cpu_exec(CPUState *cpu)
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
                 // [TEMP]
-                break;
+                // break;
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 
