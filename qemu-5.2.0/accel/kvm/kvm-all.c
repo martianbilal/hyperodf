@@ -3363,21 +3363,22 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         }
         // printf("KVM_RUN returned with i : %d\n", i);
-        if(i == 120000){
-            // qemu_mutex_lock_iothread();
-            // save_snapshot("newtest", NULL);
-            // qemu_mutex_unlock_iothread();
-            // vm_stop(RUN_STATE_PAUSED);
-            event_notifier_test_and_clear(&(cpu->save_event));
-            event_notifier_set(&(cpu->save_event));
-            printf("pid of the parent process  : %d", getpid());
-            // while(snapshot_in_progress){
-            //     // printf("Waiting for the snapshot to complete\n");
-            //     sleep(0);
-            // }
-            // vm_start();
-            i = i + 1;
-        }
+        // if(i == 120000){
+        //     // qemu_mutex_lock_iothread();
+        //     // save_snapshot("newtest", NULL);
+        //     // qemu_mutex_unlock_iothread();
+        //     // vm_start();
+        //     // vm_stop(RUN_STATE_PAUSED);
+        //     event_notifier_test_and_clear(&(cpu->save_event));
+        //     event_notifier_set(&(cpu->save_event));
+        //     printf("pid of the parent process  : %d", getpid());
+        //     // while(snapshot_in_progress){
+        //     //     // printf("Waiting for the snapshot to complete\n");
+        //     //     sleep(0);
+        //     // }
+        //     // vm_start();
+        //     i = i + 1;
+        // }
         // if(i == 120000){
         //     // qemu_mutex_lock_iothread();
         //     // save_snapshot("newtest", NULL);
@@ -3443,6 +3444,14 @@ int kvm_cpu_exec(CPUState *cpu)
                     break;
             }
             if(run->io.port == 0x301 &&
+                *(((char *)run) + run->io.data_offset) == 'd'){
+                
+                event_notifier_test_and_clear(&(cpu->save_event));
+                event_notifier_set(&(cpu->save_event));
+
+                break;
+            }
+            if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
                 // [TEMP]
                 // qemu_mutex_lock_iothread();
@@ -3462,6 +3471,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // printf("[Debug] we are setting the save_snapshot event! \n");
                 // event_notifier_test_and_clear(&(cpu->save_event));
                 // event_notifier_set(&(cpu->save_event));
+                // break;
                 // qemu_mutex_lock_iothread();
                 // save_snapshot("newtest", NULL);
                 // qemu_mutex_unlock_iothread();

@@ -3539,11 +3539,11 @@ void handle_save_snapshot(void *opaque){
     struct timespec start, stop;
     double accum;
 
-    if(save_snapshot_now != 1){
-        return;
-    } else {
-        save_snapshot_now = 0;
-    }
+    // if(save_snapshot_now != 1){
+    //     return;
+    // } else {
+    //     save_snapshot_now = 0;
+    // }
     printf("[Debug] handle_save_snapshot is called! \n");
     if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
     {
