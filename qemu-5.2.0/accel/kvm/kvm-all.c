@@ -3363,17 +3363,22 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         }
         // printf("KVM_RUN returned with i : %d\n", i);
-        if(i == 141000){
+        if(i == 120000){
             // qemu_mutex_lock_iothread();
             // save_snapshot("newtest", NULL);
             // qemu_mutex_unlock_iothread();
             // vm_stop(RUN_STATE_PAUSED);
             event_notifier_test_and_clear(&(cpu->save_event));
             event_notifier_set(&(cpu->save_event));
+            printf("pid of the parent process  : %d", getpid());
+            // while(snapshot_in_progress){
+            //     // printf("Waiting for the snapshot to complete\n");
+            //     sleep(0);
+            // }
             // vm_start();
             i = i + 1;
         }
-        // if(i == 140002){
+        // if(i == 120000){
         //     // qemu_mutex_lock_iothread();
         //     // save_snapshot("newtest", NULL);
         //     // qemu_mutex_unlock_iothread();
@@ -3440,7 +3445,12 @@ int kvm_cpu_exec(CPUState *cpu)
             if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
                 // [TEMP]
+                // qemu_mutex_lock_iothread();
+                // save_snapshot("newtest", NULL);
+                // load_snapshot("newtest", NULL);
+                // qemu_mutex_unlock_iothread();
                 // break;
+
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 
@@ -3537,6 +3547,8 @@ int kvm_cpu_exec(CPUState *cpu)
                     ski_forkall_slave(&did_fork, &is_child);
                     if(did_fork){
                         cpu->forked = true;
+                        printf("pid of the child process  : %d", getpid());
+                        
                         // [Bilal] [Measure] clock time when cpu thread is restored
                         if( clock_gettime( CLOCK_REALTIME, &(cpu->cpu_thread_forked)) == -1 ) {
                             perror( "clock gettime" );

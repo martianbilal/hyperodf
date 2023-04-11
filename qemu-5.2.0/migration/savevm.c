@@ -943,6 +943,12 @@ static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
 
     //     return 0;
     // }
+
+    // // skip loading the ioapic device
+    // if(strcmp("0000:00:00.0/I440FX", se->idstr) == 0){
+    //     printf("0000:00:00.0/I440FX load skipping\n");
+    //     return 0;
+    // }
     struct timespec start, end;
     double time_taken;
 
@@ -1442,10 +1448,10 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
         // [important : this is the one taking most amount of time]
         // [note] [Bilal] this skip brings the time to 70ms
         printf("[precopy_iter]Saving %s\n", se->idstr);
-        // if(strcmp(se->idstr, "ram") == 0){
-        //     printf("[skip] ram in precopy iter\n");
-        //     continue;
-        // }
+        if(strcmp(se->idstr, "ram") == 0){
+            printf("[skip] ram in precopy iter\n");
+            continue;
+        }
         trace_savevm_section_start(se->idstr, se->section_id);
 
         save_section_header(f, se, QEMU_VM_SECTION_END);
