@@ -519,6 +519,16 @@ void cpu_thread_signal_destroyed(CPUState *cpu)
 }
 
 
+static bool pause_vcpu(void){
+    CPUState *cpu;
+
+    CPU_FOREACH(cpu) {
+        cpu->stopped = true;
+    }
+
+    return true;
+}
+
 static bool all_vcpus_paused(void)
 {
     CPUState *cpu;
@@ -551,11 +561,15 @@ void pause_all_vcpus(void)
      */
     replay_mutex_unlock();
 
+    // while (!all_vcpus_paused()) {
+    //     qemu_cond_wait(&qemu_pause_cond, &qemu_global_mutex);
+    //     CPU_FOREACH(cpu) {
+    //         qemu_cpu_kick(cpu);
+    //     }
+    // }
+
     while (!all_vcpus_paused()) {
-        qemu_cond_wait(&qemu_pause_cond, &qemu_global_mutex);
-        CPU_FOREACH(cpu) {
-            qemu_cpu_kick(cpu);
-        }
+        pause_vcpu();
     }
 
     qemu_mutex_unlock_iothread();

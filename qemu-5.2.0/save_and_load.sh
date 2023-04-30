@@ -29,13 +29,16 @@ spawn ./run.sh
 expect "syzkaller login: "
 send "root\r"
 
-
 expect "root@syzkaller:~# "
 send "gcc -o example ./save.c\r"
 
 # sleep 10
 expect "root@syzkaller:~# "
+send "hostname -I\r"
+
+expect "root@syzkaller:~# "
 send "./example\r"
+
 
 
 expect "root@syzkaller:~# "
@@ -45,8 +48,14 @@ send "gcc -o example ./example.c\r"
 expect "root@syzkaller:~# "
 send "./example\r"
 
+interact "proceed" {puts "User interaction completed."; break}
+
 
 expect "root@syzkaller:~# "
+send "ls\r"
+expect "root@syzkaller:~# "
+send "hostname -I\r"
+interact "proceed" {puts "User interaction completed."; break}
 expect "root@syzkaller:~# "
 expect "root@syzkaller:~# "
 expect "root@syzkaller:~# "
