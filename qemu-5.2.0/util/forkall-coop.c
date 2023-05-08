@@ -23,6 +23,13 @@ static int global_thread_seq = 0;
 // this is for aio thread pool
 static int thread_pool_read = 0; 
 
+
+// global variable for checking if cpu has processed the queued work
+// in vcpu thread and we can invocate VCPU event now
+int queued_work_complete = 0;
+
+int entering_after_save_snap = 0;
+
 int ski_forkall_enabled = 0;
 int ski_forkall_round = 0;
 int ski_forkall_hypercall_done = 0;

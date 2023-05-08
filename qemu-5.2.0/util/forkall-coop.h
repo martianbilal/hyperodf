@@ -59,6 +59,9 @@
 extern int ski_forkall_enabled;
 extern int ski_forkall_round;
 
+extern int queued_work_complete;
+extern int entering_after_save_snap;
+
 
 // to let everyone know that VMFORK has raised the save_snapshot event
 extern int save_snapshot_event;

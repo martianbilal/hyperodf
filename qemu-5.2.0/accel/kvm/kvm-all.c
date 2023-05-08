@@ -3239,7 +3239,11 @@ int kvm_cpu_exec(CPUState *cpu)
     int i = 0;
 
 
-    
+    if(entering_after_save_snap){
+        entering_after_save_snap = 0;
+        queued_work_complete = 1;
+        goto resume_after_save;
+    }
     
 
 
@@ -3466,11 +3470,17 @@ int kvm_cpu_exec(CPUState *cpu)
                 #ifndef DBG_MEASURE
                 printf("Received the call for fork\n");
                 #endif
+                
                 save_snapshot_event = 1;
                 // vm_stop(RUN_STATE_SAVE_VM);
                 printf("[Debug] we are setting the save_snapshot event! \n");
                 event_notifier_test_and_clear(&(cpu->save_event));
                 event_notifier_set(&(cpu->save_event));
+                if(!queued_work_complete){
+                    goto end_loop; 
+                    // break;
+                }
+                resume_after_save:
                 // break;
                 // qemu_mutex_lock_iothread();
                 // save_snapshot("newtest", NULL);
