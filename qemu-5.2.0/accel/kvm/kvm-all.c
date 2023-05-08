@@ -3421,7 +3421,7 @@ int kvm_cpu_exec(CPUState *cpu)
             // fflush(stdout);
             //use this to print a charachter
             if(run->io.port == 0x300){
-              printf("%c", *(((char *)run) + run->io.data_offset));
+                printf("%c", *(((char *)run) + run->io.data_offset));
             }
             if(run->io.port == 0x300 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
