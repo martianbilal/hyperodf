@@ -3555,7 +3555,7 @@ void handle_save_snapshot(void *opaque){
     if(result == 1 ) {
         printf("[Debug] Save_snapshot event;\n");
         if(save_snapshot("newtest", NULL) == 0){
-            entering_after_save_snap = 0;
+            entering_after_save_snap = 1;
             vm_start();
         }
     }

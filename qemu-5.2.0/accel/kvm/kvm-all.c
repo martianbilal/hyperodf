@@ -4158,6 +4158,9 @@ end_loop:
     }
 
     qatomic_set(&cpu->exit_request, 0);
+    // print that the function is ending with some metadata
+    printf("[%s:%d] Ending kvm_cpu_exec\n", __func__, __LINE__);
+    printf("[%s:%d] cpu->exit_request: %d\n", __func__, __LINE__, cpu->exit_request);
     return ret;
 }
 
