@@ -3239,11 +3239,7 @@ int kvm_cpu_exec(CPUState *cpu)
     int i = 0;
 
 
-    if(entering_after_save_snap){
-        entering_after_save_snap = 0;
-        queued_work_complete = 1;
-        goto resume_after_save;
-    }
+    
     
 
 
@@ -3262,6 +3258,12 @@ int kvm_cpu_exec(CPUState *cpu)
 
     qemu_mutex_unlock_iothread();
     cpu_exec_start(cpu);
+    if(entering_after_save_snap){
+        entering_after_save_snap = 0;
+        queued_work_complete = 1;
+        printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+        goto resume_after_save;
+    }
 
     do {
         MemTxAttrs attrs;
@@ -3477,6 +3479,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 event_notifier_test_and_clear(&(cpu->save_event));
                 event_notifier_set(&(cpu->save_event));
                 if(!queued_work_complete){
+                    printf("[%s:%d] we are waiting for the queued work to complete! \n", __func__, __LINE__);
                     goto end_loop; 
                     // break;
                 }
@@ -3539,9 +3542,12 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 // [DEBUG] [BILAL] Adding this to test if the disk snapshot can be 
                 // reloaded in the child VM
+                printf("[%s:%d] sending the fork event\n", __func__, __LINE__);
+                int cleared_result = event_notifier_test_and_clear(&(cpu->fork_event));
+                int res = event_notifier_set(&(cpu->fork_event));
+                printf("[%s:%d] result of clearing the fork event : %d\n", __func__, __LINE__, cleared_result);
+                printf("[%s:%d] result of setting the fork event : %d\n", __func__, __LINE__, res);
 
-                event_notifier_test_and_clear(&(cpu->fork_event));
-                event_notifier_set(&(cpu->fork_event));
                 // qemu_mutex_lock_iothread();
                 // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 

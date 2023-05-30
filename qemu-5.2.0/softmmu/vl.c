@@ -3625,6 +3625,8 @@ void handle_fork(void *opaque){
     printf("We are reading for the fork\n");
     #endif
 
+    printf("[%s:%d] handling the fork event\n", __func__, __LINE__);
+
     result = event_notifier_test_and_clear(&(cpu->fork_event));
 
     #ifdef DBG

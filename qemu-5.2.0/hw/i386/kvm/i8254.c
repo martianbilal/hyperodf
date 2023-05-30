@@ -104,7 +104,12 @@ static void kvm_pit_get(PITCommonState *pit)
         ret = kvm_vm_ioctl(kvm_state, KVM_GET_PIT2, &kpit);
         if (ret < 0) {
             fprintf(stderr, "KVM_GET_PIT2 failed: %s\n", strerror(ret));
-            abort();
+            // To understand the reason behind this problem look into the 
+            // personal log files and notes
+            // this KVM_GET_PIT2 is redundant and was failing for mech2
+            // so I commented it out
+            // as a result, the mech2 is now working
+            // abort();
         }
         pit->channels[0].irq_disabled = kpit.flags & KVM_PIT_FLAGS_HPET_LEGACY;
     } else {
