@@ -40,6 +40,14 @@ send "./example\r"
 
 
 expect "root@syzkaller:~# "
+send "ls\r"
+
+expect "root@syzkaller:~# "
+send "exit\r"
+
+
+
+expect "root@syzkaller:~# "
 expect "root@syzkaller:~# "
 expect "root@syzkaller:~# "
 expect "root@syzkaller:~# "
