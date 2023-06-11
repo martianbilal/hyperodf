@@ -3938,7 +3938,7 @@ void handle_fork(void *opaque){
             // qemu_cleanup();
             // load_snapshot("newtest", NULL);
             // dump_cpu_state(cpu, "pre-fork.dat");
-            vm_start();
+            // vm_start();
             // load_snapshot("newtest", NULL);
 
             // exit(0);

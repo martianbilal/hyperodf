@@ -3258,12 +3258,12 @@ int kvm_cpu_exec(CPUState *cpu)
 
     qemu_mutex_unlock_iothread();
     cpu_exec_start(cpu);
-    if(entering_after_save_snap){
-        entering_after_save_snap = 0;
-        queued_work_complete = 1;
-        printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
-        goto resume_after_save;
-    }
+    // if(entering_after_save_snap){
+    //     entering_after_save_snap = 0;
+    //     queued_work_complete = 1;
+    //     printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+    //     goto resume_after_save;
+    // }
 
     do {
         MemTxAttrs attrs;
@@ -3331,9 +3331,17 @@ int kvm_cpu_exec(CPUState *cpu)
         // if(!save_snapshot_event){
         //     run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
         // }
+        if(entering_after_save_snap){
+        entering_after_save_snap = 0;
+        queued_work_complete = 1;
+        printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+        goto testing_resume;
+        // goto resume_after_save;
+    }
+
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
         i = i + 1;
-        
+    testing_resume:
         
 
         attrs = kvm_arch_post_run(cpu, run);
