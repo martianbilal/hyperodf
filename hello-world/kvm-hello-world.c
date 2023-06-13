@@ -358,6 +358,12 @@ struct fork_info {
 	int vcpu_fd;
 };
 
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
 void fork_child_with_ioctl(struct fork_info *info, int sys_fd){
 	struct vm vm;
 	struct vcpu vcpu;
@@ -784,6 +790,7 @@ int main(int argc, char **argv)
 	struct vm parent_vm;
 	struct vcpu vcpu;
 	struct vcpu parent_vcpu;
+	struct odf_info o_info;
 	// clock_t start_clk;
 
 	enum {
@@ -838,8 +845,13 @@ int main(int argc, char **argv)
 	// start_clk = clock();
 	vcpu_init(&parent_vm, &parent_vcpu);
 	// printf("\nTime for vcpu init (parent) %lg \n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
-	
+	#define KVM_EPT_ODF 0xC00CAEC7
 	// child_vcpu_init(&parent_vcpu, &vm, &vcpu);
+	o_info.child_vcpu_fd = parent_vcpu.fd;
+	o_info.parent_vcpu_fd = parent_vcpu.fd;
+	o_info.mem_size = 0x200000;
+	ioctl(parent_vm.sys_fd, KVM_EPT_ODF, &o_info);
+
 
 	switch (mode) {
 	case REAL_MODE:

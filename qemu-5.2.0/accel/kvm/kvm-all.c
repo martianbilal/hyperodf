@@ -3331,21 +3331,22 @@ int kvm_cpu_exec(CPUState *cpu)
         // if(!save_snapshot_event){
         //     run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
         // }
-        if(entering_after_save_snap){
-        entering_after_save_snap = 0;
-        queued_work_complete = 1;
-        printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
-        goto testing_resume;
-        // goto resume_after_save;
-    }
+    //     if(entering_after_save_snap){
+    //     entering_after_save_snap = 1;
+    //     queued_work_complete = 1;
+    //     printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+    //     // goto testing_resume;
+    //     goto resume_after_save;
+    // }
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
         i = i + 1;
     testing_resume:
-        
+    
+    
 
         attrs = kvm_arch_post_run(cpu, run);
-
+    
 #ifdef KVM_HAVE_MCE_INJECTION
         if (unlikely(have_sigbus_pending)) {
             qemu_mutex_lock_iothread();
@@ -3361,6 +3362,14 @@ int kvm_cpu_exec(CPUState *cpu)
                 DPRINTF("io window exit\n");
                 kvm_eat_signals(cpu);
                 ret = EXCP_INTERRUPT;
+                if(entering_after_save_snap){
+                    entering_after_save_snap = 0;
+                    queued_work_complete = 1;
+                    printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+                    // goto testing_resume;
+                    ret = 0;
+                    goto resume_after_save;
+                }
                 break;
             }
             fprintf(stderr, "error: kvm run failed %d  %s\n", run_ret,
@@ -3376,6 +3385,13 @@ int kvm_cpu_exec(CPUState *cpu)
             ret = -1;
             break;
         }
+    //     if(entering_after_save_snap){
+    //     entering_after_save_snap = 0;
+    //     queued_work_complete = 1;
+    //     printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+    //     // goto testing_resume;
+    //     goto resume_after_save;
+    // }
         // printf("KVM_RUN returned with i : %d\n", i);
         // if(i == 120000){
         //     // qemu_mutex_lock_iothread();
@@ -3402,7 +3418,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
         //     i = i + 1;
         // }
-
+        
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
         switch (run->exit_reason) {
         case KVM_EXIT_HLT:

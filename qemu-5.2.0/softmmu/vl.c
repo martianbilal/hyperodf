@@ -3934,7 +3934,10 @@ void handle_fork(void *opaque){
             // load_snapshot("newtest", NULL);
             return; 
         } else {
-            waitpid(ret, &status, 0);
+            // waitpid(ret, &status, 0);
+            // wait(1);
+            // wait for 1 second
+            sleep(1);
             // qemu_cleanup();
             // load_snapshot("newtest", NULL);
             // dump_cpu_state(cpu, "pre-fork.dat");
