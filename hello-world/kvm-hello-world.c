@@ -11,6 +11,10 @@
 #include <time.h>
 #include <sys/wait.h>
 
+// my ioctl ids 
+#define KVM_EPT_ODF 0xC00CAEC7
+
+
 
 /* CR0 bits */
 #define CR0_PE 1u
@@ -73,6 +77,21 @@ struct vm {
 	int fd;
 	char *mem;
 };
+
+
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
+
+
+int PARENT_VCPU_FD = 0; 
+int CHILD_VCPU_FD = 0;
+int PARENT_VM_FD = 0;
+int CHILD_VM_FD = 0;
+
 
 void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 	int api_ver; 
@@ -263,7 +282,14 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	struct kvm_regs regs;
 	uint64_t memval = 0;
 	int r = 0;
+	struct odf_info o_info;
 	printf("vm----\n");
+	o_info.child_vcpu_fd = vcpu->fd;
+	o_info.parent_vcpu_fd = PARENT_VCPU_FD;
+	o_info.mem_size = 0x200000;
+	printf("PID of the process : %d\n", getpid());
+	ioctl(vm->sys_fd, KVM_EPT_ODF, &o_info);
+	
 	for (int i=0;; i++) {
 		r = ioctl(vcpu->fd, KVM_RUN, 0);
 		if (r < 0) {
@@ -358,11 +384,6 @@ struct fork_info {
 	int vcpu_fd;
 };
 
-struct odf_info{
-	int parent_vcpu_fd;
-	int child_vcpu_fd;
-	int mem_size;
-};
 
 void fork_child_with_ioctl(struct fork_info *info, int sys_fd){
 	struct vm vm;
@@ -404,6 +425,7 @@ void fork_child_with_ioctl(struct fork_info *info, int sys_fd){
 
 int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
+	struct odf_info o_info;
 	struct kvm_sregs parent_sregs;
 	struct kvm_regs parent_regs;
 	struct fork_info info;
@@ -445,9 +467,13 @@ restart:
 						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
 						printf("This is the pid of child : %ld", (long)getpid());
 						fflush(stdout);
-						sleep(50);
-						
+						// sleep(50);
+
+						PARENT_VCPU_FD = vcpu->fd;
+						PARENT_VM_FD = vm->fd;						
+
 						fork_child(vm, parent_sregs, parent_regs);
+						// ---- add the code for EPT sharing ioctl here
 						printf("== Child VM Ended====\n");
 						return 0;
 					} else {
@@ -845,12 +871,12 @@ int main(int argc, char **argv)
 	// start_clk = clock();
 	vcpu_init(&parent_vm, &parent_vcpu);
 	// printf("\nTime for vcpu init (parent) %lg \n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
-	#define KVM_EPT_ODF 0xC00CAEC7
 	// child_vcpu_init(&parent_vcpu, &vm, &vcpu);
-	o_info.child_vcpu_fd = parent_vcpu.fd;
-	o_info.parent_vcpu_fd = parent_vcpu.fd;
-	o_info.mem_size = 0x200000;
-	ioctl(parent_vm.sys_fd, KVM_EPT_ODF, &o_info);
+	// o_info.child_vcpu_fd = parent_vcpu.fd;
+	// o_info.parent_vcpu_fd = parent_vcpu.fd;
+	// o_info.mem_size = 0x200000;
+	// printf("PID of the process : %d\n", getpid());
+	// ioctl(parent_vm.sys_fd, KVM_EPT_ODF, &o_info);
 
 
 	switch (mode) {
