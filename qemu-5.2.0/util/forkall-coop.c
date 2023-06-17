@@ -26,6 +26,9 @@ static int thread_pool_read = 0;
 
 // global variable for checking if cpu has processed the queued work
 // in vcpu thread and we can invocate VCPU event now
+int PARENT_VCPU_FD = 0;
+int PARENT_VM_FD = 0;
+
 int queued_work_complete = 0;
 
 int entering_after_save_snap = 0;

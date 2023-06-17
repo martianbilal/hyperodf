@@ -3570,12 +3570,32 @@ void handle_save_snapshot(void *opaque){
     printf( "save_snapshot took %.5lf seconds\n", accum );
 }
 
+
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
 void handle_load_snapshot(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
     struct KVMState* s = cpu->kvm_state;
     int result; 
     struct timespec start, stop;
+    struct odf_info o_info;
     double accum;
+
+
+    // create the o_info
+    o_info.child_vcpu_fd = cpu->kvm_fd;
+	o_info.parent_vcpu_fd = PARENT_VCPU_FD;
+	
+    // TODO : put the right memory size
+    // as seen in kvm_set_mem or something
+    o_info.mem_size = 0x200000;
+	printf("PID of the process : %d\n", getpid());
+    #define KVM_EPT_ODF 0xC00CAEC7
+    
 
     printf("[Debug] handle_load_snapshot is called! \n");
     if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
@@ -3590,6 +3610,8 @@ void handle_load_snapshot(void *opaque){
         printf("[Debug] Load_snapshot event;\n");
         if(load_snapshot("newtest", NULL) == 0){
             save_snapshot_event = 0;
+            // make the ioctl to share the TDP table/EPT
+            ioctl(s->fd, KVM_EPT_ODF, &o_info);
             vm_start();
         }
     }
@@ -3618,6 +3640,7 @@ void handle_fork(void *opaque){
     int slot_size; 
     Error *local_err = NULL;
     // AioContext *ctx;
+    PARENT_VM_FD = s->vmfd;
 
 
     // memset(&prefork_state, 0, sizeof(prefork_state));

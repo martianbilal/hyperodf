@@ -3594,6 +3594,7 @@ int kvm_cpu_exec(CPUState *cpu)
                         perror( "clock gettime" );
                         exit( EXIT_FAILURE );
                     }
+                    PARENT_VCPU_FD = cpu->kvm_fd;
                     ski_forkall_slave(&did_fork, &is_child);
                     if(did_fork){
                         cpu->forked = true;
