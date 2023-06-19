@@ -2175,6 +2175,59 @@ int coroutine_fn bdrv_co_pwrite_zeroes(BdrvChild *child, int64_t offset,
                            BDRV_REQ_ZERO_WRITE | flags);
 }
 
+
+static void printBlockDriverState(struct BlockDriverState* bds) {
+    if (bds == NULL) {
+        printf("BlockDriverState is NULL.\n");
+        return;
+    }
+
+    printf("open_flags: %d\n", bds->open_flags);
+    printf("read_only: %d\n", bds->read_only);
+    printf("encrypted: %d\n", bds->encrypted);
+    printf("sg: %d\n", bds->sg);
+    printf("probed: %d\n", bds->probed);
+    printf("force_share: %d\n", bds->force_share);
+    printf("implicit: %d\n", bds->implicit);
+    printf("drv: %p\n", (void*)bds->drv);
+    printf("opaque: %p\n", bds->opaque);
+    printf("aio_context: %p\n", (void*)bds->aio_context);
+    printf("walking_aio_notifiers: %d\n", bds->walking_aio_notifiers);
+    printf("filename: %s\n", bds->filename);
+    printf("backing_file: %s\n", bds->backing_file);
+    printf("auto_backing_file: %s\n", bds->auto_backing_file);
+    printf("backing_format: %s\n", bds->backing_format);
+    printf("exact_filename: %s\n", bds->exact_filename);
+    printf("supported_write_flags: %u\n", bds->supported_write_flags);
+    printf("supported_zero_flags: %u\n", bds->supported_zero_flags);
+    printf("supported_truncate_flags: %u\n", bds->supported_truncate_flags);
+    printf("node_name: %s\n", bds->node_name);
+    printf("refcnt: %d\n", bds->refcnt);
+    printf("inherits_from: %p\n", (void*)bds->inherits_from);
+    printf("options: %p\n", (void*)bds->options);
+    printf("explicit_options: %p\n", (void*)bds->explicit_options);
+    printf("detect_zeroes: %d\n", bds->detect_zeroes);
+    printf("backing_blocker: %p\n", (void*)bds->backing_blocker);
+    printf("total_sectors: %ld\n", bds->total_sectors);
+    printf("write_threshold_offset: %lu\n", bds->write_threshold_offset);
+    // printf("wr_highest_offset: %" PRId64 "\n", (void *)bds->wr_highest_offset);
+
+    printf("copy_on_read: %d\n", bds->copy_on_read);
+    printf("in_flight: %u\n", bds->in_flight);
+    printf("serialising_in_flight: %u\n", bds->serialising_in_flight);
+    printf("io_plugged: %u\n", bds->io_plugged);
+    printf("enable_write_cache: %d\n", bds->enable_write_cache);
+    printf("quiesce_counter: %d\n", bds->quiesce_counter);
+    printf("recursive_quiesce_counter: %d\n", bds->recursive_quiesce_counter);
+    printf("write_gen: %u\n", bds->write_gen);
+    printf("active_flush_req: %d\n", bds->active_flush_req);
+    printf("flushed_gen: %u\n", bds->flushed_gen);
+    printf("never_freeze: %d\n", bds->never_freeze);
+
+    return;
+}
+
+
 /*
  * Flush ALL BDSes regardless of if they are reachable via a BlkBackend or not.
  */
@@ -2198,6 +2251,7 @@ int bdrv_flush_all(void)
         int ret;
 
         aio_context_acquire(aio_context);
+        printBlockDriverState(bs);
         ret = bdrv_flush(bs);
         if (ret < 0 && !result) {
             result = ret;
