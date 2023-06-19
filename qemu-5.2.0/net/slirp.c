@@ -610,6 +610,24 @@ error:
     return -1;
 }
 
+// find the slirpstate without the monitor
+static SlirpState *getSlirpState(void)
+{
+    SlirpState *tmp;
+    const char *id = "__org.qemu.net0";
+    NetClientState *nc = qemu_find_netdev(id);
+    if (!nc) {
+        fprintf(stderr, "unrecognized netdev id '%s'\n", id);
+        exit(1);
+    }
+    if (strcmp(nc->model, "user")) {
+        fprintf(stderr, "invalid device specified\n");
+        exit(1);
+    }
+    tmp = DO_UPCAST(SlirpState, nc, nc);
+    return tmp;
+}
+
 static SlirpState *slirp_lookup(Monitor *mon, const char *id)
 {
     if (id) {
@@ -709,6 +727,7 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
     const char *fail_reason = "Unknown reason";
 
     DEBUG_PRINT("redir_str: %s\n", redir_str);
+    DEBUG_PRINT("Netdev ID : %s\n",  s->nc.name);
 
     p = redir_str;
     if (!p || get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
