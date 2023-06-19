@@ -3,6 +3,7 @@
  * Copyright (c) 1995 Danny Gasparovski.
  */
 
+#include "debug.h"
 #include "slirp.h"
 #include "ip_icmp.h"
 #ifdef __sun__
@@ -689,6 +690,13 @@ struct socket *tcp_listen(Slirp *slirp, uint32_t haddr, unsigned hport,
     int s, opt = 1;
     socklen_t addrlen = sizeof(addr);
     memset(&addr, 0, addrlen);
+
+    DEBUG_PRINT("tcp_listen");
+    DEBUG_PRINT("haddr = %s\n", inet_ntoa((struct in_addr){ .s_addr = haddr }));
+    DEBUG_PRINT("hport = %d\n", ntohs(hport));
+    DEBUG_PRINT("laddr = %s\n", inet_ntoa((struct in_addr){ .s_addr = laddr }));
+    DEBUG_PRINT("lport = %d\n", ntohs(lport));
+    DEBUG_PRINT("flags = %x\n", flags);
 
     DEBUG_CALL("tcp_listen");
     DEBUG_ARG("haddr = %s", inet_ntoa((struct in_addr){ .s_addr = haddr }));

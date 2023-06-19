@@ -13,6 +13,15 @@
 
 extern int slirp_debug;
 
+#define DBG_SLIRP
+#ifdef DBG_SLIRP
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
+    __func__,  __LINE__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) /* do nothing */
+#endif
+
+
 #define DEBUG_CALL(fmt, ...)                      \
     do {                                          \
         if (G_UNLIKELY(slirp_debug & DBG_CALL)) { \

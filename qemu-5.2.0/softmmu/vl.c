@@ -3611,7 +3611,8 @@ void handle_load_snapshot(void *opaque){
         if(load_snapshot("newtest", NULL) == 0){
             save_snapshot_event = 0;
             // make the ioctl to share the TDP table/EPT
-            ioctl(s->fd, KVM_EPT_ODF, &o_info);
+            // ioctl(s->fd, KVM_EPT_ODF, &o_info);
+            
             vm_start();
         }
     }

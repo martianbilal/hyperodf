@@ -689,6 +689,14 @@ void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
     monitor_printf(mon, "invalid format\n");
 }
 
+#define DBG_SLIRP
+#ifdef DBG_SLIRP
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
+    __func__,  __LINE__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) /* do nothing */
+#endif
+
 static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
 {
     struct in_addr host_addr = { .s_addr = INADDR_ANY };
@@ -699,6 +707,8 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
     int is_udp;
     char *end;
     const char *fail_reason = "Unknown reason";
+
+    DEBUG_PRINT("redir_str: %s\n", redir_str);
 
     p = redir_str;
     if (!p || get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
@@ -748,6 +758,7 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
         goto fail_syntax;
     }
 
+    DEBUG_PRINT("Calling the slirp_add_hostfwd\n");
     if (slirp_add_hostfwd(s->slirp, is_udp, host_addr, host_port, guest_addr,
                           guest_port) < 0) {
         error_setg(errp, "Could not set up host forwarding rule '%s'",
