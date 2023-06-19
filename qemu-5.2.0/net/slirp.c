@@ -628,6 +628,25 @@ static SlirpState *getSlirpState(void)
     return tmp;
 }
 
+void update_hostfwd(void){
+    int err = 0;
+    SlirpState *s = getSlirpState();
+
+    struct in_addr host_addr;
+    host_addr.s_addr = 16777343;
+        
+    slirp_hostfwd(s, "tcp:127.0.0.1:10023-:22", NULL);
+    
+    DEBUG_PRINT("Done adding new hostfwd\n");
+    err = slirp_remove_hostfwd(s->slirp, 0, host_addr, 10021);
+    if (err < 0) {
+        fprintf(stderr, "failed to remove hostfwd\n");
+        exit(1);
+    }
+    return;
+}
+
+
 static SlirpState *slirp_lookup(Monitor *mon, const char *id)
 {
     if (id) {
@@ -707,13 +726,6 @@ void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
     monitor_printf(mon, "invalid format\n");
 }
 
-#define DBG_SLIRP
-#ifdef DBG_SLIRP
-#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
-    __func__,  __LINE__, ##args)
-#else
-#define DEBUG_PRINT(fmt, args...) /* do nothing */
-#endif
 
 static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
 {

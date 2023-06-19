@@ -692,6 +692,8 @@ struct socket *tcp_listen(Slirp *slirp, uint32_t haddr, unsigned hport,
     memset(&addr, 0, addrlen);
 
     DEBUG_PRINT("tcp_listen");
+
+    DEBUG_PRINT("haddr_IN = %u\n", haddr);
     DEBUG_PRINT("haddr = %s\n", inet_ntoa((struct in_addr){ .s_addr = haddr }));
     DEBUG_PRINT("hport = %d\n", ntohs(hport));
     DEBUG_PRINT("laddr = %s\n", inet_ntoa((struct in_addr){ .s_addr = laddr }));

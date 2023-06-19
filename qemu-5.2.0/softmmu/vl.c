@@ -3571,6 +3571,12 @@ void handle_save_snapshot(void *opaque){
 }
 
 
+
+// static void update_hostfwd(){
+//     getSlirpState();
+//     return;
+// }
+
 struct odf_info{
 	int parent_vcpu_fd;
 	int child_vcpu_fd;
@@ -3612,7 +3618,7 @@ void handle_load_snapshot(void *opaque){
             save_snapshot_event = 0;
             // make the ioctl to share the TDP table/EPT
             // ioctl(s->fd, KVM_EPT_ODF, &o_info);
-            
+            update_hostfwd();
             vm_start();
         }
     }

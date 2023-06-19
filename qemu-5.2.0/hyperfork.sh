@@ -40,14 +40,14 @@ send "./example\r"
 
 
 expect "root@syzkaller:~# "
-send "ls\r"
+# send "ls\r"
 
-expect "root@syzkaller:~# "
-send "exit\r"
+# expect "root@syzkaller:~# "
+# send "exit\r"
 
 
-expect "root@syzkaller:~# "
-send "touch newdir.txt\r"
+# expect "root@syzkaller:~# "
+# send "touch newdir.txt\r"
 
 
 
