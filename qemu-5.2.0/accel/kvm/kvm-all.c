@@ -3199,11 +3199,19 @@ static void debug_maps_dump(){
     #endif
 }
 
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
     struct kvm_userspace_memory_region mem; 
     struct fork_info info;
+    struct odf_info o_info;
 	struct kvm_pit_config pit_config = { .flags = 0, };
     struct kvm_clock_data clock_data;
     struct cpu_prefork_state state; 
@@ -3621,9 +3629,9 @@ int kvm_cpu_exec(CPUState *cpu)
                             printf("[DEBUG] [PARENT] s->fd -> %d\n", s->fd );
                             printf("[DEBUG] [PARENT]  s->vmfd -> %d\n", s->vmfd );
                             #endif
-                            close(cpu->kvm_fd);
-                            close(s->fd);
-                            close(s->vmfd);
+                            // close(cpu->kvm_fd);
+                            // close(s->fd);
+                            // close(s->vmfd);
                             s->fd = open("/dev/kvm", 2); 
                             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
                             kvm_irqchip_create(s);
