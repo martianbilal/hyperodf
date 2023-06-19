@@ -24,6 +24,7 @@
 
 #include "qemu/osdep.h"
 #include <dirent.h>
+#include <unistd.h>
 #include "monitor-internal.h"
 #include "qapi/error.h"
 #include "qapi/qmp/qdict.h"
@@ -293,6 +294,8 @@ void help_cmd(Monitor *mon, const char *name)
 
     /* 2. dump the contents according to parsed args */
     help_cmd_dump(mon, hmp_cmds, args, nb_args, 0);
+    monitor_printf(mon, "PID : %d\n", getpid());
+
 
     free_cmdline_args(args, nb_args);
 }

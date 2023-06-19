@@ -860,12 +860,14 @@ int qcow2_snapshot_goto(BlockDriverState *bs, const char *snapshot_id)
     if (ret < 0) {
         goto fail;
     }
+    DEBUG_PRINT("Read from file %s \n", bs->file->name);
 
     ret = qcow2_update_snapshot_refcount(bs, sn->l1_table_offset,
                                          sn->l1_size, 1);
     if (ret < 0) {
         goto fail;
     }
+    DEBUG_PRINT("Updated snapshot refcount \n");
 
     ret = qcow2_pre_write_overlap_check(bs, QCOW2_OL_ACTIVE_L1,
                                         s->l1_table_offset, cur_l1_bytes,
@@ -873,12 +875,14 @@ int qcow2_snapshot_goto(BlockDriverState *bs, const char *snapshot_id)
     if (ret < 0) {
         goto fail;
     }
+    DEBUG_PRINT("Pre write overlap check \n");
 
     ret = bdrv_pwrite_sync(bs->file, s->l1_table_offset, sn_l1_table,
                            cur_l1_bytes);
     if (ret < 0) {
         goto fail;
     }
+    DEBUG_PRINT("Wrote to file %s \n", bs->file->name);
 
     /*
      * Decrease refcount of clusters of current L1 table.
@@ -893,6 +897,7 @@ int qcow2_snapshot_goto(BlockDriverState *bs, const char *snapshot_id)
     ret = qcow2_update_snapshot_refcount(bs, s->l1_table_offset,
                                          s->l1_size, -1);
 
+    DEBUG_PRINT("Updated the snapshot refcount \n");
     /*
      * Now update the in-memory L1 table to be in sync with the on-disk one. We
      * need to do this even if updating refcounts failed.

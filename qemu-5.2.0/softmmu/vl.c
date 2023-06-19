@@ -3967,13 +3967,14 @@ void handle_fork(void *opaque){
             // waitpid(ret, &status, 0);
             // wait(1);
             // wait for 1 second
-            sleep(1);
+            sleep(2);
             // qemu_cleanup();
             // load_snapshot("newtest", NULL);
             // dump_cpu_state(cpu, "pre-fork.dat");
             // vm_start();
             // load_snapshot("newtest", NULL);
-
+            
+            printf("[%s:%d]IN the parent process\n", __func__, __LINE__);
             // exit(0);
             return;
             // qemu_mutex_unlock_iothread();

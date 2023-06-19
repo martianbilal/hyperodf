@@ -43,6 +43,15 @@
 #define QCOW_MAX_CRYPT_CLUSTERS 32
 #define QCOW_MAX_SNAPSHOTS 65536
 
+#define DBG_QCOW2
+#ifdef DBG_QCOW2
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
+    __func__,  __LINE__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) /* do nothing */
+#endif
+
+
 /* Field widths in qcow2 mean normal cluster offsets cannot reach
  * 64PB; depending on cluster size, compressed clusters can have a
  * smaller limit (64PB for up to 16k clusters, then ramps down to

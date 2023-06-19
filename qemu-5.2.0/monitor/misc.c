@@ -222,6 +222,8 @@ static void hmp_trace_file(Monitor *mon, const QDict *qdict)
 
 static void hmp_info_help(Monitor *mon, const QDict *qdict)
 {
+    // printf("PID : %d\n", getpid());
+    
     help_cmd(mon, "info");
 }
 
