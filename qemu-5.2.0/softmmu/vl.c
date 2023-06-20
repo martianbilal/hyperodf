@@ -3964,6 +3964,7 @@ void handle_fork(void *opaque){
             // load_snapshot("newtest", NULL);
             return; 
         } else {
+            PARENT_PID = getpid();
             // waitpid(ret, &status, 0);
             // wait(1);
             // wait for 1 second

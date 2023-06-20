@@ -28,6 +28,8 @@ static int thread_pool_read = 0;
 // in vcpu thread and we can invocate VCPU event now
 int PARENT_VCPU_FD = 0;
 int PARENT_VM_FD = 0;
+// set it to 0, so we only start detecting it after forkall
+int PARENT_PID = 0;
 
 int queued_work_complete = 0;
 

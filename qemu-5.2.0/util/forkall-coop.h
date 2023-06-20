@@ -59,6 +59,7 @@
 extern int ski_forkall_enabled;
 extern int ski_forkall_round;
 
+extern int PARENT_PID;
 extern int PARENT_VM_FD;
 extern int PARENT_VCPU_FD;
 extern int queued_work_complete;

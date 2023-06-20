@@ -3348,6 +3348,9 @@ int kvm_cpu_exec(CPUState *cpu)
     // }
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        if(PARENT_PID){
+            DEBUG_PRINT("[pid: %d]kvm_run ret: %d\n", getpid(), run_ret);
+        }
         i = i + 1;
     testing_resume:
     
