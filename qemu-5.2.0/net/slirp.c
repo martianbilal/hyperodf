@@ -628,14 +628,14 @@ static SlirpState *getSlirpState(void)
     return tmp;
 }
 
-void update_hostfwd(void){
+void update_hostfwd(const char *redir_str){
     int err = 0;
     SlirpState *s = getSlirpState();
 
     struct in_addr host_addr;
     host_addr.s_addr = 16777343;
         
-    slirp_hostfwd(s, "tcp:127.0.0.1:10023-:22", NULL);
+    slirp_hostfwd(s, redir_str, NULL);
     
     DEBUG_PRINT("Done adding new hostfwd\n");
     err = slirp_remove_hostfwd(s->slirp, 0, host_addr, 10021);

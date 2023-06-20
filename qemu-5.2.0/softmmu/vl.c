@@ -3618,7 +3618,7 @@ void handle_load_snapshot(void *opaque){
             save_snapshot_event = 0;
             // make the ioctl to share the TDP table/EPT
             // ioctl(s->fd, KVM_EPT_ODF, &o_info);
-            update_hostfwd();
+            update_hostfwd("tcp:127.0.0.1:10023-:22");
             vm_start();
         }
     }
@@ -3970,6 +3970,7 @@ void handle_fork(void *opaque){
             // wait(1);
             // wait for 1 second
             sleep(2);
+            update_hostfwd("tcp:127.0.0.1:10025-:22");
             // qemu_cleanup();
             // load_snapshot("newtest", NULL);
             // dump_cpu_state(cpu, "pre-fork.dat");
