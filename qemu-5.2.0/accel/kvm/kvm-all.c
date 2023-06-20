@@ -3368,6 +3368,7 @@ int kvm_cpu_exec(CPUState *cpu)
         if (run_ret < 0) {
             if (run_ret == -EINTR || run_ret == -EAGAIN) {
                 DPRINTF("io window exit\n");
+                DEBUG_PRINT("io window exit\n");
                 kvm_eat_signals(cpu);
                 ret = EXCP_INTERRUPT;
                 if(entering_after_save_snap){
@@ -3693,13 +3694,13 @@ int kvm_cpu_exec(CPUState *cpu)
                             #endif
                         }
                         cpu->should_wait = false;
-                        // if(is_child){
+                        if(is_child){
                             vm_stop(RUN_STATE_RESTORE_VM);
 
                             printf("[Debug] we are setting the load_snapshot event! \n");
                             event_notifier_test_and_clear(&(cpu->load_event));
                             event_notifier_set(&(cpu->load_event));
-                        // }
+                        }
                         break;
                     }
                     sleep(0);
