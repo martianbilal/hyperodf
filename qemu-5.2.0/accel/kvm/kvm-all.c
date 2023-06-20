@@ -3349,7 +3349,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
         if(PARENT_PID){
-            DEBUG_PRINT("[pid: %d]kvm_run ret: %d\n", getpid(), run_ret);
+            // DEBUG_PRINT("[pid: %d]kvm_run ret: %d\n", getpid(), run_ret);
         }
         i = i + 1;
     testing_resume:
@@ -3621,6 +3621,7 @@ int kvm_cpu_exec(CPUState *cpu)
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
                         if(is_child){
+                            // exit(0);
                             // vm_stop(RUN_STATE_RESTORE_VM);
                             // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
@@ -3698,6 +3699,7 @@ int kvm_cpu_exec(CPUState *cpu)
                         }
                         cpu->should_wait = false;
                         if(is_child){
+                            DEBUG_PRINT("is_child : %d\n", is_child);
                             vm_stop(RUN_STATE_RESTORE_VM);
 
                             printf("[Debug] we are setting the load_snapshot event! \n");

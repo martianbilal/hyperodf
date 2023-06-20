@@ -3775,6 +3775,7 @@ void handle_fork(void *opaque){
         if (ret < 0){
             printf("Failed to fork\n");
         } else if (ret == 0) {
+            // exit(0);
             // [Bilal] [Measure] clock time on hypercall
             printf("[DEBUG] load snapshot is called!\n");
             fflush(stdout);
