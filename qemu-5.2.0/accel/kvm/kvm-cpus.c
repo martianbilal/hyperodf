@@ -130,7 +130,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
         printf("[%s:%d] starting to wait for io event\n", __func__, __LINE__);
 
         qemu_wait_io_event(cpu);
-        printf("[%s:%d] ended wait for io event\n", __func__, __LINE__);
+        printf("[%d|%s:%d] ended wait for io event\n", getpid(), __func__, __LINE__);
     } while (!cpu->unplug || cpu_can_run(cpu));
 
 
