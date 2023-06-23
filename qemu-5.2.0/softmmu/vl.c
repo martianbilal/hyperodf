@@ -2207,13 +2207,36 @@ static int device_init_func(void *opaque, QemuOpts *opts, Error **errp)
 static int chardev_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     Error *local_err = NULL;
-    DEBUG_PRINT("chardev_init_func\n");
+    DEBUG_PRINT("chardev_init_func printing opts : \n");
+    qemu_opts_print(opts, "\n\t");
     if (!qemu_chr_new_from_opts(opts, NULL, &local_err)) {
         if (local_err) {
             error_propagate(errp, local_err);
             return -1;
         }
         exit(0);
+    }
+    return 0;
+}
+
+#ifndef QEMU_OPTION_INT_H
+struct QemuOpts {
+    char *id;
+    QemuOptsList *list;
+    Location loc;
+    QTAILQ_HEAD(, QemuOpt) head;
+    QTAILQ_ENTRY(QemuOpts) next;
+};
+#endif
+
+static int chardev_pre_init_func(void *opaque, QemuOpts *opts, Error **errp)
+{
+    DEBUG_PRINT("chardev_pre_init_func \n");
+
+    if(strcmp("compat_monitor1", opts->id) == 0){
+        DEBUG_PRINT("chardev_pre_init_func calling the actual func\n");
+        // qemu_opts_print(opts, "\n\t");
+        return chardev_init_func(opaque, opts, errp);
     }
     return 0;
 }
@@ -2230,6 +2253,19 @@ static int mon_init_func(void *opaque, QemuOpts *opts, Error **errp)
     return monitor_init_opts(opts, errp);
 }
 
+
+
+static int mon_pre_init_func(void *opaque, QemuOpts *opts, Error **errp)
+{   
+    // compare opts->id to compat_monitor0
+    if(strcmp(opts->id, "compat_monitor0") == 0)
+    {
+        DEBUG_PRINT("mon_pre_init_func\n");
+        return 0;
+    }
+    return mon_init_func(opaque, opts, errp);
+}
+
 static void monitor_parse(const char *optarg, const char *mode, bool pretty)
 {
     static int monitor_device_index = 0;
@@ -2237,12 +2273,16 @@ static void monitor_parse(const char *optarg, const char *mode, bool pretty)
     const char *p;
     char label[32];
 
+    DEBUG_PRINT("optsarg: %s  |  mode : %s\n", optarg, mode);
+
     if (strstart(optarg, "chardev:", &p)) {
         snprintf(label, sizeof(label), "%s", p);
     } else {
+        DEBUG_PRINT("monitor_device_index: %d\n", monitor_device_index);
         snprintf(label, sizeof(label), "compat_monitor%d",
                  monitor_device_index);
         opts = qemu_chr_parse_compat(label, optarg, true);
+        DEBUG_PRINT("label : %s\n", label);
         if (!opts) {
             error_report("parse error: %s", optarg);
             exit(1);
@@ -3970,6 +4010,14 @@ void handle_fork(void *opaque){
             // wait for 1 second
             sleep(2);
             PARENT_PID = getpid();
+
+            monitor_parse("unix:qemu-monitor-socket1,server,nowait", "readline", NULL);
+            DEBUG_PRINT("returned from the monitor parse\n");
+            qemu_opts_foreach(qemu_find_opts("chardev"),
+                      chardev_pre_init_func, NULL, &error_fatal);
+            DEBUG_PRINT("returned from the chardev pre init func\n");
+            qemu_opts_foreach(qemu_find_opts("mon"),
+                      mon_pre_init_func, NULL, &error_fatal);
             // update_hostfwd("tcp:127.0.0.1:10025-:22");
             // qemu_cleanup();
             // load_snapshot("newtest", NULL);

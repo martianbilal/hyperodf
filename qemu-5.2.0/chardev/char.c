@@ -371,11 +371,16 @@ QemuOpts *qemu_chr_parse_compat(const char *label, const char *filename,
     QemuOpts *opts;
     Error *local_err = NULL;
 
+
+    DEBUG_PRINT("qemu_chr_parse_compat: label=%s, filename=%s\n", label, filename);
+
     opts = qemu_opts_create(qemu_find_opts("chardev"), label, 1, &local_err);
     if (local_err) {
         error_report_err(local_err);
         return NULL;
     }
+
+    DEBUG_PRINT("created the qemu opts  %s\n", label);
 
     if (strstart(filename, "mon:", &p)) {
         if (!permit_mux_mon) {
@@ -666,6 +671,8 @@ Chardev *qemu_chr_new_from_opts(QemuOpts *opts, GMainContext *context,
     const char *id = qemu_opts_id(opts);
     char *bid = NULL;
 
+    DEBUG_PRINT("Printing opts: %p\n", opts);
+    qemu_opts_print(opts, "\n");
     if (name && is_help_option(name)) {
         GString *str = g_string_new("");
 
