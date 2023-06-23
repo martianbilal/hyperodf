@@ -2207,7 +2207,7 @@ static int device_init_func(void *opaque, QemuOpts *opts, Error **errp)
 static int chardev_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     Error *local_err = NULL;
-
+    DEBUG_PRINT("chardev_init_func\n");
     if (!qemu_chr_new_from_opts(opts, NULL, &local_err)) {
         if (local_err) {
             error_propagate(errp, local_err);
