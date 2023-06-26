@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 
+#include "qemu/futex.h"
 #include "qemu/osdep.h"
 #include "qemu-common.h"
 #include "monitor/monitor.h"
@@ -395,25 +396,35 @@ void qemu_wait_io_event_common(CPUState *cpu)
 {
     qatomic_mb_set(&cpu->thread_kicked, false);
     if (cpu->stop) {
+        DEBUG_PRINT("stop the cpu\n");
         qemu_cpu_stop(cpu, false);
     }
+    DEBUG_PRINT("processing queued cpu work\n");
     process_queued_cpu_work(cpu);
+    DEBUG_PRINT("processed the queued cpu work\n");
 }
 
 void qemu_wait_io_event(CPUState *cpu)
 {
     bool slept = false;
 
+    DEBUG_PRINT("wait io event \n");
+
     while (cpu_thread_is_idle(cpu)) {
+        DEBUG_PRINT("cpu thread is idle \n");
         if (!slept) {
             slept = true;
             qemu_plugin_vcpu_idle_cb(cpu);
         }
+        DEBUG_PRINT("waiting for cpu->halt_cond \n");
         qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        DEBUG_PRINT("cpu->halt_cond is signaled \n");
     }
     if (slept) {
+        DEBUG_PRINT("resume now cpu\n");
         qemu_plugin_vcpu_resume_cb(cpu);
     }
+    DEBUG_PRINT("gotten out of the wait\n");
 
 #ifdef _WIN32
     /* Eat dummy APC queued by cpus_kick_thread. */
@@ -421,6 +432,7 @@ void qemu_wait_io_event(CPUState *cpu)
         SleepEx(0, TRUE);
     }
 #endif
+    DEBUG_PRINT("calling qemu_wait_io_event_common\n");
     qemu_wait_io_event_common(cpu);
 }
 
@@ -441,8 +453,48 @@ void cpus_kick_thread(CPUState *cpu)
 #endif
 }
 
+// //function from stackoverflow 
+static void full_write(int fd, const char *buf, size_t len)
+{
+        while (len > 0) {
+                ssize_t ret = write(fd, buf, len);
+
+                if ((ret == -1) && (errno != EINTR))
+                        break;
+
+                buf += (size_t) ret;
+                len -= (size_t) ret;
+        }
+}
+
+
+//function from stackoverflow
+static void print_backtrace(void)
+{
+        static const char start[] = "BACKTRACE ------------\n";
+        static const char end[] = "----------------------\n";
+
+        void *bt[1024];
+        int bt_size;
+        char **bt_syms;
+        int i;
+
+        bt_size = backtrace(bt, 1024);
+        bt_syms = backtrace_symbols(bt, bt_size);
+        full_write(STDERR_FILENO, start, strlen(start));
+        for (i = 1; i < bt_size; i++) {
+                size_t len = strlen(bt_syms[i]);
+                full_write(STDERR_FILENO, bt_syms[i], len);
+                full_write(STDERR_FILENO, "\n", 1);
+        }
+        full_write(STDERR_FILENO, end, strlen(end));
+    free(bt_syms);
+}
+
 void qemu_cpu_kick(CPUState *cpu)
 {
+    DEBUG_PRINT("kicking cpu %d | broadcast halt cond\n", cpu->cpu_index);
+    print_backtrace();
     qemu_cond_broadcast(cpu->halt_cond);
     if (cpus_accel->kick_vcpu_thread) {
         cpus_accel->kick_vcpu_thread(cpu);

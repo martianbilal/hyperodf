@@ -672,7 +672,7 @@ Chardev *qemu_chr_new_from_opts(QemuOpts *opts, GMainContext *context,
     char *bid = NULL;
 
     DEBUG_PRINT("Printing opts: %p\n", opts);
-    qemu_opts_print(opts, "\n");
+    // qemu_opts_print(opts, "\n");
     if (name && is_help_option(name)) {
         GString *str = g_string_new("");
 

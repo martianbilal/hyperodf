@@ -2208,7 +2208,7 @@ static int chardev_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     Error *local_err = NULL;
     DEBUG_PRINT("chardev_init_func printing opts : \n");
-    qemu_opts_print(opts, "\n\t");
+    // qemu_opts_print(opts, "\n\t");
     if (!qemu_chr_new_from_opts(opts, NULL, &local_err)) {
         if (local_err) {
             error_propagate(errp, local_err);
@@ -4024,6 +4024,7 @@ void handle_fork(void *opaque){
             // dump_cpu_state(cpu, "pre-fork.dat");
             // vm_start();
             // load_snapshot("newtest", NULL);
+            kvm_cpu_synchronize_post_init(cpu);
             
             printf("[%s:%d]IN the parent process\n", __func__, __LINE__);
             // exit(0);

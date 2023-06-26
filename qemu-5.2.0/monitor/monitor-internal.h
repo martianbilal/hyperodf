@@ -33,7 +33,7 @@
 #include "qemu/readline.h"
 #include "sysemu/iothread.h"
 
-#define DBG_MON
+// #define DBG_MON
 #ifdef DBG_MON
 #define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s:%d] " fmt, \
     __func__,  __LINE__, ##args)

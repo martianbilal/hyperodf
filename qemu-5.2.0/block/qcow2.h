@@ -43,7 +43,7 @@
 #define QCOW_MAX_CRYPT_CLUSTERS 32
 #define QCOW_MAX_SNAPSHOTS 65536
 
-#define DBG_QCOW2
+// #define DBG_QCOW2
 #ifdef DBG_QCOW2
 #define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
     __func__,  __LINE__, ##args)

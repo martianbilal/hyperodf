@@ -7,7 +7,7 @@
 #include "qom/object.h"
 
 
-#define DBG_CHAR
+// #define DBG_CHAR
 #ifdef DBG_CHAR
 #define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s:%d] " fmt, \
     __func__,  __LINE__, ##args)
