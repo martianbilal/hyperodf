@@ -35,6 +35,7 @@
 #include "qemu/error-report.h"
 #include "qemu/main-loop.h"
 #include "sysemu/replay.h"
+#include <execinfo.h>
 
 
 // #define DBG
@@ -2181,6 +2182,7 @@ static void printBlockDriverState(struct BlockDriverState* bds) {
         printf("BlockDriverState is NULL.\n");
         return;
     }
+    print_backtrace();
 
     printf("open_flags: %d\n", bds->open_flags);
     printf("read_only: %d\n", bds->read_only);
@@ -2252,6 +2254,7 @@ int bdrv_flush_all(void)
 
         aio_context_acquire(aio_context);
         printBlockDriverState(bs);
+        // print_backtrace();
         ret = bdrv_flush(bs);
         if (ret < 0 && !result) {
             result = ret;

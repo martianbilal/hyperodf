@@ -4024,7 +4024,9 @@ void handle_fork(void *opaque){
             // dump_cpu_state(cpu, "pre-fork.dat");
             // vm_start();
             // load_snapshot("newtest", NULL);
-            kvm_cpu_synchronize_post_init(cpu);
+            // kvm_cpu_synchronize_post_init(cpu);
+            vm_start();
+            DEBUG_PRINT("Started the VM\n");
             
             printf("[%s:%d]IN the parent process\n", __func__, __LINE__);
             // exit(0);
