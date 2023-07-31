@@ -71,7 +71,7 @@
 #include <string.h>
 #include <time.h>
 
-#define DBG
+// #define DBG
 
 const unsigned int postcopy_ram_discard_version;
 

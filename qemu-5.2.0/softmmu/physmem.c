@@ -71,7 +71,7 @@
 
 #include "monitor/monitor.h"
 
-#define DBG_IO
+// #define DBG_IO
 
 #ifdef CONFIG_LIBDAXCTL
 #include <daxctl/libdaxctl.h>

@@ -66,7 +66,7 @@
 
 // #define DBG_IO
 #define DBG_MEASURE
-#define DBG_FDS
+// #define DBG_FDS
 // #define DBG_RIP_CHILD
 // #define DBG_RIP_PARENT
 // #define DBG_RIP_PARENT_PREFORK
@@ -3511,11 +3511,11 @@ int kvm_cpu_exec(CPUState *cpu)
                 
                 save_snapshot_event = 1;
                 // vm_stop(RUN_STATE_SAVE_VM);
-                printf("[Debug] we are setting the save_snapshot event! \n");
+                // printf("[Debug] we are setting the save_snapshot event! \n");
                 event_notifier_test_and_clear(&(cpu->save_event));
                 event_notifier_set(&(cpu->save_event));
                 if(!queued_work_complete){
-                    printf("[%s:%d] we are waiting for the queued work to complete! \n", __func__, __LINE__);
+                    // printf("[%s:%d] we are waiting for the queued work to complete! \n", __func__, __LINE__);
                     goto end_loop; 
                     // break;
                 }
@@ -3555,7 +3555,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 kvm_vcpu_pre_fork(cpu, prefork_state);
                 if (qemu_mutex_iothread_locked()){
-                    printf("[debug] This is the main thread!\n");
+                    // printf("[debug] This is the main thread!\n");
                 }
                 cpu->should_wait = true;
                 // qemu_mutex_unlock_iothread();
@@ -3578,11 +3578,11 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 // [DEBUG] [BILAL] Adding this to test if the disk snapshot can be 
                 // reloaded in the child VM
-                printf("[%s:%d] sending the fork event\n", __func__, __LINE__);
+                // printf("[%s:%d] sending the fork event\n", __func__, __LINE__);
                 int cleared_result = event_notifier_test_and_clear(&(cpu->fork_event));
                 int res = event_notifier_set(&(cpu->fork_event));
-                printf("[%s:%d] result of clearing the fork event : %d\n", __func__, __LINE__, cleared_result);
-                printf("[%s:%d] result of setting the fork event : %d\n", __func__, __LINE__, res);
+                // printf("[%s:%d] result of clearing the fork event : %d\n", __func__, __LINE__, cleared_result);
+                // printf("[%s:%d] result of setting the fork event : %d\n", __func__, __LINE__, res);
 
                 // qemu_mutex_lock_iothread();
                 // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
@@ -3610,7 +3610,7 @@ int kvm_cpu_exec(CPUState *cpu)
                     ski_forkall_slave(&did_fork, &is_child);
                     if(did_fork){
                         cpu->forked = true;
-                        printf("pid of the child process  : %d", getpid());
+                        // printf("pid of the child process  : %d", getpid());
                         
                         // [Bilal] [Measure] clock time when cpu thread is restored
                         if( clock_gettime( CLOCK_REALTIME, &(cpu->cpu_thread_forked)) == -1 ) {
@@ -3703,7 +3703,7 @@ int kvm_cpu_exec(CPUState *cpu)
                             vm_stop(RUN_STATE_RESTORE_VM);
 
                         if(is_child){
-                            printf("[Debug] we are setting the load_snapshot event! \n");
+                            // printf("[Debug] we are setting the load_snapshot event! \n");
                             event_notifier_test_and_clear(&(cpu->load_event));
                             event_notifier_set(&(cpu->load_event));
                         }
@@ -3801,7 +3801,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // save_snapshot("fork-snap", &err);
                 qemu_mutex_unlock_iothread();
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
-                dumpKVMState(s, "./ParentKVMDump", "Parent VM");
+                // dumpKVMState(s, "./ParentKVMDump", "Parent VM");
 child_spawn: 
                 start_fork();
                 // qemu_mutex_lock_iothread();
@@ -4023,7 +4023,7 @@ child_spawn:
                     // 
                     // drive_new( opts, 1,  &error_fatal);
                     printf("created new drive for the child\n");
-                    dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
+                    // dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
                     printf("loading snapshot....\n");
                     vm_stop(RUN_STATE_RESTORE_VM);
                     err = NULL;

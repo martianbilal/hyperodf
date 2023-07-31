@@ -471,6 +471,7 @@ static void full_write(int fd, const char *buf, size_t len)
 //function from stackoverflow
 static void print_backtrace(void)
 {
+    return;
         static const char start[] = "BACKTRACE ------------\n";
         static const char end[] = "----------------------\n";
 

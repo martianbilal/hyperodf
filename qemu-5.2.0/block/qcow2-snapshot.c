@@ -31,7 +31,7 @@
 #include "qemu/cutils.h"
 
 
-#define DBG
+// #define DBG
 
 /* Obtain a backtrace and print it to stdout. */
 void

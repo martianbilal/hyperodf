@@ -12,7 +12,7 @@
 
 #include "sysemu/cpus.h"
 
-#define DBG_KVM
+// #define DBG_KVM
 #ifdef DBG_KVM
 #define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
     __func__,  __LINE__, ##args)

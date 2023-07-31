@@ -3596,18 +3596,19 @@ void handle_save_snapshot(void *opaque){
         printf("[Debug] Save_snapshot event;\n");
         if(save_snapshot("newtest", NULL) == 0){
             entering_after_save_snap = 1;
+            if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
+            {
+                perror( "clock gettime" );
+                return EXIT_FAILURE;
+            }
+            accum = ( stop.tv_sec - start.tv_sec )
+                + (double)( stop.tv_nsec - start.tv_nsec )
+                / (double)BILLION;
+            printf( "save_snapshot took %.5lf seconds\n", accum );
+
             vm_start();
         }
     }
-    if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
-    {
-        perror( "clock gettime" );
-        return EXIT_FAILURE;
-    }
-    accum = ( stop.tv_sec - start.tv_sec )
-        + (double)( stop.tv_nsec - start.tv_nsec )
-        / (double)BILLION;
-    printf( "save_snapshot took %.5lf seconds\n", accum );
 }
 
 
@@ -4025,7 +4026,7 @@ void handle_fork(void *opaque){
             // vm_start();
             // load_snapshot("newtest", NULL);
             // kvm_cpu_synchronize_post_init(cpu);
-            vm_start();
+            // vm_start();
             DEBUG_PRINT("Started the VM\n");
             
             printf("[%s:%d]IN the parent process\n", __func__, __LINE__);

@@ -13,7 +13,7 @@
 
 extern int slirp_debug;
 
-#define DBG_SLIRP
+// #define DBG_SLIRP
 #ifdef DBG_SLIRP
 #define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
     __func__,  __LINE__, ##args)

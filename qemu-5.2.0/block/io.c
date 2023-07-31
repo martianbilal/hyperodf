@@ -61,7 +61,7 @@ static void print_backtrace(void)
 {
         static const char start[] = "BACKTRACE ------------\n";
         static const char end[] = "----------------------\n";
-
+        return;
         void *bt[1024];
         int bt_size;
         char **bt_syms;

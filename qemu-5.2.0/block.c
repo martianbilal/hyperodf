@@ -51,7 +51,7 @@
 #include "block/coroutines.h"
 #include <execinfo.h>
 
-#define DBG 
+// #define DBG 
 
 #ifdef CONFIG_BSD
 #include <sys/ioctl.h>
@@ -175,6 +175,7 @@ static void full_write(int fd, const char *buf, size_t len)
 //function from stackoverflow
 void print_backtrace(void)
 {
+    return;
         static const char start[] = "BACKTRACE ------------\n";
         static const char end[] = "----------------------\n";
 
