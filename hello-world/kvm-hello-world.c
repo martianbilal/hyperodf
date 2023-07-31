@@ -10,7 +10,10 @@
 #include <linux/kvm.h>
 #include <time.h>
 #include <sys/wait.h>
-#include "replayer/src/sys-replay.h"
+
+// my ioctl ids 
+#define KVM_EPT_ODF 0xC00CAEC7
+
 
 
 /* CR0 bits */
@@ -74,6 +77,21 @@ struct vm {
 	int fd;
 	char *mem;
 };
+
+
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
+
+
+int PARENT_VCPU_FD = 0; 
+int CHILD_VCPU_FD = 0;
+int PARENT_VM_FD = 0;
+int CHILD_VM_FD = 0;
+
 
 void child_vm_init(struct vm *parent_vm, struct vm *vm, size_t mem_size) {
 	int api_ver; 
@@ -264,9 +282,14 @@ int child_run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 	struct kvm_regs regs;
 	uint64_t memval = 0;
 	int r = 0;
+	struct odf_info o_info;
 	printf("vm----\n");
-	dbg_pr("vcpu : %d", vcpu->fd);
-	dbg_pr("vcpu->kvm_run : %p", vcpu->kvm_run);
+	o_info.child_vcpu_fd = vcpu->fd;
+	o_info.parent_vcpu_fd = PARENT_VCPU_FD;
+	o_info.mem_size = 0x200000;
+	printf("PID of the process : %d\n", getpid());
+	ioctl(vm->sys_fd, KVM_EPT_ODF, &o_info);
+	
 	for (int i=0;; i++) {
 		r = ioctl(vcpu->fd, KVM_RUN, 0);
 		if (r < 0) {
@@ -335,17 +358,10 @@ extern const unsigned char guest64[], guest64_end[];
 
 void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_regs parent_regs){
 	struct vm vm; 
-	struct vcpu vcpu;
-
-	#ifdef use_replayer
-	vm = *parent_vm;
-	#endif 
+	struct vcpu vcpu; 
 	// struct kvm_sregs parent_sregs;
 	// struct kvm_regs parent_regs;
-	/*
-		commenting this stuff out for testing with replay
-	*/
-	#ifndef use_replayer
+
 	child_vm_init(parent_vm, &vm, 0x200000);
 	vcpu_init(&vm, &vcpu);
 	
@@ -357,22 +373,6 @@ void fork_child(struct vm *parent_vm, struct kvm_sregs parent_sregs, struct kvm_
 		perror("KVM_SET_REGS");
 		exit(1);
 	}
-	#endif
-
-	#ifdef use_replayer
-	replay_child();
-	replay_print_child_fds();
-	replay_print_parent_fds();
-	vm.fd = parent_fds[1];
-	vm.sys_fd = parent_fds[0];
-	vm.mem = parent_vm->mem;
-	vcpu.fd = parent_fds[2];
-	vcpu.kvm_run = replay_kvm_run;
-
-	#endif
-	/*
-		commented uptil this point
-	*/
 	// memcpy(vm.mem, guest64, guest64_end-guest64); //Todo : remove it 
 	child_run_vm(&vm, &vcpu, 8);
 	return; 
@@ -383,6 +383,7 @@ struct fork_info {
 	int vm_fd;
 	int vcpu_fd;
 };
+
 
 void fork_child_with_ioctl(struct fork_info *info, int sys_fd){
 	struct vm vm;
@@ -424,6 +425,7 @@ void fork_child_with_ioctl(struct fork_info *info, int sys_fd){
 
 int run_vm(struct vm *vm, struct vcpu *vcpu, size_t sz)
 {
+	struct odf_info o_info;
 	struct kvm_sregs parent_sregs;
 	struct kvm_regs parent_regs;
 	struct fork_info info;
@@ -444,7 +446,6 @@ restart:
 		
 		switch (vcpu->kvm_run->exit_reason) {
 		case KVM_EXIT_HLT:
-						
 			if (ioctl(vcpu->fd, KVM_GET_SREGS, &parent_sregs) < 0) {
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
@@ -453,35 +454,26 @@ restart:
 				perror("KVM_GET_SREGS - fc");
 				exit(1);
 			}
-			
-
 			if (parent_regs.rax == 42)
-			{	
-				#ifdef use_replayer
-				replay_detach_strace();
-				replay_generate_csv_logs(raw_logs, csv_logs);
-				replay_read_csv(csv_logs);
-				replay_print_ioctl_list();
-				#endif
+			{				
 				if(MODE == 1){
 					printf("This is the pid of the parent : %ld", (long)getpid());
 					fflush(stdout);
 					if(fork() == 0){
-						fflush(stdout);
 						printf("== Child VM Started====\n");
 						//do work for the child 
 						//setup the vm --> with the same memory as that of the parent store in the 
 						//in vm->mem =====> Do all of the child vm init
 						//setup a vcpu --> set its sreg and reg the same as that of the parent vcpu  
 						printf("This is the pid of child : %ld", (long)getpid());
+						fflush(stdout);
 						// sleep(50);
-						#ifndef use_replayer
-						close(vm->fd);
-						close(vm->sys_fd);
-						close(vcpu->fd);
-						#endif
-						dbg_pr("[parent]\tvcpu->kvm_run : %p", vcpu->kvm_run);
+
+						PARENT_VCPU_FD = vcpu->fd;
+						PARENT_VM_FD = vm->fd;						
+
 						fork_child(vm, parent_sregs, parent_regs);
+						// ---- add the code for EPT sharing ioctl here
 						printf("== Child VM Ended====\n");
 						return 0;
 					} else {
@@ -824,16 +816,9 @@ int main(int argc, char **argv)
 	struct vm parent_vm;
 	struct vcpu vcpu;
 	struct vcpu parent_vcpu;
-	int ret = 0;
+	struct odf_info o_info;
 	// clock_t start_clk;
 
-	hello_test();
-	// replayer_main();
-	replay_init();
-	// need /proc/sys/kernel/yama/ptrace_scope to be 0 for this 
-	#ifdef use_replayer
-	replay_attach_strace(getpid(), "replayer/logs/final.log");
-	#endif
 	enum {
 		REAL_MODE,
 		PROTECTED_MODE,
@@ -886,20 +871,23 @@ int main(int argc, char **argv)
 	// start_clk = clock();
 	vcpu_init(&parent_vm, &parent_vcpu);
 	// printf("\nTime for vcpu init (parent) %lg \n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
-	
 	// child_vcpu_init(&parent_vcpu, &vm, &vcpu);
+	// o_info.child_vcpu_fd = parent_vcpu.fd;
+	// o_info.parent_vcpu_fd = parent_vcpu.fd;
+	// o_info.mem_size = 0x200000;
+	// printf("PID of the process : %d\n", getpid());
+	// ioctl(parent_vm.sys_fd, KVM_EPT_ODF, &o_info);
+
 
 	switch (mode) {
 	case REAL_MODE:
-		ret = !run_real_mode(&vm, &vcpu);
-		goto ret_gracefully;
+		return !run_real_mode(&vm, &vcpu);
+
 	case PROTECTED_MODE:
-		ret = !run_protected_mode(&vm, &vcpu);
-		goto ret_gracefully;
+		return !run_protected_mode(&vm, &vcpu);
 
 	case PAGED_32BIT_MODE:
-		ret = !run_paged_32bit_mode(&vm, &vcpu);
-		goto ret_gracefully;
+		return !run_paged_32bit_mode(&vm, &vcpu);
 
 	case LONG_MODE:
 		// start_clk = clock();
@@ -910,16 +898,13 @@ int main(int argc, char **argv)
 		// printf("\nTime for VCPU init(child): %lg\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
 		// start_clk = clock();
 		// MODE = 1;
-		ret = !run_long_mode(&parent_vm, &parent_vcpu);
-		goto ret_gracefully;
+		run_long_mode(&parent_vm, &parent_vcpu);
 		// run_long_mode(NULL, &parent_vm, &parent_vcpu);
 		// run_long_mode(&parent_vcpu, &vm, &vcpu);
 		// printf("\nDid calls in %lg seconds\n", (clock() - start_clk) / (double) CLOCKS_PER_SEC);
-
+ 		
+		return 0;
 	}
 
-ret_gracefully: 
-	replay_destroy();
-
-	return !ret;
+	return 1;
 }

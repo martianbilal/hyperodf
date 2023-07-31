@@ -73,11 +73,3 @@ mechanism, without notifying the userspace VM host program of the VM
 exits caused by these instructions.  So we need some other way to
 trigger a VM exit.  HLT is convenient because it is a single-byte
 instruction.
-
-
-## rePlayer Usage 
-
-In order to use it with replayer, run `make CFLAGS='-Duse_replayer'` instead of 
-`make`. 
-
-`use_replayer` macro controls wether we would be manually re running the ioctls in the child VM or would we let the rePlayer do it for us.

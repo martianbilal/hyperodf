@@ -5,6 +5,15 @@
 
 /* cpus.c */
 
+// #define DBG_CPUS
+#ifdef DBG_CPUS
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%d|%s():%d] " fmt, \
+    getpid(), __func__,  __LINE__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) /* do nothing */
+#endif
+
+
 /* CPU execution threads */
 
 typedef struct CpusAccel {
@@ -21,9 +30,6 @@ typedef struct CpusAccel {
     int64_t (*get_virtual_clock)(void);
     int64_t (*get_elapsed_ticks)(void);
 } CpusAccel;
-
-
-extern void *VAPIC_RESTORE;
 
 /* register accel-specific cpus interface implementation */
 void cpus_register_accel(const CpusAccel *i);

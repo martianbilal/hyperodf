@@ -423,20 +423,6 @@ LinuxAioState *laio_init(Error **errp)
     int rc;
     LinuxAioState *s;
 
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("laio_init\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-
-
     s = g_malloc0(sizeof(*s));
     rc = event_notifier_init(&s->e, false);
     if (rc < 0) {

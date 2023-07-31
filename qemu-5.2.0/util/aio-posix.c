@@ -676,19 +676,6 @@ void aio_context_setup(AioContext *ctx)
     ctx->fdmon_ops = &fdmon_poll_ops;
     ctx->epollfd = -1;
 
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("%s called\n", __func__);
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-    printf("\n");
-
     /* Use the fastest fd monitoring implementation if available */
     if (fdmon_io_uring_setup(ctx)) {
         return;

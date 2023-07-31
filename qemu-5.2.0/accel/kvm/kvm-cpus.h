@@ -12,6 +12,14 @@
 
 #include "sysemu/cpus.h"
 
+// #define DBG_KVM
+#ifdef DBG_KVM
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
+    __func__,  __LINE__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) /* do nothing */
+#endif
+
 extern const CpusAccel kvm_cpus;
 
 int kvm_init_vcpu(CPUState *cpu, Error **errp);

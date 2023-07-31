@@ -16,6 +16,7 @@
 #include "qemu/osdep.h"
 #include "qemu/error-report.h"
 #include "qemu/main-loop.h"
+#include "qemu/thread.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/runstate.h"
 #include "sysemu/cpus.h"
@@ -51,7 +52,9 @@ static void *kvm_vcpu_thread_fn(void *arg)
     cpu->system_reset = false;
     
     rcu_register_thread();
-    ski_forkall_thread_add_self_tid();
+    if(USE_HYPERODF){
+        ski_forkall_thread_add_self_tid();
+    }
 
 
     qemu_mutex_lock_iothread();
@@ -90,6 +93,8 @@ static void *kvm_vcpu_thread_fn(void *arg)
     do {
         if (cpu_can_run(cpu)) {
             r = kvm_cpu_exec(cpu);
+            // printf("[%s:%d] ended kvm_cpu_exec with r = %d\n", __func__, __LINE__, r);
+
             if (r == EXCP_DEBUG) {
                 cpu_handle_guest_debug(cpu);
             }
@@ -122,14 +127,22 @@ static void *kvm_vcpu_thread_fn(void *arg)
         //     qemu_mutex_lock_iothread();
         // }
 
+        // printf("[%s:%d] starting to wait for io event\n", __func__, __LINE__);
 
         qemu_wait_io_event(cpu);
+        // printf("[%d|%s:%d] ended wait for io event\n", getpid(), __func__, __LINE__);
     } while (!cpu->unplug || cpu_can_run(cpu));
+
+
+    // printf("[%s:%d] cpu is unplugged or cpu cannot run\n", __func__, __LINE__);
 
     kvm_destroy_vcpu(cpu);
     cpu_thread_signal_destroyed(cpu);
     qemu_mutex_unlock_iothread();
     rcu_unregister_thread();
+
+    // printf("[%s:%d] done with kvm_vcpu_thread_fn and we have ended it\n", __func__, __LINE__);
+
     return NULL;
 }
 
@@ -140,6 +153,7 @@ void kvm_start_vcpu_thread(CPUState *cpu)
     #ifdef DBG
     printf("[debug] VCPU Thread create called! \n");
     #endif
+    printf("[%s:%d] creating the vcpu thread\n", __func__, __LINE__);
 
     cpu->thread = g_malloc0(sizeof(QemuThread));
     cpu->halt_cond = g_malloc0(sizeof(QemuCond));
@@ -148,6 +162,7 @@ void kvm_start_vcpu_thread(CPUState *cpu)
              cpu->cpu_index);
     qemu_thread_create(cpu->thread, thread_name, kvm_vcpu_thread_fn,
                        cpu, QEMU_THREAD_JOINABLE);
+    printf("[%s:%d] ending the vcpu thread\n", __func__, __LINE__);
 }
 
 const CpusAccel kvm_cpus = {

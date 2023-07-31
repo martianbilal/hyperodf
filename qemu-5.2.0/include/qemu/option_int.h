@@ -28,6 +28,7 @@
 
 #include "qemu/option.h"
 #include "qemu/error-report.h"
+#include "qemu/typedefs.h"
 
 struct QemuOpt {
     char *name;

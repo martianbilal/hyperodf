@@ -1,23 +1,11 @@
-CFLAGS = -O0 -g
-INCLUDES = -I./replayer/src
-
-SRCS_REPLAYER = replayer/src/parse-logs.c replayer/src/sys-replay.c replayer/src/read-structs.c
-OBJS_REPLAYER = $(SRCS_REPLAYER:.c=.o)
+CFLAGS = -O1 -g
 
 .PHONY: run
-run: clean kvm-hello-world
+run: kvm-hello-world
 	./kvm-hello-world -l -1
 
-replayer:
-	cd ./replayer 
-	$(MAKE) clean
-	$(MAKE)
-
-kvm-hello-world: kvm-hello-world.o payload.o $(OBJS_REPLAYER)
-	$(CC) $(CFLAGS) $^ -o $@
-	# cd replayer
-	# ./replayer/ioctl_parse.py
-	# cd ../
+kvm-hello-world: kvm-hello-world.o payload.o
+	$(CC) $^ -o $@
 
 payload.o: payload.ld guest16.o guest32.img.o guest64.img.o
 	$(LD) -T $< -o $@
@@ -37,14 +25,8 @@ guest32.img: guest32.o
 %.img.o: %.img
 	$(LD) -b binary -r $^ -o $@
 
-.c.o:
-	$(CC) $(CFLAGS) $(INCLUDES) -c $<  -o $@
-
 .PHONY: clean
 clean:
 	$(RM) kvm-hello-world kvm-hello-world.o payload.o guest16.o \
 		guest32.o guest32.img guest32.img.o \
-		guest64.o guest64.img guest64.img.o \
-		replayer/src/sys-replay.o \
-		replayer/src/read-structs.o \
-		replayer/src/parse-logs.o 
+		guest64.o guest64.img guest64.img.o

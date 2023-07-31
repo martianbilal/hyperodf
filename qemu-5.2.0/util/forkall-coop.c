@@ -23,10 +23,27 @@ static int global_thread_seq = 0;
 // this is for aio thread pool
 static int thread_pool_read = 0; 
 
+
+// global variable for checking if cpu has processed the queued work
+// in vcpu thread and we can invocate VCPU event now
+int PARENT_VCPU_FD = 0;
+int PARENT_VM_FD = 0;
+// set it to 0, so we only start detecting it after forkall
+int PARENT_PID = 0;
+
+int queued_work_complete = 0;
+
+int entering_after_save_snap = 0;
+
 int ski_forkall_enabled = 0;
 int ski_forkall_round = 0;
 int ski_forkall_hypercall_done = 0;
 int ski_forkall_thread_pool_ready_fork = 0; 
+
+int save_snapshot_event = 0;
+
+int snapshot_in_progress = 0;
+int sanpshot_complete = 0;
 
 
 #pragma GCC push_options
@@ -442,7 +459,6 @@ pid_t ski_forkall_master(){
 	// Now that we got the state of all threads 
 	int pid = -1;
 	while(pid != 0)
-	// if((pid = 38429)){
 	if((pid = fork())){
 		// Parent
 		ski_log_forkall("Parent (child pid = %d)\n", pid);

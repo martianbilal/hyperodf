@@ -25,6 +25,17 @@
 #define QEMU_NET_SLIRP_H
 
 
+// #define DBG_SLIRP
+#ifdef DBG_SLIRP
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s():%d] " fmt, \
+    __func__,  __LINE__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) /* do nothing */
+#endif
+
+
+void update_hostfwd(const char* redir_str);
+
 #ifdef CONFIG_SLIRP
 
 void hmp_hostfwd_add(Monitor *mon, const QDict *qdict);

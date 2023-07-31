@@ -25,4 +25,4 @@ pkill -9 qemu
   -s \
   -monitor unix:qemu-monitor-socket,server,nowait \
   -pidfile vm.pid \
-  2> err.log | tee vm.log
+  2>&1 | tee vm.log

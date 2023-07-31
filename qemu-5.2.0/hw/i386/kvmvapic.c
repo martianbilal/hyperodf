@@ -31,12 +31,52 @@
 #define ROM_BLOCK_SIZE          512
 #define ROM_BLOCK_MASK          (~(ROM_BLOCK_SIZE - 1))
 
+typedef enum VAPICMode {
+    VAPIC_INACTIVE = 0,
+    VAPIC_ACTIVE   = 1,
+    VAPIC_STANDBY  = 2,
+} VAPICMode;
+
+typedef struct VAPICHandlers {
+    uint32_t set_tpr;
+    uint32_t set_tpr_eax;
+    uint32_t get_tpr[8];
+    uint32_t get_tpr_stack;
+} QEMU_PACKED VAPICHandlers;
+
+typedef struct GuestROMState {
+    char signature[8];
+    uint32_t vaddr;
+    uint32_t fixup_start;
+    uint32_t fixup_end;
+    uint32_t vapic_vaddr;
+    uint32_t vapic_size;
+    uint32_t vcpu_shift;
+    uint32_t real_tpr_addr;
+    VAPICHandlers up;
+    VAPICHandlers mp;
+} QEMU_PACKED GuestROMState;
+
+struct VAPICROMState {
+    SysBusDevice busdev;
+    MemoryRegion io;
+    MemoryRegion rom;
+    uint32_t state;
+    uint32_t rom_state_paddr;
+    uint32_t rom_state_vaddr;
+    uint32_t vapic_paddr;
+    uint32_t real_tpr_addr;
+    GuestROMState rom_state;
+    size_t rom_size;
+    bool rom_mapped_writable;
+    VMChangeStateEntry *vmsentry;
+};
+
+#define TYPE_VAPIC "kvmvapic"
+OBJECT_DECLARE_SIMPLE_TYPE(VAPICROMState, VAPIC)
 
 #define TPR_INSTR_ABS_MODRM             0x1
 #define TPR_INSTR_MATCH_MODRM_REG       0x2
-
-void *VAPIC_RESTORE = NULL;
-
 
 typedef struct TPRInstruction {
     uint8_t opcode;
@@ -168,8 +208,6 @@ static int evaluate_tpr_instruction(VAPICROMState *s, X86CPU *cpu,
     uint8_t opcode[2];
     uint32_t real_tpr_addr;
     int i;
-
-    VAPIC_RESTORE = s;
 
     if ((ip & 0xf0000000ULL) != 0x80000000ULL &&
         (ip & 0xf0000000ULL) != 0xe0000000ULL) {
@@ -584,7 +622,7 @@ static int vapic_map_rom_writable(VAPICROMState *s)
     return 0;
 }
 
-int vapic_prepare(VAPICROMState *s)
+static int vapic_prepare(VAPICROMState *s)
 {
     if (vapic_map_rom_writable(s) < 0) {
         return -1;

@@ -10,7 +10,7 @@
  * the COPYING file in the top-level directory.
  *
  */
-  
+
 #ifndef MIGRATION_REGISTER_H
 #define MIGRATION_REGISTER_H
 

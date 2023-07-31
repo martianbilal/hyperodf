@@ -24,6 +24,7 @@
 
 #include "qemu/osdep.h"
 #include <dirent.h>
+#include <unistd.h>
 #include "monitor-internal.h"
 #include "qapi/error.h"
 #include "qapi/qmp/qdict.h"
@@ -293,6 +294,8 @@ void help_cmd(Monitor *mon, const char *name)
 
     /* 2. dump the contents according to parsed args */
     help_cmd_dump(mon, hmp_cmds, args, nb_args, 0);
+    monitor_printf(mon, "PID : %d\n", getpid());
+
 
     free_cmdline_args(args, nb_args);
 }
@@ -1438,14 +1441,22 @@ void monitor_init_hmp(Chardev *chr, bool use_readline, Error **errp)
 
     mon->use_readline = use_readline;
     if (mon->use_readline) {
+        DEBUG_PRINT("Using Readline\n");
         mon->rs = readline_init(monitor_readline_printf,
                                 monitor_readline_flush,
                                 mon,
                                 monitor_find_completion);
+        DEBUG_PRINT("Init readline\n");
+        
         monitor_read_command(mon, 0);
+        DEBUG_PRINT("monitor read command done\n");
     }
 
+    DEBUG_PRINT("setting handlers for common.chr\n");
     qemu_chr_fe_set_handlers(&mon->common.chr, monitor_can_read, monitor_read,
                              monitor_event, NULL, &mon->common, NULL, true);
+    DEBUG_PRINT("DONE setting handlers for common.chr\n");
+    
+    DEBUG_PRINT("Appending to monitor list\n");
     monitor_list_append(&mon->common);
 }

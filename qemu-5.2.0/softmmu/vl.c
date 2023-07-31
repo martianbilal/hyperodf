@@ -86,7 +86,7 @@
 #include "qemu/config-file.h"
 #include "qemu-options.h"
 #include "qemu/main-loop.h"
-#include "util/forkall-coop.h"
+#include <stdbool.h>
 #ifdef CONFIG_VIRTFS
 #include "fsdev/qemu-fsdev.h"
 #endif
@@ -122,6 +122,7 @@
 #include "qemu/guest-random.h"
 #include "block/qcow2.h"
 #include <signal.h>
+#include "util/forkall-coop.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 // #define DBG
@@ -1746,6 +1747,7 @@ static bool main_loop_should_exit(void)
     if (qemu_powerdown_requested()) {
         qemu_system_powerdown();
     }
+    // if (qemu_vmstop_requested(&r) && !save_snapshot_event) {
     if (qemu_vmstop_requested(&r)) {
         vm_stop(r);
     }
@@ -1755,9 +1757,10 @@ static bool main_loop_should_exit(void)
 void qemu_main_loop(void)
 {
 #ifdef CONFIG_PROFILER
-    int64_t ti;
+    int64_t ti;1
 #endif
     while (!main_loop_should_exit()) {
+    // while (true) {
 #ifdef CONFIG_PROFILER
         ti = profile_getclock();
 #endif
@@ -2204,13 +2207,36 @@ static int device_init_func(void *opaque, QemuOpts *opts, Error **errp)
 static int chardev_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     Error *local_err = NULL;
-
+    DEBUG_PRINT("chardev_init_func printing opts : \n");
+    // qemu_opts_print(opts, "\n\t");
     if (!qemu_chr_new_from_opts(opts, NULL, &local_err)) {
         if (local_err) {
             error_propagate(errp, local_err);
             return -1;
         }
         exit(0);
+    }
+    return 0;
+}
+
+#ifndef QEMU_OPTION_INT_H
+struct QemuOpts {
+    char *id;
+    QemuOptsList *list;
+    Location loc;
+    QTAILQ_HEAD(, QemuOpt) head;
+    QTAILQ_ENTRY(QemuOpts) next;
+};
+#endif
+
+static int chardev_pre_init_func(void *opaque, QemuOpts *opts, Error **errp)
+{
+    DEBUG_PRINT("chardev_pre_init_func \n");
+
+    if(strcmp("compat_monitor1", opts->id) == 0){
+        DEBUG_PRINT("chardev_pre_init_func calling the actual func\n");
+        // qemu_opts_print(opts, "\n\t");
+        return chardev_init_func(opaque, opts, errp);
     }
     return 0;
 }
@@ -2227,6 +2253,19 @@ static int mon_init_func(void *opaque, QemuOpts *opts, Error **errp)
     return monitor_init_opts(opts, errp);
 }
 
+
+
+static int mon_pre_init_func(void *opaque, QemuOpts *opts, Error **errp)
+{   
+    // compare opts->id to compat_monitor0
+    if(strcmp(opts->id, "compat_monitor0") == 0)
+    {
+        DEBUG_PRINT("mon_pre_init_func\n");
+        return 0;
+    }
+    return mon_init_func(opaque, opts, errp);
+}
+
 static void monitor_parse(const char *optarg, const char *mode, bool pretty)
 {
     static int monitor_device_index = 0;
@@ -2234,12 +2273,16 @@ static void monitor_parse(const char *optarg, const char *mode, bool pretty)
     const char *p;
     char label[32];
 
+    DEBUG_PRINT("optsarg: %s  |  mode : %s\n", optarg, mode);
+
     if (strstart(optarg, "chardev:", &p)) {
         snprintf(label, sizeof(label), "%s", p);
     } else {
+        DEBUG_PRINT("monitor_device_index: %d\n", monitor_device_index);
         snprintf(label, sizeof(label), "compat_monitor%d",
                  monitor_device_index);
         opts = qemu_chr_parse_compat(label, optarg, true);
+        DEBUG_PRINT("label : %s\n", label);
         if (!opts) {
             error_report("parse error: %s", optarg);
             exit(1);
@@ -3526,38 +3569,108 @@ static void qemu_pre_save_snapshot_cleanup(void){
 static void qemu_pre_load_snapshot_setup(void){
     return;
 }
+#define BILLION  1000000000L;
+static int save_snapshot_now = 1;
+
+void handle_save_snapshot(void *opaque){
+    CPUState *cpu = (CPUState*)opaque; 
+    struct KVMState* s = cpu->kvm_state;
+    int result; 
+    struct timespec start, stop;
+    double accum;
+
+    // if(save_snapshot_now != 1){
+    //     return;
+    // } else {
+    //     save_snapshot_now = 0;
+    // }
+    printf("[Debug] handle_save_snapshot is called! \n");
+    if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
+    {
+        perror( "clock gettime" );
+        return EXIT_FAILURE;
+    }
+
+    result = event_notifier_test_and_clear(&(cpu->save_event));
+    if(result == 1 ) {
+        printf("[Debug] Save_snapshot event;\n");
+        if(save_snapshot("newtest", NULL) == 0){
+            entering_after_save_snap = 1;
+            if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
+            {
+                perror( "clock gettime" );
+                return EXIT_FAILURE;
+            }
+            accum = ( stop.tv_sec - start.tv_sec )
+                + (double)( stop.tv_nsec - start.tv_nsec )
+                / (double)BILLION;
+            printf( "save_snapshot took %.5lf seconds\n", accum );
+
+            vm_start();
+        }
+    }
+}
+
+
+
+// static void update_hostfwd(){
+//     getSlirpState();
+//     return;
+// }
+
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
 
 void handle_load_snapshot(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
     struct KVMState* s = cpu->kvm_state;
     int result; 
+    struct timespec start, stop;
+    struct odf_info o_info;
+    double accum;
+
+
+    // create the o_info
+    o_info.child_vcpu_fd = cpu->kvm_fd;
+	o_info.parent_vcpu_fd = PARENT_VCPU_FD;
+	
+    // TODO : put the right memory size
+    // as seen in kvm_set_mem or something
+    o_info.mem_size = 0x200000;
+	printf("PID of the process : %d\n", getpid());
+    #define KVM_EPT_ODF 0xC00CAEC7
+    
 
     printf("[Debug] handle_load_snapshot is called! \n");
+    if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
+    {
+        perror( "clock gettime" );
+        return EXIT_FAILURE;
+    }
 
     // vm_stop(RUN_STATE_RESTORE_VM);
     result = event_notifier_test_and_clear(&(cpu->load_event));
     if(result == 1 ) {
         printf("[Debug] Load_snapshot event;\n");
-        if( clock_gettime( CLOCK_REALTIME, &(cpu->start_forkall_master)) == -1 ) {
-            perror( "clock gettime" );
-            exit( EXIT_FAILURE );
-        } 
-        vm_stop(RUN_STATE_RESTORE_VM);
-        
-        if(load_snapshot_memory("test", NULL) == 0){
+        if(load_snapshot("newtest", NULL) == 0){
+            save_snapshot_event = 0;
+            // make the ioctl to share the TDP table/EPT
+            // ioctl(s->fd, KVM_EPT_ODF, &o_info);
+            // update_hostfwd("tcp:127.0.0.1:10023-:22");
             vm_start();
-            if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
-                perror( "clock gettime" );
-                exit( EXIT_FAILURE );
-            }
-            printf("[DEBUG] time after the load_snapshot : %lf\n", (cpu->end_forkall_master.tv_sec + (cpu->end_forkall_master.tv_nsec / 1E9)));
-        }
-        else{
-            vm_start();
-            
-            printf("Error in loading the snapshot\n");
         }
     }
+    if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
+    {
+        perror( "clock gettime" );
+        return EXIT_FAILURE;
+    }
+    accum = ( stop.tv_sec - start.tv_sec )
+    + (double)( stop.tv_nsec - start.tv_nsec ) / (double)BILLION;
+    printf( "Time spent in the load_snapshot:  %lf\n", accum );
     return;
 }
 
@@ -3575,12 +3688,15 @@ void handle_fork(void *opaque){
     int slot_size; 
     Error *local_err = NULL;
     // AioContext *ctx;
+    PARENT_VM_FD = s->vmfd;
 
 
     // memset(&prefork_state, 0, sizeof(prefork_state));
     #ifdef DBG
     printf("We are reading for the fork\n");
     #endif
+
+    printf("[%s:%d] handling the fork event\n", __func__, __LINE__);
 
     result = event_notifier_test_and_clear(&(cpu->fork_event));
 
@@ -3632,20 +3748,20 @@ void handle_fork(void *opaque){
         printf("[debug] stopped the vm\n");
         #endif
         
-        // runstate_is_running();
+        runstate_is_running();
 
-        // bdrv_drain_all_begin();
+        bdrv_drain_all_begin();
         // cpu_synchronize_all_states();
         // cpu_stop_current();
         // // job_cancel_sync_all();
         // bdrv_close_all();
-        // bdrv_drain_all_end();
+        bdrv_drain_all_end();
         // if (!bdrv_all_can_snapshot(has_devices, devices, errp)) {
         //     return false;
         // }
 
 
-        // aio_context_acquire(qemu_get_aio_context());
+        aio_context_acquire(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
         // fork_save_vm_state(cpu, prefork_state);
         // close(9);
@@ -3658,7 +3774,7 @@ void handle_fork(void *opaque){
         printf("Done with the save snapshot!");
         #endif  
         
-        // aio_context_release(qemu_get_aio_context());
+        aio_context_release(qemu_get_aio_context());
         // save_snapshot("prefork_state", NULL);
         // close("snapshot.qcow2");
         // sleep(30);
@@ -3681,13 +3797,12 @@ void handle_fork(void *opaque){
 
         // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-        // kvm_set_old_env(cpu);
-        // gdbserver_cleanup();
+        kvm_set_old_env(cpu);
+        gdbserver_cleanup();
         // gdbserver_fork_linux();
 
         // Bilal : Adding this call to the forkall master for testing
         ret = ski_forkall_master();
-        ski_forkall_patch_thread_references();
         // [Bilal] [Measure] clock time on return from forkall master
         if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
             perror( "clock gettime" );
@@ -3701,6 +3816,7 @@ void handle_fork(void *opaque){
         if (ret < 0){
             printf("Failed to fork\n");
         } else if (ret == 0) {
+            // exit(0);
             // [Bilal] [Measure] clock time on hypercall
             printf("[DEBUG] load snapshot is called!\n");
             fflush(stdout);
@@ -3891,12 +4007,30 @@ void handle_fork(void *opaque){
             // load_snapshot("newtest", NULL);
             return; 
         } else {
-            waitpid(ret, &status, 0);
+            // waitpid(ret, &status, 0);
+            // wait(1);
+            // wait for 1 second
+            sleep(2);
+            PARENT_PID = getpid();
+
+            monitor_parse("unix:qemu-monitor-socket1,server,nowait", "readline", NULL);
+            DEBUG_PRINT("returned from the monitor parse\n");
+            qemu_opts_foreach(qemu_find_opts("chardev"),
+                      chardev_pre_init_func, NULL, &error_fatal);
+            DEBUG_PRINT("returned from the chardev pre init func\n");
+            qemu_opts_foreach(qemu_find_opts("mon"),
+                      mon_pre_init_func, NULL, &error_fatal);
+            // update_hostfwd("tcp:127.0.0.1:10025-:22");
             // qemu_cleanup();
             // load_snapshot("newtest", NULL);
-            dump_cpu_state(cpu, "pre-fork.dat");
+            // dump_cpu_state(cpu, "pre-fork.dat");
+            // vm_start();
             // load_snapshot("newtest", NULL);
-
+            // kvm_cpu_synchronize_post_init(cpu);
+            // vm_start();
+            DEBUG_PRINT("Started the VM\n");
+            
+            printf("[%s:%d]IN the parent process\n", __func__, __LINE__);
             // exit(0);
             return;
             // qemu_mutex_unlock_iothread();
@@ -5578,9 +5712,15 @@ void qemu_init(int argc, char **argv, char **envp)
     if(result < 0) {
         printf("Failed to init notifier\n");
     }
+    
     result = event_notifier_init(&(cpu->load_event), 0); 
     if(result < 0) {
         printf("Failed to init notifier\n");
+    }
+
+    result = event_notifier_init(&(cpu->save_event), 0); 
+    if(result < 0) {
+        printf("Failed to init notifier[save_event]\n");
     }
 
     printf("Event RFD : %d\n", cpu->fork_event.rfd);
@@ -5600,9 +5740,12 @@ void qemu_init(int argc, char **argv, char **envp)
     // printf("success :: make the pipe system call \n");
     qemu_set_fd_handler(cpu->fork_event.rfd, handle_fork, NULL, cpu);
     qemu_set_fd_handler(cpu->load_event.rfd, handle_load_snapshot, NULL, cpu);
+    qemu_set_fd_handler(cpu->save_event.rfd, handle_save_snapshot, NULL, cpu);
 
     accel_setup_post(current_machine);
     os_setup_post();
+    // save_snapshot("newtest", NULL);
+    // load_snapshot("newtest", NULL);
 
     return;
 }
@@ -5821,7 +5964,6 @@ void qemu_init_child(int argc, char **argv, char **envp)
             }
         }
     }
-
     if (userconfig) {
         if (qemu_read_default_config_file() < 0) {
             exit(1);

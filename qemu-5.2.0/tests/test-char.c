@@ -1455,104 +1455,105 @@ int main(int argc, char **argv)
 
     g_test_init(&argc, &argv, NULL);
 
-//     if (socket_check_protocol_support(&has_ipv4, &has_ipv6) < 0) {
-//         g_printerr("socket_check_protocol_support() failed\n");
-//         goto end;
-//     }
+    if (socket_check_protocol_support(&has_ipv4, &has_ipv6) < 0) {
+        g_printerr("socket_check_protocol_support() failed\n");
+        goto end;
+    }
 
-//     module_call_init(MODULE_INIT_QOM);
-//     qemu_add_opts(&qemu_chardev_opts);
+    module_call_init(MODULE_INIT_QOM);
+    qemu_add_opts(&qemu_chardev_opts);
 
-//     g_test_add_func("/char/null", char_null_test);
-//     g_test_add_func("/char/invalid", char_invalid_test);
-//     g_test_add_func("/char/ringbuf", char_ringbuf_test);
-//     g_test_add_func("/char/mux", char_mux_test);
-// #ifdef _WIN32
-//     g_test_add_func("/char/console/subprocess", char_console_test_subprocess);
-//     g_test_add_func("/char/console", char_console_test);
-// #endif
-//     g_test_add_func("/char/stdio/subprocess", char_stdio_test_subprocess);
-//     g_test_add_func("/char/stdio", char_stdio_test);
-// #ifndef _WIN32
-//     g_test_add_func("/char/pipe", char_pipe_test);
-// #endif
-//     g_test_add_func("/char/file", char_file_test);
-// #ifndef _WIN32
-//     g_test_add_func("/char/file-fifo", char_file_fifo_test);
-// #endif
+    g_test_add_func("/char/null", char_null_test);
+    return g_test_run();
+    g_test_add_func("/char/invalid", char_invalid_test);
+    g_test_add_func("/char/ringbuf", char_ringbuf_test);
+    g_test_add_func("/char/mux", char_mux_test);
+#ifdef _WIN32
+    g_test_add_func("/char/console/subprocess", char_console_test_subprocess);
+    g_test_add_func("/char/console", char_console_test);
+#endif
+    g_test_add_func("/char/stdio/subprocess", char_stdio_test_subprocess);
+    g_test_add_func("/char/stdio", char_stdio_test);
+#ifndef _WIN32
+    g_test_add_func("/char/pipe", char_pipe_test);
+#endif
+    g_test_add_func("/char/file", char_file_test);
+#ifndef _WIN32
+    g_test_add_func("/char/file-fifo", char_file_fifo_test);
+#endif
 
-// #define SOCKET_SERVER_TEST(name, addr)                                  \
-//     static CharSocketServerTestConfig server1 ## name =                 \
-//         { addr, false, false };                                         \
-//     static CharSocketServerTestConfig server2 ## name =                 \
-//         { addr, true, false };                                          \
-//     static CharSocketServerTestConfig server3 ## name =                 \
-//         { addr, false, true };                                          \
-//     static CharSocketServerTestConfig server4 ## name =                 \
-//         { addr, true, true };                                           \
-//     g_test_add_data_func("/char/socket/server/mainloop/" # name,        \
-//                          &server1 ##name, char_socket_server_test);     \
-//     g_test_add_data_func("/char/socket/server/wait-conn/" # name,       \
-//                          &server2 ##name, char_socket_server_test);     \
-//     g_test_add_data_func("/char/socket/server/mainloop-fdpass/" # name, \
-//                          &server3 ##name, char_socket_server_test);     \
-//     g_test_add_data_func("/char/socket/server/wait-conn-fdpass/" # name, \
-//                          &server4 ##name, char_socket_server_test)
+#define SOCKET_SERVER_TEST(name, addr)                                  \
+    static CharSocketServerTestConfig server1 ## name =                 \
+        { addr, false, false };                                         \
+    static CharSocketServerTestConfig server2 ## name =                 \
+        { addr, true, false };                                          \
+    static CharSocketServerTestConfig server3 ## name =                 \
+        { addr, false, true };                                          \
+    static CharSocketServerTestConfig server4 ## name =                 \
+        { addr, true, true };                                           \
+    g_test_add_data_func("/char/socket/server/mainloop/" # name,        \
+                         &server1 ##name, char_socket_server_test);     \
+    g_test_add_data_func("/char/socket/server/wait-conn/" # name,       \
+                         &server2 ##name, char_socket_server_test);     \
+    g_test_add_data_func("/char/socket/server/mainloop-fdpass/" # name, \
+                         &server3 ##name, char_socket_server_test);     \
+    g_test_add_data_func("/char/socket/server/wait-conn-fdpass/" # name, \
+                         &server4 ##name, char_socket_server_test)
 
-// #define SOCKET_CLIENT_TEST(name, addr)                                  \
-//     static CharSocketClientTestConfig client1 ## name =                 \
-//         { addr, NULL, false, false, char_socket_event };                \
-//     static CharSocketClientTestConfig client2 ## name =                 \
-//         { addr, NULL, true, false, char_socket_event };                 \
-//     static CharSocketClientTestConfig client3 ## name =                 \
-//         { addr, ",reconnect=1", false, false, char_socket_event };      \
-//     static CharSocketClientTestConfig client4 ## name =                 \
-//         { addr, ",reconnect=1", true, false, char_socket_event };       \
-//     static CharSocketClientTestConfig client5 ## name =                 \
-//         { addr, NULL, false, true, char_socket_event };                 \
-//     static CharSocketClientTestConfig client6 ## name =                 \
-//         { addr, NULL, true, true, char_socket_event };                  \
-//     static CharSocketClientTestConfig client7 ## name =                 \
-//         { addr, ",reconnect=1", true, false,                            \
-//             char_socket_event_with_error };                             \
-//     static CharSocketClientTestConfig client8 ## name =                 \
-//         { addr, ",reconnect=1", false, false, char_socket_event };      \
-//     g_test_add_data_func("/char/socket/client/mainloop/" # name,        \
-//                          &client1 ##name, char_socket_client_test);     \
-//     g_test_add_data_func("/char/socket/client/wait-conn/" # name,       \
-//                          &client2 ##name, char_socket_client_test);     \
-//     g_test_add_data_func("/char/socket/client/mainloop-reconnect/" # name, \
-//                          &client3 ##name, char_socket_client_test);     \
-//     g_test_add_data_func("/char/socket/client/wait-conn-reconnect/" # name, \
-//                          &client4 ##name, char_socket_client_test);     \
-//     g_test_add_data_func("/char/socket/client/mainloop-fdpass/" # name, \
-//                          &client5 ##name, char_socket_client_test);     \
-//     g_test_add_data_func("/char/socket/client/wait-conn-fdpass/" # name, \
-//                          &client6 ##name, char_socket_client_test);     \
-//     g_test_add_data_func("/char/socket/client/reconnect-error/" # name, \
-//                          &client7 ##name, char_socket_client_test);     \
-//     g_test_add_data_func("/char/socket/client/dupid-reconnect/" # name, \
-//                          &client8 ##name, char_socket_client_dupid_test)
+#define SOCKET_CLIENT_TEST(name, addr)                                  \
+    static CharSocketClientTestConfig client1 ## name =                 \
+        { addr, NULL, false, false, char_socket_event };                \
+    static CharSocketClientTestConfig client2 ## name =                 \
+        { addr, NULL, true, false, char_socket_event };                 \
+    static CharSocketClientTestConfig client3 ## name =                 \
+        { addr, ",reconnect=1", false, false, char_socket_event };      \
+    static CharSocketClientTestConfig client4 ## name =                 \
+        { addr, ",reconnect=1", true, false, char_socket_event };       \
+    static CharSocketClientTestConfig client5 ## name =                 \
+        { addr, NULL, false, true, char_socket_event };                 \
+    static CharSocketClientTestConfig client6 ## name =                 \
+        { addr, NULL, true, true, char_socket_event };                  \
+    static CharSocketClientTestConfig client7 ## name =                 \
+        { addr, ",reconnect=1", true, false,                            \
+            char_socket_event_with_error };                             \
+    static CharSocketClientTestConfig client8 ## name =                 \
+        { addr, ",reconnect=1", false, false, char_socket_event };      \
+    g_test_add_data_func("/char/socket/client/mainloop/" # name,        \
+                         &client1 ##name, char_socket_client_test);     \
+    g_test_add_data_func("/char/socket/client/wait-conn/" # name,       \
+                         &client2 ##name, char_socket_client_test);     \
+    g_test_add_data_func("/char/socket/client/mainloop-reconnect/" # name, \
+                         &client3 ##name, char_socket_client_test);     \
+    g_test_add_data_func("/char/socket/client/wait-conn-reconnect/" # name, \
+                         &client4 ##name, char_socket_client_test);     \
+    g_test_add_data_func("/char/socket/client/mainloop-fdpass/" # name, \
+                         &client5 ##name, char_socket_client_test);     \
+    g_test_add_data_func("/char/socket/client/wait-conn-fdpass/" # name, \
+                         &client6 ##name, char_socket_client_test);     \
+    g_test_add_data_func("/char/socket/client/reconnect-error/" # name, \
+                         &client7 ##name, char_socket_client_test);     \
+    g_test_add_data_func("/char/socket/client/dupid-reconnect/" # name, \
+                         &client8 ##name, char_socket_client_dupid_test)
 
-//     if (has_ipv4) {
-//         SOCKET_SERVER_TEST(tcp, &tcpaddr);
-//         SOCKET_CLIENT_TEST(tcp, &tcpaddr);
-//         g_test_add_data_func("/char/socket/server/two-clients/tcp", &tcpaddr,
-//                              char_socket_server_two_clients_test);
-//     }
-// #ifndef WIN32
-//     SOCKET_SERVER_TEST(unix, &unixaddr);
-//     SOCKET_CLIENT_TEST(unix, &unixaddr);
-//     g_test_add_data_func("/char/socket/server/two-clients/unix", &unixaddr,
-//                          char_socket_server_two_clients_test);
-// #endif
+    if (has_ipv4) {
+        SOCKET_SERVER_TEST(tcp, &tcpaddr);
+        SOCKET_CLIENT_TEST(tcp, &tcpaddr);
+        // g_test_add_data_func("/char/socket/server/two-clients/tcp", &tcpaddr,
+                            //  char_socket_server_two_clients_test);
+    }
+#ifndef WIN32
+    SOCKET_SERVER_TEST(unix, &unixaddr);
+    SOCKET_CLIENT_TEST(unix, &unixaddr);
+    // g_test_add_data_func("/char/socket/server/two-clients/unix", &unixaddr,
+                        //  char_socket_server_two_clients_test);
+#endif
 
-//     g_test_add_func("/char/udp", char_udp_test);
-// #if defined(HAVE_CHARDEV_SERIAL) && !defined(WIN32)
-//     g_test_add_func("/char/serial", char_serial_test);
-// #endif
-    // g_test_add_func("/char/hotswap", char_hotswap_test);
-    // g_test_add_func("/char/websocket", char_websock_test);
+    g_test_add_func("/char/udp", char_udp_test);
+#if defined(HAVE_CHARDEV_SERIAL) && !defined(WIN32)
+    g_test_add_func("/char/serial", char_serial_test);
+#endif
+    g_test_add_func("/char/hotswap", char_hotswap_test);
+    g_test_add_func("/char/websocket", char_websock_test);
 
 end:
     return g_test_run();

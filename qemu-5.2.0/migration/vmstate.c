@@ -75,43 +75,6 @@ static void vmstate_handle_alloc(void *ptr, const VMStateField *field,
     }
 }
 
-
-/*
-    load the state of an object from a QEMUFile
-        -> f: the QEMUFile
-        -> vmsd: the VMStateDescription of the object
-        -> opaque: the object
-        
-        VMStateDescription describes the structure of the object along with
-        the functions to save and load the object, and the pointer to the object
-        itself.
-
-        function iterates through the fields of the object and calls the
-        load_state function of the field to load the state of the field.
-
-*/
-
-/*
-1. The first block of code checks the version_id of the object and the one
-provided by the fuzzer. If the version_id provided by the fuzzer is greater
-than the one of the object, then the fuzzer gets an error message. If the
-version_id provided by the fuzzer is less than the one of the object, then
-the fuzzer will check if there is a function to handle this case. If there is
-a function to handle this case, then the fuzzer will use that function. If
-there is no function to handle this case, then the fuzzer gets an error
-message.
-2. The second block of code checks if there is a pre_load function for the
-object. If there is a pre_load function for the object, then the fuzzer will
-use that function. If there is no pre_load function for the object, then the
-fuzzer will continue to load the state of the object.
-3. The third block of code iterates over the fields of the object and loads
-the state of the object. If the field exists, then the fuzzer will load the
-state of the field. If the field does not exist, then the fuzzer will not
-load the state of the field.
-4. The fourth block of code checks if there is a post_load function for the
-object. If there is a post_load function for the object, then the fuzzer will
-use that function. If there is no post_load function for the object, then the
-fuzzer will continue to load the state of the object. */
 int vmstate_load_state(QEMUFile *f, const VMStateDescription *vmsd,
                        void *opaque, int version_id)
 {
@@ -140,9 +103,6 @@ int vmstate_load_state(QEMUFile *f, const VMStateDescription *vmsd,
         trace_vmstate_load_state_end(vmsd->name, "too old", -EINVAL);
         return -EINVAL;
     }
-    
-    // checks if anything needs to be done before loading the state
-    // of the object
     if (vmsd->pre_load) {
         int ret = vmsd->pre_load(opaque);
         if (ret) {

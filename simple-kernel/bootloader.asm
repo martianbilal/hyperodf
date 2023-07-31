@@ -38,22 +38,15 @@ call printString
 ; call readDisk
 ; call printString
 
-call readTimer
-call printString
+
 
 ; this is the hypercall for FORK
 mov eax, 63h
 mov dx, 301h
 out dx, eax
 
-
-call readTimer
-call printString
-
-
 mov bx, helloWorld
 call printString
-
 
 call readDisk
 call printString

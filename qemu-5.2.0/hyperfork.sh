@@ -31,12 +31,27 @@ send "root\r"
 
 
 expect "root@syzkaller:~# "
-send "gcc -o example ./example.c\r"
+# send "gcc -o example ./example.c\r"
+send "gcc -o example ./modex.c\r"
 
 # sleep 10
 expect "root@syzkaller:~# "
 send "./example\r"
 
+
+
+expect "root@syzkaller:~# "
+# send "ls\r"
+
+# expect "root@syzkaller:~# "
+# send "exit\r"
+
+
+# expect "root@syzkaller:~# "
+# send "touch newdir.txt\r"
+
+
+
 expect "root@syzkaller:~# "
 send "ls\r"
 expect "root@syzkaller:~# "
@@ -44,6 +59,4 @@ send "ls\r"
 expect "root@syzkaller:~# "
 send "ls\r"
 expect "root@syzkaller:~# "
-send "ls\r"
 expect "root@syzkaller:~# "
-send "ls\r"

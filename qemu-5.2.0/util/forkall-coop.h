@@ -59,6 +59,19 @@
 extern int ski_forkall_enabled;
 extern int ski_forkall_round;
 
+extern int PARENT_PID;
+extern int PARENT_VM_FD;
+extern int PARENT_VCPU_FD;
+extern int queued_work_complete;
+extern int entering_after_save_snap;
+
+
+// to let everyone know that VMFORK has raised the save_snapshot event
+extern int save_snapshot_event;
+
+extern int snapshot_in_progress;
+extern int snapshot_complete;
+
 typedef struct struct_fork_thread {
     int tid_original;
 	int tid_restore;

@@ -1,4 +1,0 @@
-obj-y += \
-hello.o \
-use_replayer.o \
-post_fork_hanlde.o 

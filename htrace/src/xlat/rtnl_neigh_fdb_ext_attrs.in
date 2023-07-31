@@ -1,5 +1,0 @@
-#enum
-#value_indexed
-NFEA_UNSPEC		0
-NFEA_ACTIVITY_NOTIFY	1
-NFEA_DONT_REFRESH	2

@@ -13,9 +13,6 @@
  *
  */
 
-#include "replayer/src/sys-replay.h"
-
-#include <math.h>
 #include <time.h>
 #include <sys/time.h>
 #include "qemu/osdep.h"
@@ -26,7 +23,6 @@
 #include <time.h>
 
 #include <linux/kvm.h>
-#include <unistd.h>
 
 #include "qemu/atomic.h"
 #include "qemu/option.h"
@@ -65,15 +61,13 @@
 
 #include "hw/boards.h"
 #include "util/forkall-coop.h"
-#include "hw/i386/apic_internal.h"
-
 // #include "cpu.h"
 
 
 
 // #define DBG_IO
 #define DBG_MEASURE
-#define DBG_FDS
+// #define DBG_FDS
 // #define DBG_RIP_CHILD
 // #define DBG_RIP_PARENT
 // #define DBG_RIP_PARENT_PREFORK
@@ -510,7 +504,10 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot, boo
     KVMState *s = kvm_state;
     struct kvm_userspace_memory_region mem;
     int ret;
- 
+    
+    // log that this function has been called : 
+    // printf("[MEMLISTEN]kvm_set_user_memory_region called\n"); 
+
     mem.slot = slot->slot | (kml->as_id << 16);
     mem.guest_phys_addr = slot->start_addr;
     mem.userspace_addr = (unsigned long)slot->ram;
@@ -618,7 +615,6 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
     printf("[debug] kvm_init_vcpu started!");
     fflush(stdout);
     #endif
-
     trace_kvm_init_vcpu(cpu->cpu_index, kvm_arch_vcpu_id(cpu));
 
     if(cpu->is_child){
@@ -2758,7 +2754,7 @@ int cpu_get_pre_fork_state(CPUState *cpu, struct cpu_prefork_state *state, int v
     } while (ret == -EINTR);
     attr = "tsc_khz";
     if(ret < 0) goto err;
-    state->tsc_khz = &tsc_khz;
+    state->tsc_khz = tsc_khz;
     #ifdef DBG
         printf("[debug] prefork-tsc : %d", tsc_khz);    
     #endif
@@ -2840,7 +2836,7 @@ int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpu
     #ifdef DBG
     printf("starting set attrs\n");
     #endif
-    state->regs.rip = state->regs.rip + 1;
+    // state->regs.rip = 0xacdc;
     //set regs
     /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
     do 
@@ -3193,91 +3189,6 @@ static void kvm_post_fork_fixup(CPUState *cpu, struct cpu_prefork_state *prefork
     return;
 }
 
-struct vcpu_exception {
-    __u8 injected;
-    __u8 nr;
-    __u8 has_error_code;
-    __u8 pending;
-    __u32 error_code;
-} exception;
-struct vcpu_interrupt {
-    __u8 injected;
-    __u8 nr;
-    __u8 soft;
-    __u8 shadow;
-} interrupt;
-struct vcpu_nmi {
-    __u8 injected;
-    __u8 pending;
-    __u8 masked;
-    __u8 pad;
-} nmi;
-struct vcpu_smi{
-    __u8 smm;
-    __u8 pending;
-    __u8 smm_inside_nmi;
-    __u8 latched_init;
-} smi;
-
-
-static void print_exception(struct vcpu_exception *exce, char prefix[]){
-    printf("%sexception has error code: %d\n", prefix, exce->has_error_code);
-    printf("%sexception error_code: %d\n", prefix, exce->error_code);
-    printf("%sexception nr: %d\n", prefix, exce->nr);
-    printf("%sexception injected: %d\n", prefix, exce->injected);
-    printf("%sexception pending: %d\n", prefix, exce->pending);
-    return;
-}
-
-
-static void print_interrupt(struct vcpu_interrupt *interrupt, char prefix[]){
-    printf("%sinterrupt soft: %d\n", prefix, interrupt->soft);
-    printf("%sinterrupt shadow: %d\n", prefix, interrupt->shadow);
-    printf("%sinterrupt injected: %d\n", prefix, interrupt->injected);
-    printf("%sinterrupt nr: %d\n", prefix, interrupt->nr);
-    return;
-}
-
-static void print_nmi(struct vcpu_nmi *nmi, char prefix[]){
-    printf("%snmi injected: %d\n", prefix, nmi->injected);
-    printf("%snmi pending: %d\n", prefix, nmi->pending);
-    printf("%snmi masked: %d\n", prefix, nmi->masked);
-    printf("%snmi pad: %d\n", prefix, nmi->pad);
-    return;
-}
-
-static void print_smi(struct vcpu_smi *smi, char prefix[]){
-    printf("%ssmi smm: %d\n", prefix, smi->smm);
-    printf("%ssmi smm_inside_nmi: %d\n", prefix, smi->smm_inside_nmi);
-    printf("%ssmi pending: %d\n", prefix, smi->pending);
-    printf("%ssmi latched_init: %d\n", prefix, smi->latched_init);
-    return;
-}
-
-static void print_vcpu_events(int vcpu_fd){
-    struct kvm_vcpu_events *events;
-    events = g_new0(struct kvm_vcpu_events, 1);
-    int ret = ioctl(vcpu_fd, KVM_GET_VCPU_EVENTS, events);
-    if(ret < 0){
-        printf("KVM GET VCPU EVENTS FAILED!! \n");
-        fflush(stdout);
-    }
-    printf("[%d]KVM GET VCPU EVENTS: \n", getpid());
-
-
-    printf("exception has payload: %d\n", events->exception_has_payload);
-    printf("exception payload: %llu\n", events->exception_payload);
-    printf("flags: %d\n", events->flags);
-    printf("events reserved: %s\n", events->reserved);
-    printf("events sipi vector: %d\n", events->sipi_vector);
-
-    // print structs 
-    print_exception((struct vcpu_exception *)(&(events->exception)), "\t");
-    print_interrupt((struct vcpu_interrupt*)(&(events->interrupt)), "\t");
-    print_nmi((struct vcpu_nmi*)(&(events->nmi)), "\t");
-    print_smi((struct vcpu_smi*)(&(events->smi)), "\t");
-    return;
-}
 
 static void debug_maps_dump(){
     #ifdef DEBUG
@@ -3289,11 +3200,19 @@ static void debug_maps_dump(){
     #endif
 }
 
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
     struct kvm_userspace_memory_region mem; 
     struct fork_info info;
+    struct odf_info o_info;
 	struct kvm_pit_config pit_config = { .flags = 0, };
     struct kvm_clock_data clock_data;
     struct cpu_prefork_state state; 
@@ -3326,7 +3245,7 @@ int kvm_cpu_exec(CPUState *cpu)
     struct QDict *bs_opts;
     int result; 
     DPRINTF("kvm_cpu_exec()\n");
-
+    int i = 0;
 
 
     
@@ -3348,6 +3267,12 @@ int kvm_cpu_exec(CPUState *cpu)
 
     qemu_mutex_unlock_iothread();
     cpu_exec_start(cpu);
+    // if(entering_after_save_snap){
+    //     entering_after_save_snap = 0;
+    //     queued_work_complete = 1;
+    //     printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+    //     goto resume_after_save;
+    // }
 
     do {
         MemTxAttrs attrs;
@@ -3405,13 +3330,35 @@ int kvm_cpu_exec(CPUState *cpu)
         }
         #endif
 
-
+        // if(save_snapshot_event){
+        //     goto fork_from_here;
+        // }
         // printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
+        // skip KVM_RUN if we have received the hypercall but we have not completed the 
+        // save_snapshot function.. if we are done with the save_snapshot function then
+        // we can call the KVM_RUN again
+        // if(!save_snapshot_event){
+        //     run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        // }
+    //     if(entering_after_save_snap){
+    //     entering_after_save_snap = 1;
+    //     queued_work_complete = 1;
+    //     printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+    //     // goto testing_resume;
+    //     goto resume_after_save;
+    // }
+
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
-        
+        if(PARENT_PID){
+            // DEBUG_PRINT("[pid: %d]kvm_run ret: %d\n", getpid(), run_ret);
+        }
+        i = i + 1;
+    testing_resume:
+    
+    
 
         attrs = kvm_arch_post_run(cpu, run);
-
+    
 #ifdef KVM_HAVE_MCE_INJECTION
         if (unlikely(have_sigbus_pending)) {
             qemu_mutex_lock_iothread();
@@ -3425,8 +3372,17 @@ int kvm_cpu_exec(CPUState *cpu)
         if (run_ret < 0) {
             if (run_ret == -EINTR || run_ret == -EAGAIN) {
                 DPRINTF("io window exit\n");
+                DEBUG_PRINT("io window exit\n");
                 kvm_eat_signals(cpu);
                 ret = EXCP_INTERRUPT;
+                if(entering_after_save_snap){
+                    entering_after_save_snap = 0;
+                    queued_work_complete = 1;
+                    printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+                    // goto testing_resume;
+                    ret = 0;
+                    goto resume_after_save;
+                }
                 break;
             }
             fprintf(stderr, "error: kvm run failed %d  %s\n", run_ret,
@@ -3442,7 +3398,40 @@ int kvm_cpu_exec(CPUState *cpu)
             ret = -1;
             break;
         }
+    //     if(entering_after_save_snap){
+    //     entering_after_save_snap = 0;
+    //     queued_work_complete = 1;
+    //     printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+    //     // goto testing_resume;
+    //     goto resume_after_save;
+    // }
+        // printf("KVM_RUN returned with i : %d\n", i);
+        // if(i == 120000){
+        //     // qemu_mutex_lock_iothread();
+        //     // save_snapshot("newtest", NULL);
+        //     // qemu_mutex_unlock_iothread();
+        //     // vm_start();
+        //     // vm_stop(RUN_STATE_PAUSED);
+        //     event_notifier_test_and_clear(&(cpu->save_event));
+        //     event_notifier_set(&(cpu->save_event));
+        //     printf("pid of the parent process  : %d", getpid());
+        //     // while(snapshot_in_progress){
+        //     //     // printf("Waiting for the snapshot to complete\n");
+        //     //     sleep(0);
+        //     // }
+        //     // vm_start();
+        //     i = i + 1;
+        // }
+        // if(i == 120000){
+        //     // qemu_mutex_lock_iothread();
+        //     // save_snapshot("newtest", NULL);
+        //     // qemu_mutex_unlock_iothread();
+        //     event_notifier_test_and_clear(&(cpu->load_event));
+        //     event_notifier_set(&(cpu->load_event));
 
+        //     i = i + 1;
+        // }
+        
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
         switch (run->exit_reason) {
         case KVM_EXIT_HLT:
@@ -3471,7 +3460,7 @@ int kvm_cpu_exec(CPUState *cpu)
             // fflush(stdout);
             //use this to print a charachter
             if(run->io.port == 0x300){
-              printf("%c", *(((char *)run) + run->io.data_offset));
+                printf("%c", *(((char *)run) + run->io.data_offset));
             }
             if(run->io.port == 0x300 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
@@ -3485,7 +3474,7 @@ int kvm_cpu_exec(CPUState *cpu)
                     gettimeofday(&t, NULL);
                     milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
                     timestamps[3] = milliseconds;
-                        
+                    
                     #ifdef TIMESTAMP_PRINT
                     printf("\n=====>>>>>Timestamp when Parent calls cpu_exec: %lld\n", timestamps[0]);
                     printf("Timestamp when QEMU Forks: %lld\n", timestamps[1]);
@@ -3498,43 +3487,59 @@ int kvm_cpu_exec(CPUState *cpu)
                     break;
             }
             if(run->io.port == 0x301 &&
+                *(((char *)run) + run->io.data_offset) == 'd'){
+                
+                event_notifier_test_and_clear(&(cpu->save_event));
+                event_notifier_set(&(cpu->save_event));
+
+                break;
+            }
+            if(run->io.port == 0x301 &&
                 *(((char *)run) + run->io.data_offset) == 'c'){
-                // print_vcpu_events(cpu->kvm_fd);
+                // [TEMP]
+                // qemu_mutex_lock_iothread();
+                // save_snapshot("newtest", NULL);
+                // load_snapshot("newtest", NULL);
+                // qemu_mutex_unlock_iothread();
+                // break;
+
                 //fork here 
                 //
                 //get the locks being used by the rest of the threads 
                 #ifndef DBG_MEASURE
                 printf("Received the call for fork\n");
                 #endif
-                printf("[Debug] vapic_restore : %p\n", VAPIC_RESTORE );
                 
-
-                #ifdef USE_REPLAYER
-                replay_detach_strace();
-                replay_generate_csv_logs("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.log", "/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv");
-                DEBUG_PRINTF("Done with generating logs");
-                replay_read_csv("/root/kvm-samples/qemu-5.2.0/replayer/logs/qemu.csv"); 
-                DEBUG_PRINTF("Done with reading csv");
-
-                // replay_print_ioctl_list();
-                #endif
+                save_snapshot_event = 1;
+                // vm_stop(RUN_STATE_SAVE_VM);
+                // printf("[Debug] we are setting the save_snapshot event! \n");
+                event_notifier_test_and_clear(&(cpu->save_event));
+                event_notifier_set(&(cpu->save_event));
+                if(!queued_work_complete){
+                    // printf("[%s:%d] we are waiting for the queued work to complete! \n", __func__, __LINE__);
+                    goto end_loop; 
+                    // break;
+                }
+                resume_after_save:
+                // break;
+                // qemu_mutex_lock_iothread();
+                // save_snapshot("newtest", NULL);
+                // qemu_mutex_unlock_iothread();
+                // break;
+                // vm_start();
+            // fork_from_here:
 
                 do {
                     ret = ioctl(cpu->kvm_fd , KVM_DEBUG, NULL);
                 } while (ret == -EINTR);
                 FORK_COUNTER = FORK_COUNTER + 1;
                 if(FORK_COUNTER > 1){
-                    ret = 0;
-                    printf("%c", *(((char *)run) + run->io.data_offset));
-
-                    // printf("[Debug] vmfork called!\n");
-                    printf("[Debug] Fork Counter : %d\n", FORK_COUNTER);
-                    goto skip_jump;
-                    // exit(0);
-                    // continue;
-                    // vm_start();
+                    ret = 0; 
                     break;
                 }
+                // vm_stop(RUN_STATE_SAVE_VM);
+
+                
                 DEBUG_PRINTF("[DEBUG] parent dump\n");
                 debug_maps_dump();
                 // [TEST] [VERIFY] 
@@ -3551,7 +3556,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 kvm_vcpu_pre_fork(cpu, prefork_state);
                 if (qemu_mutex_iothread_locked()){
-                    printf("[debug] This is the main thread!\n");
+                    // printf("[debug] This is the main thread!\n");
                 }
                 cpu->should_wait = true;
                 // qemu_mutex_unlock_iothread();
@@ -3574,15 +3579,17 @@ int kvm_cpu_exec(CPUState *cpu)
 
                 // [DEBUG] [BILAL] Adding this to test if the disk snapshot can be 
                 // reloaded in the child VM
+                // printf("[%s:%d] sending the fork event\n", __func__, __LINE__);
+                int cleared_result = event_notifier_test_and_clear(&(cpu->fork_event));
+                int res = event_notifier_set(&(cpu->fork_event));
+                // printf("[%s:%d] result of clearing the fork event : %d\n", __func__, __LINE__, cleared_result);
+                // printf("[%s:%d] result of setting the fork event : %d\n", __func__, __LINE__, res);
 
-                cpu_synchronize_all_pre_loadvm();
-                vm_stop(RUN_STATE_PAUSED);
-                event_notifier_test_and_clear(&(cpu->fork_event));
-                event_notifier_set(&(cpu->fork_event));
                 // qemu_mutex_lock_iothread();
                 // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
                 // event_notifier_test_and_clear(&(cpu->fork_event));
+                // cpu_synchronize_all_pre_loadvm();
                 // sleep(60);
                 ret = 0; 
                 // break;
@@ -3600,9 +3607,12 @@ int kvm_cpu_exec(CPUState *cpu)
                         perror( "clock gettime" );
                         exit( EXIT_FAILURE );
                     }
+                    PARENT_VCPU_FD = cpu->kvm_fd;
                     ski_forkall_slave(&did_fork, &is_child);
                     if(did_fork){
                         cpu->forked = true;
+                        // printf("pid of the child process  : %d", getpid());
+                        
                         // [Bilal] [Measure] clock time when cpu thread is restored
                         if( clock_gettime( CLOCK_REALTIME, &(cpu->cpu_thread_forked)) == -1 ) {
                             perror( "clock gettime" );
@@ -3612,14 +3622,11 @@ int kvm_cpu_exec(CPUState *cpu)
                         cpu->thread_id = qemu_get_thread_id();
                         current_cpu = cpu;
                         if(is_child){
+                            // exit(0);
                             // vm_stop(RUN_STATE_RESTORE_VM);
                             // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-                            sleep(3);
-
-                            // [BILAL] NOT NEEDED
-                            // qemu_cond_init(&cpu->vcpu_recreated_cond);
-                            
+                            qemu_cond_init(&cpu->vcpu_recreated_cond);
                             // qemu_mutex_init(&cpu->vcpu_recreated_mutex);
                             cpu->is_child = true;
 
@@ -3628,57 +3635,31 @@ int kvm_cpu_exec(CPUState *cpu)
                             printf("[DEBUG] [PARENT] s->fd -> %d\n", s->fd );
                             printf("[DEBUG] [PARENT]  s->vmfd -> %d\n", s->vmfd );
                             #endif
-
                             // close(cpu->kvm_fd);
                             // close(s->fd);
                             // close(s->vmfd);
-                            #ifdef USE_REPLAYER
-                            dbg_pr("Time before calling replay_child :  %lf ", replay_current_time());
-                            replay_child();
-                            dbg_pr("Time after calling replay_child :  %lf ", replay_current_time());
-                            #endif
-                            close(s->fd);
-                            close(s->vmfd);
                             s->fd = open("/dev/kvm", 2); 
                             s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
                             kvm_irqchip_create(s);
-                            
-                            // [BILAL] NOT NEEDED
-                            qemu_init_cpu_list();
+                            // qemu_init_cpu_list();
                             // cpu->halt_cond = g_malloc0(sizeof(QemuCond));
                             // qemu_cond_init(cpu->halt_cond);
-                            
                             // kvm_init_msrs(X86_CPU(cpu));
-
-                            kvm_init_vcpu(cpu, NULL);
-                            cpu_timers_init();
                             kvm_vcpu_post_fork(cpu, prefork_state);
+                            kvm_init_vcpu(cpu, NULL);
+
                             // kvm_vcpu_post_fork(cpu, prefork_state);
-                            // kvm_cpu_synchronize_state(cpu);
-                            cpu_synchronize_all_post_init();
-                            // kvm_arch_put_registers(cpu, 3);
-                            // 3# kvm_arch_reset_vcpu(cpu);
+                            // kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
+                            // kvm_arch_reset_vcpu(cpu);
                             // prefork_state->regs.rip = 0xfff0;
-                            // 4# kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
-    
+                            kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
                             // kvm_arch_get_registers(cpu);
-                            run = cpu->kvm_run;
-                            s = cpu->kvm_state;
                             #ifdef DBG_FDS
                             printf("[DEBUG] [CHILD] cpu->kvm_fd -> %d\n", cpu->kvm_fd );
                             printf("[DEBUG] [CHILD] s->fd -> %d\n", s->fd );
                             printf("[DEBUG] [CHILD]  s->vmfd -> %d\n", s->vmfd );
                             #endif
-                           
-                            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-                            qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
-                            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-                            cpu->vcpu_recreated = true;
-                            printf("[Debug] we are setting the load_snapshot event! \n");
-                            event_notifier_test_and_clear(&(cpu->load_event));
-                            event_notifier_set(&(cpu->load_event));
-                            break;
-                            kvm_post_fork_fixup(cpu, prefork_state);
+                            // kvm_post_fork_fixup(cpu, prefork_state);
                             stupid_stub_function(cpu);
                             // [Bilal] fixup function 
                             // vm_start();
@@ -3689,7 +3670,8 @@ int kvm_cpu_exec(CPUState *cpu)
 
                             // assert(kvm_buf_set_msrs(X86_CPU(cpu)) == 0);
 
-                            
+                            run = cpu->kvm_run;
+                            s = cpu->kvm_state;
                             // [Bilal] [Measure] clock time on complete CPU restore
                             if( clock_gettime( CLOCK_REALTIME, &(cpu->end_cpu_restore)) == -1 ) {
                                 perror( "clock gettime" );
@@ -3718,14 +3700,19 @@ int kvm_cpu_exec(CPUState *cpu)
                             
                         }
                         cpu->should_wait = false;
-                        // vm_stop(RUN_STATE_RESTORE_VM);
-                        // vm_start();
-                        // vm_stop(RUN_STATE_RESTORE_VM);
-                        // print_vcpu_events(cpu->kvm_fd);
-                        
+                        DEBUG_PRINT("is_child : %d\n", is_child);
+                            DEBUG_PRINT("is_child : %d\n", is_child);
+                            vm_stop(RUN_STATE_RESTORE_VM);
+
+                        if(is_child){
+                            // printf("[Debug] we are setting the load_snapshot event! \n");
+                            event_notifier_test_and_clear(&(cpu->load_event));
+                            event_notifier_set(&(cpu->load_event));
+                        }
                         break;
                     }
                     sleep(0);
+                    // break;
 
                 }
                 break;
@@ -3816,8 +3803,8 @@ int kvm_cpu_exec(CPUState *cpu)
                 // save_snapshot("fork-snap", &err);
                 qemu_mutex_unlock_iothread();
                 // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
-                dumpKVMState(s, "./ParentKVMDump", "Parent VM");
-                // child_spawn: 
+                // dumpKVMState(s, "./ParentKVMDump", "Parent VM");
+child_spawn: 
                 start_fork();
                 // qemu_mutex_lock_iothread();
                 // qemu_cleanup();
@@ -4038,7 +4025,7 @@ int kvm_cpu_exec(CPUState *cpu)
                     // 
                     // drive_new( opts, 1,  &error_fatal);
                     printf("created new drive for the child\n");
-                    dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
+                    // dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
                     printf("loading snapshot....\n");
                     vm_stop(RUN_STATE_RESTORE_VM);
                     err = NULL;
@@ -4137,7 +4124,6 @@ int kvm_cpu_exec(CPUState *cpu)
                 break;
             
             }
-// skip_jump:
             if(run->io.direction == KVM_EXIT_IO_IN){
                 // printf("Port: %d\n", run->io.port);
                 // printf("READ VALUE Before handle : %s ",(((char *)run) + run->io.data_offset));
@@ -4221,6 +4207,9 @@ end_loop:
     }
 
     qatomic_set(&cpu->exit_request, 0);
+    // print that the function is ending with some metadata
+    printf("[%s:%d] Ending kvm_cpu_exec\n", __func__, __LINE__);
+    printf("[%s:%d] cpu->exit_request: %d\n", __func__, __LINE__, cpu->exit_request);
     return ret;
 }
 
@@ -4251,11 +4240,7 @@ int kvm_vm_ioctl(KVMState *s, int type, ...)
     va_start(ap, type);
     arg = va_arg(ap, void *);
     va_end(ap);
-    
 
-    if(type == KVM_CREATE_VCPU){
-        dbg_pr("CREATING THE VCPU");
-    }
     trace_kvm_vm_ioctl(type, arg);
     ret = ioctl(s->vmfd, type, arg);
     if (ret == -1) {

@@ -1,7 +1,0 @@
-[
-{
-  "directory": "/home/bilal/test/proc_fork_test/build",
-  "command": "/usr/bin/cc   -g   -o CMakeFiles/proc_fork.dir/main.c.o   -c /home/bilal/test/proc_fork_test/main.c",
-  "file": "/home/bilal/test/proc_fork_test/main.c"
-}
-]

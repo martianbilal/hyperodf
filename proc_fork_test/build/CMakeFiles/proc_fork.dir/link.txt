@@ -1,1 +1,0 @@
-/usr/bin/cc -g  -rdynamic CMakeFiles/proc_fork.dir/main.c.o  -o proc_fork  -L/usr/lib/x86_64-linux-gnu/libaio.so -Wl,-rpath,/usr/lib/x86_64-linux-gnu/libaio.so -lpthread -laio 

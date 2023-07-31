@@ -61,6 +61,30 @@ Coroutine *qmp_dispatcher_co;
 /* Set to true when the dispatcher coroutine should terminate */
 bool qmp_dispatcher_co_shutdown;
 
+void qemu_print_Chardev(struct Chardev *chardev) {
+    if (chardev == NULL) {
+        printf("Null pointer provided.\n");
+        return;
+    }
+
+    printf("parent_obj: %p\n", (void*) &(chardev->parent_obj));
+    printf("chr_write_lock: %p\n", (void*) &(chardev->chr_write_lock));
+    printf("be: %p\n", (void*) chardev->be);
+    printf("label: %s\n", chardev->label);
+    printf("filename: %s\n", chardev->filename);
+    printf("logfd: %d\n", chardev->logfd);
+    printf("be_open: %d\n", chardev->be_open);
+    printf("gsource: %p\n", (void*) chardev->gsource);
+    printf("gcontext: %p\n", (void*) chardev->gcontext);
+    printf("features: ");
+    for (int i = 0; i < QEMU_CHAR_FEATURE_LAST; i++) {
+        printf("%d", test_bit(i, chardev->features));
+    }
+    printf("\n");
+}
+
+
+
 /*
  * qmp_dispatcher_co_busy is used for synchronisation between the
  * monitor thread and the main thread to ensure that the dispatcher
@@ -598,8 +622,10 @@ void monitor_data_init(Monitor *mon, bool is_qmp, bool skip_flush,
                        bool use_io_thread)
 {
     if (use_io_thread && !mon_iothread) {
+        DEBUG_PRINT("About to create a new iothread\n");
         monitor_iothread_init();
     }
+    DEBUG_PRINT("About to init monitor data\n");
     qemu_mutex_init(&mon->mon_lock);
     mon->is_qmp = is_qmp;
     mon->outbuf = qstring_new();
@@ -705,6 +731,9 @@ int monitor_init(MonitorOptions *opts, bool allow_hmp, Error **errp)
         return -1;
     }
 
+    DEBUG_PRINT("PRINTING CHARDEV\n");
+    qemu_print_Chardev(chr);
+
     if (!opts->has_mode) {
         opts->mode = allow_hmp ? MONITOR_MODE_READLINE : MONITOR_MODE_CONTROL;
     }
@@ -722,6 +751,7 @@ int monitor_init(MonitorOptions *opts, bool allow_hmp, Error **errp)
             warn_report("'pretty' is deprecated for HMP monitors, it has no "
                         "effect and will be removed in future versions");
         }
+        DEBUG_PRINT("monitor_init_hmp\n");
         monitor_init_hmp(chr, true, &local_err);
         break;
     default:

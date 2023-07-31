@@ -18,7 +18,6 @@
 #include <sys/ioctl.h>
 #include <sys/utsname.h>
 
-
 #include <linux/kvm.h>
 #include "standard-headers/asm-x86/kvm_para.h"
 
@@ -2284,16 +2283,6 @@ static void kvm_getput_reg(__u64 *kvm_reg, target_ulong *qemu_reg, int set)
     } else {
         *qemu_reg = *kvm_reg;
     }
-}
-
-int kvm_update_rip(CPUState *cs, int set){
-    X86CPU *cpu = X86_CPU(cs);
-    CPUX86State *env = &cpu->env;
-    struct kvm_regs regs;
-    int ret = 0;
-    env->eip = env->eip + 1;
-    kvm_getput_reg(&regs.rip, &env->eip, set);
-
 }
 
 static int kvm_getput_regs(X86CPU *cpu, int set)
