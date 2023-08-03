@@ -462,26 +462,26 @@ install_kata() {
 
 	# Install compressed kernel
 	if [ "${arch_target}" = "powerpc" ]; then
-		install --mode 0644 -D "vmlinux" "${install_path}/${vmlinuz}"
+		sudo install --mode 0644 -D "vmlinux" "${install_path}/${vmlinuz}"
 	else
-		install --mode 0644 -D "${bzImage}" "${install_path}/${vmlinuz}"
+		sudo install --mode 0644 -D "${bzImage}" "${install_path}/${vmlinuz}"
 	fi
 
 	# Install uncompressed kernel
 	if [ "${arch_target}" = "arm64" ]; then
-		install --mode 0644 -D "arch/${arch_target}/boot/Image" "${install_path}/${vmlinux}"
+		sudo install --mode 0644 -D "arch/${arch_target}/boot/Image" "${install_path}/${vmlinux}"
 	elif [ "${arch_target}" = "s390" ]; then
-		install --mode 0644 -D "arch/${arch_target}/boot/vmlinux" "${install_path}/${vmlinux}"
+		sudo install --mode 0644 -D "arch/${arch_target}/boot/vmlinux" "${install_path}/${vmlinux}"
 	else
-		install --mode 0644 -D "vmlinux" "${install_path}/${vmlinux}"
+		sudo install --mode 0644 -D "vmlinux" "${install_path}/${vmlinux}"
 	fi
 
-	install --mode 0644 -D ./.config "${install_path}/config-${kernel_version}"
+	sudo install --mode 0644 -D ./.config "${install_path}/config-${kernel_version}"
 
-	ln -sf "${vmlinuz}" "${install_path}/vmlinuz${suffix}.container"
-	ln -sf "${vmlinux}" "${install_path}/vmlinux${suffix}.container"
-	ls -la "${install_path}/vmlinux${suffix}.container"
-	ls -la "${install_path}/vmlinuz${suffix}.container"
+	sudo ln -sf "${vmlinuz}" "${install_path}/vmlinuz${suffix}.container"
+	sudo ln -sf "${vmlinux}" "${install_path}/vmlinux${suffix}.container"
+	sudo ls -la "${install_path}/vmlinux${suffix}.container"
+	sudo ls -la "${install_path}/vmlinuz${suffix}.container"
 	popd >>/dev/null
 }
 
