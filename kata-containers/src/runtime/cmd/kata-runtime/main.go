@@ -39,7 +39,6 @@ var usage = fmt.Sprintf(`%s runtime
 
 %s is a command line program for running applications packaged
 according to the Open Container Initiative (OCI).`, katautils.NAME, katautils.NAME)
-
 var notes = fmt.Sprintf(`
 NOTES:
 
@@ -494,6 +493,10 @@ func cliContextToContext(c *cli.Context) (context.Context, error) {
 
 func main() {
 	// create a new empty context
+	// print to the stdout
+	fmt.Println("kata runtime for HYPERODF")
+
 	ctx := context.Background()
+
 	createRuntime(ctx)
 }

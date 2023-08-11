@@ -801,6 +801,10 @@ func (q *qemu) StartVM(ctx context.Context, timeout int) error {
 	span, ctx := katatrace.Trace(ctx, q.Logger(), "StartVM", qemuTracingTags, map[string]string{"sandbox_id": q.id})
 	defer span.End()
 
+	// print something to stdout 
+	fmt.Println("StartVM")
+
+
 	if q.config.Debug {
 		params := q.arch.kernelParameters(q.config.Debug)
 		strParams := SerializeParams(params, "=")

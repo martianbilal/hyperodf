@@ -8,6 +8,8 @@ package containerdshim
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/sirupsen/logrus"
 
@@ -16,6 +18,19 @@ import (
 )
 
 func startContainer(ctx context.Context, s *service, c *container) (retErr error) {
+	f, ferr := os.OpenFile("/tmp/test.txt", os.O_CREATE|os.O_WRONLY, 0644)
+	if ferr != nil {
+		log.Fatal(ferr)
+	}
+	// write hello world to file
+	if _, ferr := f.Write([]byte("Hello World startContainer\n")); ferr != nil {
+		log.Fatal(ferr)
+	}
+	// close the file
+	if ferr := f.Close(); ferr != nil {
+		log.Fatal(ferr)
+	}
+
 	shimLog.WithField("container", c.id).Debug("start container")
 	defer func() {
 		if retErr != nil {

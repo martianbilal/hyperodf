@@ -238,6 +238,7 @@ func RunManager(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 }
 
 func run(ctx context.Context, manager Manager, initFunc Init, name string, config Config) error {
+	// fmt.Println("FOR HYPERODF")
 	parseFlags()
 	if versionFlag {
 		fmt.Printf("%s:\n", os.Args[0])
