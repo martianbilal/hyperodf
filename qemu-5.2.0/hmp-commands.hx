@@ -53,6 +53,19 @@ SRST
 ERST
 
     {
+        .name       = "hello",
+        .args_type  = "",
+        .params     = "",
+        .help       = "Print 'Hello, World!' to the monitor",
+        .cmd = hmp_hello,
+    },
+
+SRST
+``hello``
+  print hello world.
+ERST
+
+    {
         .name       = "exit_preconfig",
         .args_type  = "",
         .params     = "",

@@ -951,6 +951,11 @@ void hmp_quit(Monitor *mon, const QDict *qdict)
     qmp_quit(NULL);
 }
 
+void hmp_hello(Monitor *mon, const QDict *qdict)
+{
+    monitor_printf(mon, "Hello, World!\n");
+}
+
 void hmp_stop(Monitor *mon, const QDict *qdict)
 {
     qmp_stop(NULL);
