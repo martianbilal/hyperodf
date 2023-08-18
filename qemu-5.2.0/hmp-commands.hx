@@ -53,11 +53,11 @@ SRST
 ERST
 
     {
-        .name       = "hello",
+        .name       = "do_fork",
         .args_type  = "",
         .params     = "",
-        .help       = "Print 'Hello, World!' to the monitor",
-        .cmd = hmp_hello,
+        .help       = "Fork the VM",
+        .cmd = hmp_vmfork,
     },
 
 SRST

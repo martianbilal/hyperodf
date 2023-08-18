@@ -951,9 +951,36 @@ void hmp_quit(Monitor *mon, const QDict *qdict)
     qmp_quit(NULL);
 }
 
-void hmp_hello(Monitor *mon, const QDict *qdict)
+static void save_vm(const char* name, Error **errp){
+    save_snapshot( "fork_snap", errp);
+}
+
+static void del_vm(const char* name, Error **errp){
+    BlockDriverState *bs;
+    if (bdrv_all_delete_snapshot(name, &bs, errp) < 0) {
+        error_prepend(errp,
+                      "deleting snapshot on device '%s': ",
+                      bdrv_get_device_name(bs));
+    }
+}
+
+void hmp_vmfork(Monitor *mon, const QDict *qdict)
 {
-    monitor_printf(mon, "Hello, World!\n");
+    Error *err = NULL;
+    const char *name = "fork_snap";
+
+    monitor_printf(mon, "Forking the VM!\n");
+
+    // save_snapshot
+    save_vm(name, &err);
+    hmp_handle_error(mon, err);
+    
+    // del snapshot
+    del_vm(name, &err);
+    hmp_handle_error(mon, err);
+
+
+    monitor_printf(mon, "Forking the VM!\n");
 }
 
 void hmp_stop(Monitor *mon, const QDict *qdict)

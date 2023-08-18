@@ -3797,7 +3797,7 @@ void handle_fork(void *opaque){
 
         // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-        kvm_set_old_env(cpu);
+        // kvm_set_old_env(cpu);
         gdbserver_cleanup();
         // gdbserver_fork_linux();
 
