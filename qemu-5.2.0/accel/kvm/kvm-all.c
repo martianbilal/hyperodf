@@ -3348,7 +3348,22 @@ int kvm_cpu_exec(CPUState *cpu)
     //     goto resume_after_save;
     // }
 
+        int *did_fork = malloc(sizeof(int));
+        int *is_child = malloc(sizeof(int));
+        *did_fork = 0;
+        *is_child = 0;
+        
+        if(!(*did_fork)){
+            ski_forkall_slave(did_fork, is_child);
+            // printf("calling the forkall slave in vcpu thread\n");
+        }
+        if(*did_fork && !(*is_child)){
+            printf("Forked child process\n");
+        }
+
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        
+
         if(PARENT_PID){
             // DEBUG_PRINT("[pid: %d]kvm_run ret: %d\n", getpid(), run_ret);
         }

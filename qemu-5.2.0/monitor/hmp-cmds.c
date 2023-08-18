@@ -57,6 +57,8 @@
 #include "hw/rdma/rdma.h"
 #include "migration/snapshot.h"
 #include "migration/misc.h"
+#include "util/forkall-coop.h"
+#include "util/hodf-util.h"
 
 #ifdef CONFIG_SPICE
 #include <spice/enums.h>
@@ -964,6 +966,18 @@ static void del_vm(const char* name, Error **errp){
     }
 }
 
+static void do_ski_fork(void){
+    // do a simple fork and print the exit in the child 
+    // h_cpu_kick();
+    pid_t pid = ski_forkall_master();
+    if (pid == 0) {
+        printf("I am the child\n");
+        exit(0);
+    } else {
+        printf("I am the parent\n");
+    }  
+}
+
 void hmp_vmfork(Monitor *mon, const QDict *qdict)
 {
     Error *err = NULL;
@@ -978,6 +992,20 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     // del snapshot
     del_vm(name, &err);
     hmp_handle_error(mon, err);
+
+    // stop vm
+    // vm_stop(RUN_STATE_RESTORE_VM);
+    // vm_start();
+
+    // Master forkall
+    // ski_forkall_hypercall_done = 1;
+    // while(1){
+    //     if(ski_forkall_thread_pool_ready_check()){
+    //         break;
+    //     }
+    // }
+
+    do_ski_fork();
 
 
     monitor_printf(mon, "Forking the VM!\n");

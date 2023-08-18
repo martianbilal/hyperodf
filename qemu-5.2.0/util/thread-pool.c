@@ -130,6 +130,7 @@ static void *worker_thread(void *opaque)
                     // qemu_sem_destroy(&pool->sem);
 
                     ski_forkall_slave(&did_fork, &is_child);
+                    
                     // }
                     if(did_fork){
                         ski_log_forkall("Did fork");
