@@ -1,6 +1,7 @@
 
 
 #include "forkall-coop.h"
+#include "util/hodf-util.h"
 
 #include <asm/prctl.h>
 #include <sys/prctl.h>
@@ -444,6 +445,7 @@ pid_t ski_forkall_master(){
 			break;
 		}
 
+		h_cpu_kick();
 		ski_log_forkall("[MASTER] Waiting for all threads to be ready (%d/%d)\n", threads_done, nthreads);
 		
 		//XXX: QEMU Specific!! Tries to wake up the first cpu when it's waiting for the initial kick (cpus.c)

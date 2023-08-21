@@ -132,7 +132,7 @@ static void *worker_thread(void *opaque)
                     // printf("[debug] [aio-thread] lock : %d \n", ret);
                     // printf("[debug] [aio-thread] counter : %d \n", pool->sem.count);
                     // qemu_sem_destroy(&pool->sem);
-
+                    // if(qemu_mutex_iothread_locked()) qemu_mutex_unlock_iothread();
                     ski_forkall_slave(&did_fork, &is_child);
                     // kick_all();
                     // cpu_kick_all();

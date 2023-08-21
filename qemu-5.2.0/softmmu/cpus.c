@@ -427,6 +427,7 @@ void qemu_wait_io_event(CPUState *cpu)
         DEBUG_PRINT("waiting for cpu->halt_cond \n");
         qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
         DEBUG_PRINT("cpu->halt_cond is signaled \n");
+        printf("returning from wait \n");
     }
     if (slept) {
         DEBUG_PRINT("resume now cpu\n");

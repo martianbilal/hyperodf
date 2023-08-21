@@ -5,7 +5,7 @@ set timout 30
 # Launch run.sh script to create and start the QEMU VM
 spawn ./run.sh
 
-sleep 3
+sleep 6
 
 # Connect to the UNIX socket
 spawn socat unix-connect:qemu-monitor-socket -

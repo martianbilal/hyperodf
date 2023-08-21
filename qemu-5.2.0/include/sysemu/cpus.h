@@ -5,7 +5,7 @@
 
 /* cpus.c */
 
-// #define DBG_CPUS
+#define DBG_CPUS
 #ifdef DBG_CPUS
 #define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%d|%s():%d] " fmt, \
     getpid(), __func__,  __LINE__, ##args)

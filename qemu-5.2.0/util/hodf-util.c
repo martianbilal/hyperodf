@@ -40,9 +40,11 @@ void h_cpu_kick(void){
     for(int i = 0; i < H_MAX_CPUS; i++){
         if(metadata_array[i].threadid != 0){
             // still not setting the thread_kicked flag
+            // qemu_mutex_lock(qemu_global_mutex);
             qemu_cond_broadcast(&metadata_array[i].halt_cond);
             // from main-loop.h #define SIG_IPI SIGUSR1
-            pthread_kill(metadata_array[i].threadid, SIGUSR1);
+            // pthread_kill(metadata_array[i].threadid, SIGUSR1);
+            break;
         }
     }
     return;

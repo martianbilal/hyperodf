@@ -90,7 +90,6 @@ static void *kvm_vcpu_thread_fn(void *arg)
         cpu->vcpu_dirty = false;
     }
 
-    h_save_metadata(cpu->halt_cond, cpu->thread->thread, cpu->cpu_index);
     do {
         if (cpu_can_run(cpu)) {
             r = kvm_cpu_exec(cpu);
@@ -100,6 +99,8 @@ static void *kvm_vcpu_thread_fn(void *arg)
                 cpu_handle_guest_debug(cpu);
             }
         }
+        // h_save_metadata(cpu->halt_cond, cpu->thread->thread, cpu->cpu_index);
+
         
         // if(cpu->should_wait){
         //     qemu_mutex_unlock_iothread();
@@ -129,24 +130,27 @@ static void *kvm_vcpu_thread_fn(void *arg)
         // }
 
         // printf("[%s:%d] starting to wait for io event\n", __func__, __LINE__);
-        // int *did_fork = malloc(sizeof(int));
-        // int *is_child = malloc(sizeof(int));
-        // *did_fork = 0;
-        // *is_child = 0;
-        // if(!(*did_fork)){
-        //     ski_forkall_slave(did_fork, is_child);
-        //     printf("calling the forkall slave in vcpu thread\n");
-        // }
-        // if(*did_fork && !(*is_child)){
-        //     printf("Forked child process\n");
-        // }
+        int *did_fork = malloc(sizeof(int));
+        int *is_child = malloc(sizeof(int));
+        *did_fork = 0;
+        *is_child = 0;
+        if(!(*did_fork)){
+            ski_forkall_slave(did_fork, is_child);
+            // printf("calling the forkall slave in vcpu thread\n");
+        }
+        if(*did_fork && !(*is_child)){
+            printf("Forked child process\n");
+        }
 
         // if(ski_forkall_thread_pool_ready_fork){
         //     qemu_cpu_kick(cpu);
         //     printf("kicked the cpu\n");
         // }
 
+        // h_save_metadata(cpu->halt_cond, cpu->thread->thread, cpu->cpu_index);
         qemu_wait_io_event(cpu);
+        // h_save_metadata(cpu->halt_cond, cpu->thread->thread, cpu->cpu_index);
+        
         // printf("[%d|%s:%d] ended wait for io event\n", getpid(), __func__, __LINE__);
     } while (!cpu->unplug || cpu_can_run(cpu));
 

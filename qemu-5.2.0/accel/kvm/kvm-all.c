@@ -4213,8 +4213,13 @@ skip_jump:
             break;
         }
     } while (ret == 0);
+    int did_fork = 0;
+    int is_child = 0;
 end_loop:
+
     cpu_exec_end(cpu);
+    ski_forkall_slave(&did_fork, &is_child);
+    printf("RETURNED FROM SKI FORKALL SLAVE +++++++++++\n\n\n\n\n");
     qemu_mutex_lock_iothread();
 
     if (ret < 0) {

@@ -987,12 +987,12 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     monitor_printf(mon, "Forking the VM!\n");
 
     // save_snapshot
-    save_vm(name, &err);
-    hmp_handle_error(mon, err);
+    // save_vm(name, &err);
+    // hmp_handle_error(mon, err);
     
     // del snapshot
-    del_vm(name, &err);
-    hmp_handle_error(mon, err);
+    // del_vm(name, &err);
+    // hmp_handle_error(mon, err);
 
     // stop vm
     // vm_stop(RUN_STATE_RESTORE_VM);
