@@ -158,6 +158,14 @@ void cpu_synchronize_all_post_init(void)
     }
 }
 
+void cpu_kick_all(void){
+    CPUState *cpu;
+
+    CPU_FOREACH(cpu) {
+        qemu_cpu_kick(cpu);
+    }
+}
+
 void cpu_synchronize_all_pre_loadvm(void)
 {
     CPUState *cpu;

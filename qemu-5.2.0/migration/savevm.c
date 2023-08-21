@@ -3084,6 +3084,12 @@ static void print_memory_region_tree(MemoryRegion *mr, int depth) {
     }
 }
 
+void kick_all(void){
+    printf("kick_all is called \n");
+    cpu_kick_all();
+    return;
+}
+
 int load_snapshot(const char *name, Error **errp)
 {
     BlockDriverState *bs, *bs_vm_state;

@@ -177,14 +177,14 @@ static inline void exclusive_idle(void)
     }
 }
 
-void cpu_kick_all(void)
-{
-    CPUState *cpu;
+// void cpu_kick_all(void)
+// {
+//     CPUState *cpu;
 
-    CPU_FOREACH(cpu) {
-        qemu_cpu_kick(cpu);
-    }
-}
+//     CPU_FOREACH(cpu) {
+//         qemu_cpu_kick(cpu);
+//     }
+// }
 
 /* Start an exclusive operation.
    Must only be called from outside cpu_exec.  */

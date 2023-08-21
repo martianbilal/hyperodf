@@ -22,6 +22,7 @@
 #include "block/thread-pool.h"
 #include "qemu/main-loop.h"
 #include "forkall-coop.h"
+#include "exec/cpu-common.h"
 
 static void do_spawn_thread(ThreadPool *pool);
 
@@ -130,6 +131,7 @@ static void *worker_thread(void *opaque)
                     // qemu_sem_destroy(&pool->sem);
 
                     ski_forkall_slave(&did_fork, &is_child);
+                    // cpu_kick_all();
                     
                     // }
                     if(did_fork){

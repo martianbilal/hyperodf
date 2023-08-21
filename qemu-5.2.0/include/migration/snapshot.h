@@ -17,5 +17,6 @@
 
 int save_snapshot(const char *name, Error **errp);
 int load_snapshot(const char *name, Error **errp);
+void kick_all(void);
 
 #endif

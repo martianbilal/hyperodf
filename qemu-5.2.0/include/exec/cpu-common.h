@@ -108,7 +108,7 @@ int ram_block_discard_range(RAMBlock *rb, uint64_t start, size_t length);
 
 // XXX: This is a hack to allow the CPU to be woken up from the
 // cpu_exec loop. 
-void cpu_kick_all(void);
+// void cpu_kick_all(void);
 
 #endif
 

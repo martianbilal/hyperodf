@@ -969,6 +969,7 @@ static void del_vm(const char* name, Error **errp){
 static void do_ski_fork(void){
     // do a simple fork and print the exit in the child 
     // h_cpu_kick();
+    kick_all();
     pid_t pid = ski_forkall_master();
     if (pid == 0) {
         printf("I am the child\n");

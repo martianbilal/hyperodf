@@ -264,6 +264,14 @@ int monitor_set_cpu(Monitor *mon, int cpu_index)
     return 0;
 }
 
+
+void send_cpu_kick(void){
+    CPUState *cpu;
+    CPU_FOREACH(cpu){
+        qemu_cpu_kick(cpu);
+    }
+}
+
 /* Callers must hold BQL. */
 static CPUState *mon_get_cpu_sync(Monitor *mon, bool synchronize)
 {
