@@ -503,7 +503,7 @@ static void print_backtrace(void)
 void qemu_cpu_kick(CPUState *cpu)
 {
     DEBUG_PRINT("kicking cpu %d | broadcast halt cond\n", cpu->cpu_index);
-    print_backtrace();
+    // print_backtrace();
     qemu_cond_broadcast(cpu->halt_cond);
     if (cpus_accel->kick_vcpu_thread) {
         cpus_accel->kick_vcpu_thread(cpu);

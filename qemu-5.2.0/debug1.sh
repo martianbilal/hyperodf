@@ -5,7 +5,7 @@ set timout 30
 # Launch run.sh script to create and start the QEMU VM
 spawn ./run.sh
 
-sleep 2
+sleep 3
 
 # Connect to the UNIX socket
 spawn socat unix-connect:qemu-monitor-socket -
@@ -13,6 +13,6 @@ spawn socat unix-connect:qemu-monitor-socket -
 expect "(qemu)"
 send "do_fork\r"
 
-expect "Command executed"
+sleep 30
 
 exit 0

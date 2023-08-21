@@ -23,6 +23,7 @@
 #include "qemu/main-loop.h"
 #include "forkall-coop.h"
 #include "exec/cpu-common.h"
+#include "util/hodf-util.h"
 
 static void do_spawn_thread(ThreadPool *pool);
 
@@ -108,10 +109,12 @@ static void *worker_thread(void *opaque)
             if(did_fork){
                 forked:
 				// After forking resort to the original code
+                h_cpu_kick();
 				qemu_mutex_unlock(&pool->lock);
                 qemu_sem_wait(&pool->sem);
                 ret = 0;
                 qemu_mutex_lock(&pool->lock);
+
             }
             else {
                 qemu_mutex_unlock(&pool->lock);
@@ -131,7 +134,9 @@ static void *worker_thread(void *opaque)
                     // qemu_sem_destroy(&pool->sem);
 
                     ski_forkall_slave(&did_fork, &is_child);
+                    // kick_all();
                     // cpu_kick_all();
+                    // h_cpu_kick();
                     
                     // }
                     if(did_fork){

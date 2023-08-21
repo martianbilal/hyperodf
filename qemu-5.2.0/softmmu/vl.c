@@ -86,6 +86,7 @@
 #include "qemu/config-file.h"
 #include "qemu-options.h"
 #include "qemu/main-loop.h"
+#include "util/hodf-util.h"
 #include <stdbool.h>
 #ifdef CONFIG_VIRTFS
 #include "fsdev/qemu-fsdev.h"
@@ -4089,6 +4090,8 @@ void qemu_init(int argc, char **argv, char **envp)
     ARGV = argv;
     ENVP = envp; 
     ARGC = argc;
+
+    h_initialize();
 
     // used only for changing the buffering type of the stdout
     os_set_line_buffering();

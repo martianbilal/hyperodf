@@ -29,6 +29,9 @@ void *slave_function(void *arg) {
             if (is_child) {
                 printf("Child: Slave Thread %d is duplicated in child process\n", id);
             } else {
+                pthread_mutex_lock(&cond_mutex);
+                pthread_cond_signal(&cond_var);
+                pthread_mutex_unlock(&cond_mutex);
                 printf("Parent: Slave Thread %d continues in parent process\n", id);
             }
             break;
@@ -57,9 +60,7 @@ int main() {
     sleep(3);
 
     // Signal the condition variable, allowing the first slave thread to proceed
-    pthread_mutex_lock(&cond_mutex);
-    pthread_cond_signal(&cond_var);
-    pthread_mutex_unlock(&cond_mutex);
+    
 
     // Main thread (master) initiates forkall
     pid_t child_pid = ski_forkall_master();

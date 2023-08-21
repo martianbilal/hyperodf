@@ -25,6 +25,7 @@
 #include "util/forkall-coop.h"
 
 #include "kvm-cpus.h"
+#include "util/hodf-util.h"
 
 static int post_fork_setup(struct cpu_prefork_state *prefork_state){
     #ifdef DBG
@@ -89,7 +90,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
         cpu->vcpu_dirty = false;
     }
 
-
+    h_save_metadata(cpu->halt_cond, cpu->thread->thread, cpu->cpu_index);
     do {
         if (cpu_can_run(cpu)) {
             r = kvm_cpu_exec(cpu);
