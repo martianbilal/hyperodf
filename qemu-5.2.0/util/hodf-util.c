@@ -2,7 +2,7 @@
 #include "qemu/thread.h"
 
 // debug flag for hodf
-#define DBG_HODF
+// #define DBG_HODF
 
 #ifdef DBG_HODF
 #define DEBUG_PRINT(fmt, args...) printf( "[%d|%s():%d] " fmt, \

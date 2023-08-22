@@ -3359,7 +3359,8 @@ int kvm_cpu_exec(CPUState *cpu)
             // printf("calling the forkall slave in vcpu thread\n");
         }
         if(*did_fork && !(*is_child)){
-            printf("Forked child process\n");
+            printf("[kvm_cpu_exec]Forked parent process\n");
+            fflush(stdout);
         }
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);

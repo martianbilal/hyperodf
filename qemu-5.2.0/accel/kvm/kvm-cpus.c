@@ -139,7 +139,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
             // printf("calling the forkall slave in vcpu thread\n");
         }
         if(*did_fork && !(*is_child)){
-            printf("Forked child process\n");
+            printf("[vcpu_thread_fn]Forked parent process\n");
         }
 
         // if(ski_forkall_thread_pool_ready_fork){
