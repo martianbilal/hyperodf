@@ -124,9 +124,11 @@ static void *worker_thread(void *opaque)
 					// while(!did_fork){
                     // printf("[debug] [aio-thread] counter : %d \n", pool->sem.count);
                     // printf("ret value : %d\n", ski_forkall_hypercall_done);
+                    // int init_count = pool->sem.count;
+                    timed_wait:
                     if(!ski_forkall_hypercall_done){
                         ski_forkall_thread_pool_not_ready();
-                        ret = qemu_sem_timedwait(&pool->sem, 10000);
+                        ret = qemu_sem_timedwait(&pool->sem, 100);
                         ski_forkall_thread_pool_ready();
                     }
                     // printf("[debug] [aio-thread] lock : %d \n", ret);
@@ -147,6 +149,8 @@ static void *worker_thread(void *opaque)
                         // pool->idle_threads --;
                         ski_log_forkall("Did fork");
                         goto forked;
+                    } else if( !did_fork && ret == -1) {
+                        goto timed_wait;
                     }
 					
 					// Sishuai: comment to see if it could speed up
