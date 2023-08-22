@@ -15,6 +15,7 @@
 
 #include <time.h>
 #include <sys/time.h>
+#include "qapi-types-run-state.h"
 #include "qemu/osdep.h"
 #include <sys/ioctl.h>
 #include <stdio.h>
@@ -34,6 +35,7 @@
 #include "hw/pci/msix.h"
 #include "hw/s390x/adapter.h"
 #include "exec/gdbstub.h"
+#include "qemu/typedefs.h"
 #include "sysemu/cpu-timers.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/runstate.h"
@@ -3208,6 +3210,51 @@ struct odf_info{
 };
 
 
+/*
+    @brief: function to be called by the child process after fork
+           to set up the child VM. This function would be doing
+           the following:
+                1. set up child VM, VCPU, and memory
+                2. send the load_snapshot event
+                3. wait for the load_snapshot event to be completed
+                (in short all
+                the stuff previously done inside that loop after
+                fork)
+   
+    @param: info: struct containing the info about the child VM / maybe not 
+   
+    @return: 0 on success
+            -1 on failure
+*/ 
+static int establish_child(CPUState *cpu, KVMState *s, struct cpu_prefork_state *prefork_state){
+    
+
+    qemu_cond_init(&cpu->vcpu_recreated_cond);
+    cpu->is_child = true;
+    s->fd = open("/dev/kvm", 2);
+    s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+    struct kvm_run *run; // TODO : Update this with the global one
+
+    kvm_irqchip_create(s);
+
+    kvm_vcpu_post_fork(cpu, prefork_state);
+    kvm_init_vcpu(cpu, NULL);
+    kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
+
+    run = cpu->kvm_run;
+    s = cpu->kvm_state;
+
+    cpu->should_wait = false;
+    vm_stop(RUN_STATE_RESTORE_VM);
+
+    event_notifier_test_and_clear(&(cpu->load_event));
+    event_notifier_set(&(cpu->load_event));
+
+
+    return 0;
+}
+
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -3360,6 +3407,12 @@ int kvm_cpu_exec(CPUState *cpu)
         }
         if(*did_fork && !(*is_child)){
             printf("[kvm_cpu_exec]Forked parent process\n");
+            fflush(stdout);
+        }
+
+        if(*did_fork && *is_child){
+            printf("[kvm_cpu_exec]Forked child process\n");
+            establish_child();
             fflush(stdout);
         }
 
@@ -3612,7 +3665,7 @@ int kvm_cpu_exec(CPUState *cpu)
                 // break;
                 while(1) {
                     int did_fork;
-                    int is_child; 
+                    int is_child;
                     ski_forkall_hypercall_done = 1;
                     while(1){
                         if(ski_forkall_thread_pool_ready_check()){

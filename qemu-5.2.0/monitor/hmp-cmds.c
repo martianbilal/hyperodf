@@ -973,7 +973,7 @@ static void do_ski_fork(void){
     pid_t pid = ski_forkall_master();
     if (pid == 0) {
         printf("I am the child\n");
-        exit(0);
+        // exit(0);
     } else {
         printf("I am the parent\n");
     }  
