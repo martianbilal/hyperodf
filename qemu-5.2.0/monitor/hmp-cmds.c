@@ -18,6 +18,7 @@
 #include "net/net.h"
 #include "net/eth.h"
 #include "chardev/char.h"
+#include "qemu/typedefs.h"
 #include "sysemu/block-backend.h"
 #include "sysemu/runstate.h"
 #include "qemu/config-file.h"
@@ -958,6 +959,11 @@ static void save_vm(const char* name, Error **errp){
     printf("save_vm[%s]\n", name);
 }
 
+static void load_vm(const char* name, Error **errp){
+    load_snapshot(name, errp);
+    printf("load_vm[%s]\n", name);
+}
+
 static void del_vm(const char* name, Error **errp){
     BlockDriverState *bs;
     if (bdrv_all_delete_snapshot(name, &bs, errp) < 0) {
@@ -978,7 +984,7 @@ static void do_ski_fork(void){
     if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
         printf("I am the child\n");
-        while(1){}
+        // while(1){}
         // exit(0);
     } else {
         printf("I am the parent\n");
@@ -1008,6 +1014,9 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     // vm_start();
 
     do_ski_fork();
+
+    load_vm("newtest", &err);
+    hmp_handle_error(mon, err);
     
     del_vm(name, &err);
     hmp_handle_error(mon, err);

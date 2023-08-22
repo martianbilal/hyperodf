@@ -3102,6 +3102,7 @@ int load_snapshot(const char *name, Error **errp)
     #ifdef DBG
     printf("load_snapshot is called \n");
     #endif
+    printf("load_snapshot is called \n");
 
 
     if (!bdrv_all_can_snapshot(&bs)) {

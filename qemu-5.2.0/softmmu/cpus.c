@@ -433,7 +433,7 @@ void qemu_wait_io_event(CPUState *cpu)
         DEBUG_PRINT("waiting for cpu->halt_cond \n");
         // qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
         wait_again:
-        if(!did_fork){
+        if(!did_fork && !is_child){
             ret = qemu_cond_timedwait(cpu->halt_cond, &qemu_global_mutex, 100);
             printf("returned from timedwait\n");
             ski_forkall_slave(&did_fork, &is_child);
