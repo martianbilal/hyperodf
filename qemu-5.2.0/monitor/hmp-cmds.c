@@ -969,8 +969,13 @@ static void del_vm(const char* name, Error **errp){
 static void do_ski_fork(void){
     // do a simple fork and print the exit in the child 
     // h_cpu_kick();
+    int locked = qemu_mutex_iothread_locked();
+
     kick_all();
+
+    if(locked) qemu_mutex_unlock_iothread();
     pid_t pid = ski_forkall_master();
+    if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
         printf("I am the child\n");
         while(1){}
@@ -983,31 +988,25 @@ static void do_ski_fork(void){
 void hmp_vmfork(Monitor *mon, const QDict *qdict)
 {
     Error *err = NULL;
-    const char *name = "fork_snap";
+    // const char *name = "fork_snap";
+    const char *name = "newtest";
 
     monitor_printf(mon, "Forking the VM!\n");
 
     // save_snapshot
-    // save_vm(name, &err);
-    // hmp_handle_error(mon, err);
+    save_vm(name, &err);
+    hmp_handle_error(mon, err);
     
     // del snapshot
-    // del_vm(name, &err);
-    // hmp_handle_error(mon, err);
-
+    
     // stop vm
     // vm_stop(RUN_STATE_RESTORE_VM);
     // vm_start();
 
-    // Master forkall
-    // ski_forkall_hypercall_done = 1;
-    // while(1){
-    //     if(ski_forkall_thread_pool_ready_check()){
-    //         break;
-    //     }
-    // }
-
     do_ski_fork();
+    
+    del_vm(name, &err);
+    hmp_handle_error(mon, err);
 
 
 

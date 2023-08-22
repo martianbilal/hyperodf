@@ -110,6 +110,7 @@ static void *worker_thread(void *opaque)
                 forked:
 				// After forking resort to the original code
                 h_cpu_kick();
+                if(qemu_mutex_iothread_locked()) qemu_mutex_unlock_iothread();
 				qemu_mutex_unlock(&pool->lock);
                 qemu_sem_wait(&pool->sem);
                 ret = 0;

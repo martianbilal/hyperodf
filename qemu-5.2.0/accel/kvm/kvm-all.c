@@ -3226,7 +3226,7 @@ struct odf_info{
     @return: 0 on success
             -1 on failure
 */ 
-static int establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, struct cpu_prefork_state *prefork_state){
+int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, struct cpu_prefork_state *prefork_state){
     KVMState *s = *sp;
     struct kvm_run *run = *runp; // TODO : Update this with the global one
 
@@ -3403,25 +3403,25 @@ int kvm_cpu_exec(CPUState *cpu)
         *is_child = 0;
         
         if(!(*did_fork)){
-            ski_forkall_slave(did_fork, is_child);
+            // ski_forkall_slave(did_fork, is_child);
             // printf("calling the forkall slave in vcpu thread\n");
         }
 
         if(*did_fork){
             if(forkall_check_child()){
-                printf("[kvm_cpu_exec]Forked child process\n");
+                // printf("[kvm_cpu_exec]Forked child process\n");
             }
         }
 
         if(*did_fork && !(*is_child)){
-            printf("[kvm_cpu_exec][%d]Forked parent process\n", getpid());
+            // printf("[kvm_cpu_exec][%d]Forked parent process\n", getpid());
             fflush(stdout);
         }
 
         if(*did_fork && *is_child){
-            printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
-            establish_child(cpu, &s, &run, prefork_state);
-            fflush(stdout);
+            // printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
+            // establish_child(cpu, &s, &run, prefork_state);
+            // fflush(stdout);
         }
 
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
@@ -4275,18 +4275,18 @@ skip_jump:
             break;
         }
     } while (ret == 0);
-    int did_fork = 0;
-    int is_child = 0;
+    // int did_fork = 0;
+    // int is_child = 0;
 end_loop:
 
     cpu_exec_end(cpu);
-    ski_forkall_slave(&did_fork, &is_child);
+    // ski_forkall_slave(&did_fork, &is_child);
     printf("RETURNED FROM SKI FORKALL SLAVE +++++++++++\n\n\n\n\n");
-    if(did_fork && is_child){
-        printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
-        establish_child(cpu, &s, &run, prefork_state);
-        fflush(stdout);
-    }
+    // if(did_fork && is_child && ){
+        // printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
+        // kvm_establish_child(cpu, &s, &run, prefork_state);
+        // fflush(stdout);
+    // }
 
     qemu_mutex_lock_iothread();
 

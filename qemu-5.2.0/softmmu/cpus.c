@@ -414,6 +414,12 @@ void qemu_wait_io_event_common(CPUState *cpu)
 
 void qemu_wait_io_event(CPUState *cpu)
 {
+    int did_fork = 0;
+    int is_child = 0;
+    int ret = 0;
+    int count = 0;
+    
+
     bool slept = false;
 
     DEBUG_PRINT("wait io event \n");
@@ -425,9 +431,29 @@ void qemu_wait_io_event(CPUState *cpu)
             qemu_plugin_vcpu_idle_cb(cpu);
         }
         DEBUG_PRINT("waiting for cpu->halt_cond \n");
-        qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        // qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        wait_again:
+        if(!did_fork){
+            ret = qemu_cond_timedwait(cpu->halt_cond, &qemu_global_mutex, 100);
+            printf("returned from timedwait\n");
+            ski_forkall_slave(&did_fork, &is_child);
+            if(did_fork && is_child && count <= 1){
+                count = count + 1;
+                kvm_establish_child(cpu, &(cpu->kvm_state), &(cpu->kvm_run), cpu->prefork_state);
+            }
+            if(ret != 0){
+                goto wait_again;
+            }
+        } else {
+            qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        }
+        // if(did_fork && !is_child){
+            // printf("[vcpu_thread_fn]Forked parent process\n");
+        // }
+        
+
         DEBUG_PRINT("cpu->halt_cond is signaled \n");
-        printf("returning from wait \n");
+        // printf("returning from wait \n");
     }
     if (slept) {
         DEBUG_PRINT("resume now cpu\n");
