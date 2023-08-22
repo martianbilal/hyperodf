@@ -13,6 +13,10 @@ spawn socat unix-connect:qemu-monitor-socket -
 expect "(qemu)"
 send "do_fork\r"
 
+expect "(qemu)"
+send "info\r"
+
+
 sleep 30
 
 exit 0
