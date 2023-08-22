@@ -107,6 +107,8 @@ void ski_forkall_thread_pool_ready();
 void ski_forkall_thread_pool_not_ready();
 void ski_forkall_patch_thread_references();
 
+int forkall_check_child(void);
+
 
 void ski_forkall_hypercall_ready();
 

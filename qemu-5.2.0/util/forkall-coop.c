@@ -65,7 +65,7 @@ static int ski_create_thread_custom_stack(forkall_thread *t, pthread_t *thread, 
 */
 
 // Uncomment to enable debugging
-// #define FORKALL_DEBUGGING
+#define FORKALL_DEBUGGING
 
 pid_t ski_gettid(void){
     pid_t own_tid = syscall(SYS_gettid);
@@ -261,6 +261,10 @@ static int ski_tgkill(int tgid, int tid, int sig){
 }
 
 static int ski_forkall_is_child = 0;
+
+int forkall_check_child(void){
+	return ski_forkall_is_child;
+}
 
 
 int ski_forkall_pthread_kill(pthread_t thread, int sig){

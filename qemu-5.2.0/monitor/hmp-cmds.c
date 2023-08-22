@@ -973,6 +973,7 @@ static void do_ski_fork(void){
     pid_t pid = ski_forkall_master();
     if (pid == 0) {
         printf("I am the child\n");
+        while(1){}
         // exit(0);
     } else {
         printf("I am the parent\n");
@@ -1007,6 +1008,7 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     // }
 
     do_ski_fork();
+
 
 
     monitor_printf(mon, "Forking the VM!\n");

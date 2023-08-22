@@ -15,7 +15,6 @@
 
 #include <time.h>
 #include <sys/time.h>
-#include "qapi-types-run-state.h"
 #include "qemu/osdep.h"
 #include <sys/ioctl.h>
 #include <stdio.h>
@@ -24,6 +23,7 @@
 #include <time.h>
 
 #include <linux/kvm.h>
+#include <unistd.h>
 
 #include "qemu/atomic.h"
 #include "qemu/option.h"
@@ -3226,14 +3226,16 @@ struct odf_info{
     @return: 0 on success
             -1 on failure
 */ 
-static int establish_child(CPUState *cpu, KVMState *s, struct cpu_prefork_state *prefork_state){
-    
+static int establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, struct cpu_prefork_state *prefork_state){
+    KVMState *s = *sp;
+    struct kvm_run *run = *runp; // TODO : Update this with the global one
+
+    printf("=======================establishing child=========================\n");
 
     qemu_cond_init(&cpu->vcpu_recreated_cond);
     cpu->is_child = true;
     s->fd = open("/dev/kvm", 2);
     s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
-    struct kvm_run *run; // TODO : Update this with the global one
 
     kvm_irqchip_create(s);
 
@@ -3249,7 +3251,6 @@ static int establish_child(CPUState *cpu, KVMState *s, struct cpu_prefork_state 
 
     event_notifier_test_and_clear(&(cpu->load_event));
     event_notifier_set(&(cpu->load_event));
-
 
     return 0;
 }
@@ -3405,14 +3406,21 @@ int kvm_cpu_exec(CPUState *cpu)
             ski_forkall_slave(did_fork, is_child);
             // printf("calling the forkall slave in vcpu thread\n");
         }
+
+        if(*did_fork){
+            if(forkall_check_child()){
+                printf("[kvm_cpu_exec]Forked child process\n");
+            }
+        }
+
         if(*did_fork && !(*is_child)){
-            printf("[kvm_cpu_exec]Forked parent process\n");
+            printf("[kvm_cpu_exec][%d]Forked parent process\n", getpid());
             fflush(stdout);
         }
 
         if(*did_fork && *is_child){
-            printf("[kvm_cpu_exec]Forked child process\n");
-            establish_child();
+            printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
+            establish_child(cpu, &s, &run, prefork_state);
             fflush(stdout);
         }
 
@@ -4274,6 +4282,12 @@ end_loop:
     cpu_exec_end(cpu);
     ski_forkall_slave(&did_fork, &is_child);
     printf("RETURNED FROM SKI FORKALL SLAVE +++++++++++\n\n\n\n\n");
+    if(did_fork && is_child){
+        printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
+        establish_child(cpu, &s, &run, prefork_state);
+        fflush(stdout);
+    }
+
     qemu_mutex_lock_iothread();
 
     if (ret < 0) {
