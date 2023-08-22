@@ -3249,6 +3249,8 @@ int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, str
     cpu->should_wait = false;
     vm_stop(RUN_STATE_RESTORE_VM);
 
+    forkall_child_done();
+    printf("=======================completed established child=========================\n");
     // event_notifier_test_and_clear(&(cpu->load_event));
     // event_notifier_set(&(cpu->load_event));
 

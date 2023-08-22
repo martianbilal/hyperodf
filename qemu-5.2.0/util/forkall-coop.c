@@ -4,6 +4,7 @@
 #include "util/hodf-util.h"
 
 #include <asm/prctl.h>
+#include <pthread.h>
 #include <sys/prctl.h>
 
 
@@ -46,6 +47,8 @@ int save_snapshot_event = 0;
 int snapshot_in_progress = 0;
 int sanpshot_complete = 0;
 
+int child_setup = 0;
+
 
 #pragma GCC push_options
 #pragma GCC optimize 0
@@ -70,6 +73,25 @@ static int ski_create_thread_custom_stack(forkall_thread *t, pthread_t *thread, 
 pid_t ski_gettid(void){
     pid_t own_tid = syscall(SYS_gettid);
     return own_tid;
+}
+
+// sets child_setup to 1
+void forkall_child_done(void){
+	pthread_mutex_lock(&forkall_mutex);
+	child_setup = 1;
+	pthread_mutex_unlock(&forkall_mutex);
+	return;
+}
+
+void forkall_child_wait(void){
+	while(1){
+		pthread_mutex_lock(&forkall_mutex);
+		int child_setup_local = child_setup;
+		pthread_mutex_unlock(&forkall_mutex);
+		if(child_setup_local){
+			return;
+		}
+	}
 }
 
 int ski_forkall_thread_pool_ready_check(){

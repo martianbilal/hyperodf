@@ -984,6 +984,7 @@ static void do_ski_fork(void){
     if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
         printf("I am the child\n");
+        forkall_child_wait();
         // while(1){}
         // exit(0);
     } else {
@@ -1015,11 +1016,14 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
 
     do_ski_fork();
 
-    load_vm("newtest", &err);
-    hmp_handle_error(mon, err);
+    // only load in the child
+    if(forkall_check_child()){
+        load_vm("newtest", &err);
+        hmp_handle_error(mon, err);
+    }
     
-    del_vm(name, &err);
-    hmp_handle_error(mon, err);
+    // del_vm(name, &err);
+    // hmp_handle_error(mon, err);
 
 
 
