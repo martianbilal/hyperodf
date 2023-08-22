@@ -16,6 +16,7 @@ send "do_fork\r"
 expect "(qemu)"
 send "info\r"
 
+interact
 
 sleep 30
 
