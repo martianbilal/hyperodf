@@ -954,7 +954,8 @@ void hmp_quit(Monitor *mon, const QDict *qdict)
 }
 
 static void save_vm(const char* name, Error **errp){
-    save_snapshot( "fork_snap", errp);
+    save_snapshot(name, errp);
+    printf("save_vm[%s]\n", name);
 }
 
 static void del_vm(const char* name, Error **errp){
@@ -972,7 +973,6 @@ static void do_ski_fork(void){
     int locked = qemu_mutex_iothread_locked();
 
     kick_all();
-
     if(locked) qemu_mutex_unlock_iothread();
     pid_t pid = ski_forkall_master();
     if(locked) qemu_mutex_lock_iothread();
@@ -992,6 +992,10 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     const char *name = "newtest";
 
     monitor_printf(mon, "Forking the VM!\n");
+
+    // delete snapshot
+    del_vm(name, &err);
+    hmp_handle_error(mon, err);
 
     // save_snapshot
     save_vm(name, &err);

@@ -3595,7 +3595,8 @@ void handle_save_snapshot(void *opaque){
     result = event_notifier_test_and_clear(&(cpu->save_event));
     if(result == 1 ) {
         printf("[Debug] Save_snapshot event;\n");
-        if(save_snapshot("newtest", NULL) == 0){
+        int ret = save_snapshot("newtest", NULL);
+        if(ret == 0){
             entering_after_save_snap = 1;
             if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
             {
@@ -3606,8 +3607,11 @@ void handle_save_snapshot(void *opaque){
                 + (double)( stop.tv_nsec - start.tv_nsec )
                 / (double)BILLION;
             printf( "save_snapshot took %.5lf seconds\n", accum );
+            fflush(stdout);
 
             vm_start();
+        } else {
+            printf("Failed to save snapshot returned: %d\n", ret);
         }
     }
 }
@@ -3656,12 +3660,15 @@ void handle_load_snapshot(void *opaque){
     result = event_notifier_test_and_clear(&(cpu->load_event));
     if(result == 1 ) {
         printf("[Debug] Load_snapshot event;\n");
-        if(load_snapshot("newtest", NULL) == 0){
+        int ret = load_snapshot("newtest", NULL);
+        if(ret == 0){
             save_snapshot_event = 0;
             // make the ioctl to share the TDP table/EPT
             // ioctl(s->fd, KVM_EPT_ODF, &o_info);
             // update_hostfwd("tcp:127.0.0.1:10023-:22");
             vm_start();
+        } else {
+            printf("Failed to load snapshot returned: %d\n", ret);
         }
     }
     if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )

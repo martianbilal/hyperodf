@@ -3298,8 +3298,8 @@ int kvm_cpu_exec(CPUState *cpu)
 
 
     
-    
-
+    if(!cpu->prefork_state) cpu->prefork_state = malloc(sizeof(struct cpu_prefork_state));
+    fork_save_vm_state(cpu, cpu->prefork_state);
 
     //register the piped fd with qemu main loop 
 
