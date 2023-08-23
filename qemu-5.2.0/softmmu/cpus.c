@@ -435,7 +435,7 @@ void qemu_wait_io_event(CPUState *cpu)
         wait_again:
         if(!did_fork && !is_child){
             ret = qemu_cond_timedwait(cpu->halt_cond, &qemu_global_mutex, 100);
-            printf("returned from timedwait\n");
+            // printf("returned from timedwait[%d]\n", getpid());
             ski_forkall_slave(&did_fork, &is_child);
             if(did_fork && is_child && count <= 1){
                 count = count + 1;

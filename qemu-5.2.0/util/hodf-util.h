@@ -20,6 +20,7 @@
 
 
 extern EventNotifier mon_create_event;
+extern int parent_child_pipe[2];
 
 
 typedef struct hodf_metadata{
@@ -33,6 +34,10 @@ void h_initialize(void);
 
 void h_cpu_kick(void);
 void h_hello(void);
+void h_wait_for_load_snapshot(void);
+void h_signal_child_done(void);
+
+
 
 void h_save_metadata(QemuCond *halt_cond, pthread_t threadid, int cpu_index);
 

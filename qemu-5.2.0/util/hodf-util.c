@@ -20,10 +20,12 @@ static int H_MAX_CPUS = 20;
 hodf_metadata *metadata_array;
 
 EventNotifier mon_create_event;
+int parent_child_pipe[2];
 
 void h_initialize(void){
     DEBUG_PRINT("Starting initializing");
     metadata_array = malloc(sizeof(hodf_metadata) * H_MAX_CPUS);
+    pipe(parent_child_pipe);
     
     for(int i = 0; i < H_MAX_CPUS; i++){
         metadata_array[i].threadid = 0;
@@ -54,6 +56,24 @@ void h_cpu_kick(void){
             break;
         }
     }
+    return;
+}
+
+void h_signal_child_done(void){
+    DEBUG_PRINT("Signaling child done\n");
+    write(parent_child_pipe[1], "done", sizeof("done"));
+    DEBUG_PRINT("Signalled child done\n");
+    return;
+}
+
+void h_wait_for_load_snapshot(void){
+    char buffer[100];
+    DEBUG_PRINT("Waiting for load snapshot in child\n");
+    // compare the buffer with "done"
+    while(strcmp(buffer, "done") != 0){
+        read(parent_child_pipe[0], buffer, sizeof(buffer));
+    }
+    DEBUG_PRINT("Load snapshot done\n");
     return;
 }
 

@@ -961,6 +961,10 @@ static void save_vm(const char* name, Error **errp){
 
 static void load_vm(const char* name, Error **errp){
     load_snapshot(name, errp);
+
+    // signal completion of load_snapshot
+    h_signal_child_done();
+    
     printf("load_vm[%s]\n", name);
 }
 
@@ -984,11 +988,12 @@ static void do_ski_fork(void){
     if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
         printf("I am the child\n");
+        
+        // this waits for the setup to complete on other threads => by establish_child
         forkall_child_wait();
-        // while(1){}
-        // exit(0);
     } else {
         printf("I am the parent\n");
+        h_wait_for_load_snapshot();
     }  
 }
 
@@ -1026,7 +1031,7 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
         load_vm("newtest", &err);
         hmp_handle_error(mon, err);
 
-        create_mon();        
+        // create_mon();        
     }
     
 
