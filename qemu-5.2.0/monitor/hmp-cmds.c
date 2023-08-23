@@ -992,6 +992,11 @@ static void do_ski_fork(void){
     }  
 }
 
+static void create_mon(void){
+    event_notifier_test_and_clear(&mon_create_event);
+    event_notifier_set(&mon_create_event);
+}
+
 void hmp_vmfork(Monitor *mon, const QDict *qdict)
 {
     Error *err = NULL;
@@ -1020,12 +1025,13 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     if(forkall_check_child()){
         load_vm("newtest", &err);
         hmp_handle_error(mon, err);
+
+        create_mon();        
     }
     
+
     // del_vm(name, &err);
     // hmp_handle_error(mon, err);
-
-
 
     monitor_printf(mon, "Forking the VM!\n");
 }

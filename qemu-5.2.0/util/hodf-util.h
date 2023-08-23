@@ -14,8 +14,13 @@
 #include "qemu/sockets.h"
 #include "qemu/thread.h"
 #include "qemu/thread-posix.h"
+#include "qemu/event_notifier.h"
 
 // ======================== HODF ========================
+
+
+extern EventNotifier mon_create_event;
+
 
 typedef struct hodf_metadata{
     pthread_t threadid;

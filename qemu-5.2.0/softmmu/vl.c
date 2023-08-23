@@ -124,6 +124,7 @@
 #include "block/qcow2.h"
 #include <signal.h>
 #include "util/forkall-coop.h"
+#include "util/hodf-util.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 // #define DBG
@@ -3682,6 +3683,19 @@ void handle_load_snapshot(void *opaque){
     return;
 }
 
+
+static void create_mon_socket(void){
+    monitor_parse("unix:qemu-monitor-socket1,server,nowait", "readline", NULL);
+    DEBUG_PRINT("returned from the monitor parse\n");
+    qemu_opts_foreach(qemu_find_opts("chardev"),
+        chardev_pre_init_func, NULL, &error_fatal);
+    DEBUG_PRINT("returned from the chardev pre init func\n");
+    qemu_opts_foreach(qemu_find_opts("mon"),
+                      mon_pre_init_func, NULL, &error_fatal);
+    return;
+}
+
+
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
     // CPUState *new_cpu;
@@ -5751,6 +5765,7 @@ void qemu_init(int argc, char **argv, char **envp)
     qemu_set_fd_handler(cpu->fork_event.rfd, handle_fork, NULL, cpu);
     qemu_set_fd_handler(cpu->load_event.rfd, handle_load_snapshot, NULL, cpu);
     qemu_set_fd_handler(cpu->save_event.rfd, handle_save_snapshot, NULL, cpu);
+    qemu_set_fd_handler(mon_create_event.rfd, create_mon_socket, NULL, NULL);   
 
     accel_setup_post(current_machine);
     os_setup_post();

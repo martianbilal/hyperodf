@@ -1,5 +1,7 @@
 #include "util/hodf-util.h"
+#include "qemu/event_notifier.h"
 #include "qemu/thread.h"
+#include "qemu/typedefs.h"
 
 // debug flag for hodf
 // #define DBG_HODF
@@ -17,16 +19,21 @@
 static int H_MAX_CPUS = 20;
 hodf_metadata *metadata_array;
 
+EventNotifier mon_create_event;
 
 void h_initialize(void){
     DEBUG_PRINT("Starting initializing");
-    
     metadata_array = malloc(sizeof(hodf_metadata) * H_MAX_CPUS);
     
     for(int i = 0; i < H_MAX_CPUS; i++){
         metadata_array[i].threadid = 0;
     }
     DEBUG_PRINT("Initialization done");
+
+    int ret = event_notifier_init(&mon_create_event, 0);
+    if(ret < 0){
+        DEBUG_PRINT("Error initializing event notifier\n");
+    }
 }
 
 void h_save_metadata(QemuCond *halt_cond, pthread_t threadid, int cpu_index){
