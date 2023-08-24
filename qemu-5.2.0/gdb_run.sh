@@ -1,4 +1,4 @@
-gdb -q --args /usr/local/bin/qemu-system-x86_64 \
+gdb -q --args ./build/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \
   -kernel $KERNEL \

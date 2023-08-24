@@ -22,6 +22,8 @@
 #include "block/thread-pool.h"
 #include "qemu/main-loop.h"
 #include "forkall-coop.h"
+#include "exec/cpu-common.h"
+#include "util/hodf-util.h"
 
 static void do_spawn_thread(ThreadPool *pool);
 
@@ -107,10 +109,13 @@ static void *worker_thread(void *opaque)
             if(did_fork){
                 forked:
 				// After forking resort to the original code
+                h_cpu_kick();
+                if(qemu_mutex_iothread_locked()) qemu_mutex_unlock_iothread();
 				qemu_mutex_unlock(&pool->lock);
                 qemu_sem_wait(&pool->sem);
                 ret = 0;
                 qemu_mutex_lock(&pool->lock);
+
             }
             else {
                 qemu_mutex_unlock(&pool->lock);
@@ -120,16 +125,22 @@ static void *worker_thread(void *opaque)
 					// while(!did_fork){
                     // printf("[debug] [aio-thread] counter : %d \n", pool->sem.count);
                     // printf("ret value : %d\n", ski_forkall_hypercall_done);
+                    // int init_count = pool->sem.count;
+                    timed_wait:
                     if(!ski_forkall_hypercall_done){
                         ski_forkall_thread_pool_not_ready();
-                        ret = qemu_sem_timedwait(&pool->sem, 10000);
+                        ret = qemu_sem_timedwait(&pool->sem, 100);
                         ski_forkall_thread_pool_ready();
                     }
                     // printf("[debug] [aio-thread] lock : %d \n", ret);
                     // printf("[debug] [aio-thread] counter : %d \n", pool->sem.count);
                     // qemu_sem_destroy(&pool->sem);
-
+                    // if(qemu_mutex_iothread_locked()) qemu_mutex_unlock_iothread();
                     ski_forkall_slave(&did_fork, &is_child);
+                    // kick_all();
+                    // cpu_kick_all();
+                    // h_cpu_kick();
+                    
                     // }
                     if(did_fork){
                         ski_log_forkall("Did fork");
@@ -139,6 +150,8 @@ static void *worker_thread(void *opaque)
                         // pool->idle_threads --;
                         ski_log_forkall("Did fork");
                         goto forked;
+                    } else if( !did_fork && ret == -1) {
+                        goto timed_wait;
                     }
 					
 					// Sishuai: comment to see if it could speed up

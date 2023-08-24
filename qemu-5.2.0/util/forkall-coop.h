@@ -72,6 +72,10 @@ extern int save_snapshot_event;
 extern int snapshot_in_progress;
 extern int snapshot_complete;
 
+// for use particularly by kvm_establish child to let everyone know 
+// that we are done setting up the child
+extern int child_setup;
+
 typedef struct struct_fork_thread {
     int tid_original;
 	int tid_restore;
@@ -106,6 +110,11 @@ int ski_forkall_thread_pool_ready_check();
 void ski_forkall_thread_pool_ready();
 void ski_forkall_thread_pool_not_ready();
 void ski_forkall_patch_thread_references();
+
+int forkall_check_child(void);
+void forkall_child_done(void);
+void forkall_child_wait(void);
+
 
 
 void ski_forkall_hypercall_ready();

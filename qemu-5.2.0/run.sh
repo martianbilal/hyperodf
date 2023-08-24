@@ -17,9 +17,9 @@ pkill -9 qemu
 ./build/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \
-  -kernel $KERNEL/arch/x86/boot/bzImage \
+  -kernel $KERNEL \
   -append "console=ttyS0 root=/dev/sda earlyprintk=serial net.ifnames=0" \
-  -drive file=$TINYIMAGE/stretch_backup.qcow2,format=qcow2 \
+  -drive file=$IMAGE/stretch_backup.qcow2,format=qcow2 \
   -enable-kvm \
   -nographic \
   -s \

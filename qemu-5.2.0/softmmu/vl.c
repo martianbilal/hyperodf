@@ -86,6 +86,7 @@
 #include "qemu/config-file.h"
 #include "qemu-options.h"
 #include "qemu/main-loop.h"
+#include "util/hodf-util.h"
 #include <stdbool.h>
 #ifdef CONFIG_VIRTFS
 #include "fsdev/qemu-fsdev.h"
@@ -123,6 +124,7 @@
 #include "block/qcow2.h"
 #include <signal.h>
 #include "util/forkall-coop.h"
+#include "util/hodf-util.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 // #define DBG
@@ -3594,7 +3596,8 @@ void handle_save_snapshot(void *opaque){
     result = event_notifier_test_and_clear(&(cpu->save_event));
     if(result == 1 ) {
         printf("[Debug] Save_snapshot event;\n");
-        if(save_snapshot("newtest", NULL) == 0){
+        int ret = save_snapshot("newtest", NULL);
+        if(ret == 0){
             entering_after_save_snap = 1;
             if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
             {
@@ -3605,8 +3608,11 @@ void handle_save_snapshot(void *opaque){
                 + (double)( stop.tv_nsec - start.tv_nsec )
                 / (double)BILLION;
             printf( "save_snapshot took %.5lf seconds\n", accum );
+            fflush(stdout);
 
             vm_start();
+        } else {
+            printf("Failed to save snapshot returned: %d\n", ret);
         }
     }
 }
@@ -3655,12 +3661,15 @@ void handle_load_snapshot(void *opaque){
     result = event_notifier_test_and_clear(&(cpu->load_event));
     if(result == 1 ) {
         printf("[Debug] Load_snapshot event;\n");
-        if(load_snapshot("newtest", NULL) == 0){
+        int ret = load_snapshot("newtest", NULL);
+        if(ret == 0){
             save_snapshot_event = 0;
             // make the ioctl to share the TDP table/EPT
             // ioctl(s->fd, KVM_EPT_ODF, &o_info);
             // update_hostfwd("tcp:127.0.0.1:10023-:22");
             vm_start();
+        } else {
+            printf("Failed to load snapshot returned: %d\n", ret);
         }
     }
     if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
@@ -3673,6 +3682,19 @@ void handle_load_snapshot(void *opaque){
     printf( "Time spent in the load_snapshot:  %lf\n", accum );
     return;
 }
+
+
+static void create_mon_socket(void){
+    monitor_parse("unix:qemu-monitor-socket3,server,nowait", "readline", NULL);
+    DEBUG_PRINT("returned from the monitor parse\n");
+    qemu_opts_foreach(qemu_find_opts("chardev"),
+        chardev_pre_init_func, NULL, &error_fatal);
+    DEBUG_PRINT("returned from the chardev pre init func\n");
+    qemu_opts_foreach(qemu_find_opts("mon"),
+                      mon_pre_init_func, NULL, &error_fatal);
+    return;
+}
+
 
 void handle_fork(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
@@ -3797,7 +3819,7 @@ void handle_fork(void *opaque){
 
         // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
 
-        kvm_set_old_env(cpu);
+        // kvm_set_old_env(cpu);
         gdbserver_cleanup();
         // gdbserver_fork_linux();
 
@@ -4089,6 +4111,8 @@ void qemu_init(int argc, char **argv, char **envp)
     ARGV = argv;
     ENVP = envp; 
     ARGC = argc;
+
+    h_initialize();
 
     // used only for changing the buffering type of the stdout
     os_set_line_buffering();
@@ -5741,6 +5765,7 @@ void qemu_init(int argc, char **argv, char **envp)
     qemu_set_fd_handler(cpu->fork_event.rfd, handle_fork, NULL, cpu);
     qemu_set_fd_handler(cpu->load_event.rfd, handle_load_snapshot, NULL, cpu);
     qemu_set_fd_handler(cpu->save_event.rfd, handle_save_snapshot, NULL, cpu);
+    qemu_set_fd_handler(mon_create_event.rfd, create_mon_socket, NULL, NULL);   
 
     accel_setup_post(current_machine);
     os_setup_post();

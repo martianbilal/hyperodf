@@ -26,6 +26,7 @@
 #include "io/channel-watch.h"
 #include "trace.h"
 #include "qapi/clone-visitor.h"
+#include "util/hodf-util.h"
 
 #define SOCKET_MAX_FDS 16
 
@@ -558,6 +559,8 @@ static ssize_t qio_channel_socket_writev(QIOChannel *ioc,
     }
 
  retry:
+    // register with hodf utility
+    h_register_monitor_fd(sioc->fd);
     ret = sendmsg(sioc->fd, &msg, 0);
     if (ret <= 0) {
         if (errno == EAGAIN) {

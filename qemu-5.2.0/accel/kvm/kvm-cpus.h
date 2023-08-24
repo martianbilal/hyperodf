@@ -32,5 +32,6 @@ void kvm_start_vcpu_thread(CPUState *cpu);
 void kvm_irqchip_create(KVMState *s);
 int dump_cpu_state(CPUState *cpu, char *filename);
 int read_cpu_state(CPUState *cpu, char* filename);
+int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, struct cpu_prefork_state *prefork_state);
 
 #endif /* KVM_CPUS_H */

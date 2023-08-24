@@ -158,6 +158,14 @@ void cpu_synchronize_all_post_init(void)
     }
 }
 
+void cpu_kick_all(void){
+    CPUState *cpu;
+
+    CPU_FOREACH(cpu) {
+        qemu_cpu_kick(cpu);
+    }
+}
+
 void cpu_synchronize_all_pre_loadvm(void)
 {
     CPUState *cpu;
@@ -406,6 +414,12 @@ void qemu_wait_io_event_common(CPUState *cpu)
 
 void qemu_wait_io_event(CPUState *cpu)
 {
+    int did_fork = 0;
+    int is_child = 0;
+    int ret = 0;
+    int count = 0;
+    
+
     bool slept = false;
 
     DEBUG_PRINT("wait io event \n");
@@ -417,7 +431,24 @@ void qemu_wait_io_event(CPUState *cpu)
             qemu_plugin_vcpu_idle_cb(cpu);
         }
         DEBUG_PRINT("waiting for cpu->halt_cond \n");
-        qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        wait_again:
+        if(!did_fork && !is_child && !forkall_check_child()){
+            ret = qemu_cond_timedwait(cpu->halt_cond, &qemu_global_mutex, 100);
+            // printf("returned from timedwait[%d][did_fork: %d][is_child: %d]\n", getpid(), did_fork, is_child);
+            ski_forkall_slave(&did_fork, &is_child);
+            
+            // TODO: count <= 1 would be problematic for starting multiple VMs
+            if(did_fork && is_child && count <= 1){
+                count = count + 1;
+                kvm_establish_child(cpu, &(cpu->kvm_state), &(cpu->kvm_run), cpu->prefork_state);
+            }
+            if(ret != 0){
+                goto wait_again;
+            }
+        } else {
+            qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        }
+
         DEBUG_PRINT("cpu->halt_cond is signaled \n");
     }
     if (slept) {
@@ -495,7 +526,7 @@ static void print_backtrace(void)
 void qemu_cpu_kick(CPUState *cpu)
 {
     DEBUG_PRINT("kicking cpu %d | broadcast halt cond\n", cpu->cpu_index);
-    print_backtrace();
+    // print_backtrace();
     qemu_cond_broadcast(cpu->halt_cond);
     if (cpus_accel->kick_vcpu_thread) {
         cpus_accel->kick_vcpu_thread(cpu);
