@@ -26,10 +26,6 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	if _, ferr := f.Write([]byte("Hello World startContainer\n")); ferr != nil {
 		log.Fatal(ferr)
 	}
-	// close the file
-	if ferr := f.Close(); ferr != nil {
-		log.Fatal(ferr)
-	}
 
 	shimLog.WithField("container", c.id).Debug("start container")
 	defer func() {
@@ -50,6 +46,15 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 	}
 
 	if c.cType.IsSandbox() {
+
+		if _, ferr := f.Write([]byte("The context.ctype was __sandbox__\n")); ferr != nil {
+			log.Fatal(ferr)
+		}
+
+		if _, ferr := f.Write([]byte(fmt.Sprintf("__sandbox__ : %+v\n", s.sandbox))); ferr != nil {
+			log.Fatal(ferr)
+		}
+
 		err := s.sandbox.Start(ctx)
 		if err != nil {
 			return err
@@ -65,6 +70,9 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// shim context and the context passed to startContainer for tracing.
 		go watchOOMEvents(ctx, s)
 	} else {
+		if _, ferr := f.Write([]byte("The context.ctype was __NOT sandbox__\n")); ferr != nil {
+			log.Fatal(ferr)
+		}
 		_, err := s.sandbox.StartContainer(ctx, c.id)
 		if err != nil {
 			return err
@@ -105,6 +113,10 @@ func startContainer(ctx context.Context, s *service, c *container) (retErr error
 		// close the stdin closer channel to notify that it's safe to close process's
 		// io.
 		close(c.stdinCloser)
+	}
+	// close the file
+	if ferr := f.Close(); ferr != nil {
+		log.Fatal(ferr)
 	}
 
 	go wait(ctx, s, c, "")

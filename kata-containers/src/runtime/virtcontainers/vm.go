@@ -8,6 +8,7 @@ package virtcontainers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -237,6 +238,19 @@ func (v *VM) Resume(ctx context.Context) error {
 // Start kicks off a configured VM.
 func (v *VM) Start(ctx context.Context) error {
 	v.logger().Info("start vm")
+	f, ferr := os.OpenFile("/tmp/test1.txt", os.O_CREATE|os.O_WRONLY, 0644)
+	if ferr != nil {
+		log.Fatal(ferr)
+	}
+	// write hello world to file
+	if _, ferr := f.Write([]byte("start VM\n")); ferr != nil {
+		log.Fatal(ferr)
+	}
+	// close file
+	if ferr := f.Close(); ferr != nil {
+		log.Fatal(ferr)
+	}
+
 	return v.hypervisor.StartVM(ctx, VmStartTimeout)
 }
 

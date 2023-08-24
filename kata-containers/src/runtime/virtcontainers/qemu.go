@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"os/user"
@@ -24,6 +25,8 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"runtime/debug"
 
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/rootless"
 
@@ -801,9 +804,33 @@ func (q *qemu) StartVM(ctx context.Context, timeout int) error {
 	span, ctx := katatrace.Trace(ctx, q.Logger(), "StartVM", qemuTracingTags, map[string]string{"sandbox_id": q.id})
 	defer span.End()
 
-	// print something to stdout 
+	// print something to stdout
 	fmt.Println("StartVM")
 
+	stack := debug.Stack()
+
+	// open file
+	f, ferr := os.OpenFile("/tmp/test3.txt", os.O_CREATE|os.O_WRONLY, 0644)
+	if ferr != nil {
+		log.Fatal(ferr)
+	}
+	// write hello world to file
+	if _, ferr := f.Write([]byte("QEMU started the VM\n")); ferr != nil {
+		log.Fatal(ferr)
+	}
+
+	if _, ferr := f.Write([]byte("StartVM stack : \n" + string(stack))); ferr != nil {
+		log.Fatal(ferr)
+	}
+
+	if _, ferr := f.Write([]byte("=====================================================\n\n\n")); ferr != nil {
+		log.Fatal(ferr)
+	}
+
+	// close file
+	if ferr := f.Close(); ferr != nil {
+		log.Fatal(ferr)
+	}
 
 	if q.config.Debug {
 		params := q.arch.kernelParameters(q.config.Debug)

@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -941,6 +942,14 @@ func (c *Container) start(ctx context.Context) error {
 	if err := c.checkSandboxRunning("start"); err != nil {
 		return err
 	}
+	f, ferr := os.OpenFile("/tmp/test2.txt", os.O_CREATE|os.O_WRONLY, 0644)
+	if ferr != nil {
+		log.Fatal(ferr)
+	}
+	// write hello world to file
+	if _, ferr := f.Write([]byte("start container\n")); ferr != nil {
+		log.Fatal(ferr)
+	}
 
 	if c.state.State != types.StateReady &&
 		c.state.State != types.StateStopped {
@@ -958,6 +967,10 @@ func (c *Container) start(ctx context.Context) error {
 			c.Logger().WithError(err).Warn("Failed to stop container")
 		}
 		return err
+	}
+	// close file
+	if ferr := f.Close(); ferr != nil {
+		log.Fatal(ferr)
 	}
 
 	return c.setContainerState(types.StateRunning)
