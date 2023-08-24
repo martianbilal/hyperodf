@@ -1042,7 +1042,7 @@ static void start_socket(const char *path){
     }
 
 
-    dup2(client_sock, 31);
+    dup2(client_sock, 30);
     close(client_sock);
 
 }
