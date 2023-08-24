@@ -2,6 +2,8 @@
 
 set timout 30
 
+spawn ./recreate_snapshot.sh
+
 # Launch run.sh script to create and start the QEMU VM
 spawn ./run.sh
 
