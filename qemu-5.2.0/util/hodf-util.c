@@ -17,10 +17,14 @@
 
 // random number
 static int H_MAX_CPUS = 20;
+static int monitor_client_fd = 0;
 hodf_metadata *metadata_array;
 
 EventNotifier mon_create_event;
 int parent_child_pipe[2];
+
+// sorta hacky way to get the number of times the fd is registered
+static int times_registered_fd = 0;
 
 void h_initialize(void){
     DEBUG_PRINT("Starting initializing");
@@ -79,4 +83,20 @@ void h_wait_for_load_snapshot(void){
 
 void h_hello(void){
     printf("Hello\n");
+}
+
+
+void h_register_monitor_fd(int fd){
+    if(times_registered_fd >= 1){
+        DEBUG_PRINT("Already registered monitor fd\n");
+        return;
+    }
+    times_registered_fd++;
+    DEBUG_PRINT("Registering monitor fd: %d\n", fd);
+    monitor_client_fd = fd;
+    return;
+}
+
+int h_get_monitor_fd(void){
+    return monitor_client_fd;
 }

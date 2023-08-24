@@ -36,6 +36,8 @@ void h_cpu_kick(void);
 void h_hello(void);
 void h_wait_for_load_snapshot(void);
 void h_signal_child_done(void);
+void h_register_monitor_fd(int fd);
+int h_get_monitor_fd(void);
 
 
 

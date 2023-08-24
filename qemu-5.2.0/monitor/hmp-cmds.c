@@ -1042,14 +1042,15 @@ static void start_socket(const char *path){
     }
 
 
-    dup2(client_sock, 30);
+    // dup2(client_sock, 30); --> old hacky way
+    dup2(client_sock, h_get_monitor_fd());  // new way
     close(client_sock);
 
 }
 
 
 static void create_mon_new(void){
-    close(31);
+    // close(31);
     start_socket("qemu_monitor.sock");
 }
 
