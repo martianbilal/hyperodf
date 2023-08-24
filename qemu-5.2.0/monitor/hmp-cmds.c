@@ -1055,7 +1055,7 @@ static void create_mon_new(void){
 }
 
 
-static void do_ski_fork(void){
+static int do_ski_fork(void){
     // do a simple fork and print the exit in the child 
     // h_cpu_kick();
     int locked = qemu_mutex_iothread_locked();
@@ -1070,18 +1070,19 @@ static void do_ski_fork(void){
                 
         // this waits for the setup to complete on other threads => by establish_child
         forkall_child_wait();
-
+        return pid;
     } else {
         printf("I am the parent\n");
         h_wait_for_load_snapshot();
+        return pid;
     }  
 }
 
 void hmp_vmfork(Monitor *mon, const QDict *qdict)
 {
     Error *err = NULL;
-    // const char *name = "fork_snap";
     const char *name = "newtest";
+    int pid = 0;
 
     monitor_printf(mon, "Forking the VM!\n");
 
@@ -1093,28 +1094,18 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     save_vm(name, &err);
     hmp_handle_error(mon, err);
     
-    // del snapshot
-    
-    // stop vm
-    // vm_stop(RUN_STATE_RESTORE_VM);
-    // vm_start();
-
-    do_ski_fork();
+    pid = do_ski_fork();
 
     // only load in the child
     if(forkall_check_child()){
-        // close(31);
         load_vm("newtest", &err);
         hmp_handle_error(mon, err);
-
-        // create_mon();
     }
     
 
-    // del_vm(name, &err);
-    // hmp_handle_error(mon, err);
-
-    monitor_printf(mon, "Forking the VM!\n");
+    if(pid != 0){
+        monitor_printf(mon, "child_pid : %d\n", pid);
+    }
 }
 
 void hmp_stop(Monitor *mon, const QDict *qdict)
