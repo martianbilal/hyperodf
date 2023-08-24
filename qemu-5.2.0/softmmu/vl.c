@@ -3685,7 +3685,7 @@ void handle_load_snapshot(void *opaque){
 
 
 static void create_mon_socket(void){
-    monitor_parse("unix:qemu-monitor-socket1,server,nowait", "readline", NULL);
+    monitor_parse("unix:qemu-monitor-socket3,server,nowait", "readline", NULL);
     DEBUG_PRINT("returned from the monitor parse\n");
     qemu_opts_foreach(qemu_find_opts("chardev"),
         chardev_pre_init_func, NULL, &error_fatal);

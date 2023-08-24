@@ -964,7 +964,7 @@ static void load_vm(const char* name, Error **errp){
 
     // signal completion of load_snapshot
     h_signal_child_done();
-    
+
     printf("load_vm[%s]\n", name);
 }
 
@@ -977,6 +977,83 @@ static void del_vm(const char* name, Error **errp){
     }
 }
 
+static void create_mon(void){
+    event_notifier_test_and_clear(&mon_create_event);
+    event_notifier_set(&mon_create_event);
+}
+
+static int create_socket(const char *path) {
+    int sock;
+    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+    // if(sock != 31){
+    //     printf("sock : %d\n", sock);
+    //     close(31);
+    //     dup2(sock, 31);
+    //     close(sock);
+
+    // }
+    // assert the sock == 31
+    // assert(sock == 31);    
+
+
+    return sock;
+}
+
+static void configure_server(struct sockaddr_un *server_addr, const char *path) {
+    memset(server_addr, 0, sizeof(*server_addr));
+    server_addr->sun_family = AF_UNIX;
+    strncpy(server_addr->sun_path, path, sizeof(server_addr->sun_path) - 1);
+    // Remove old socket file if it exists
+    unlink(path);
+}
+
+// bind and listen to the socket
+static void start_socket(const char *path){
+    int server_sock = create_socket(path);
+    
+    // magic number : found the previous fd of 
+    // the socket by looking at lsof
+    // assert(server_sock == 31);
+    printf("server-sock : %d\n", server_sock);
+
+    struct sockaddr_un server_addr;
+    configure_server(&server_addr, path);
+
+    // Bind the socket to the server address
+    if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("bind");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming connections
+    if (listen(server_sock, 5) == -1) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    struct sockaddr_un client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    int client_sock;
+
+    if ((client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &client_addr_len)) == -1) {
+        perror("accept");
+    }
+
+
+    dup2(client_sock, 31);
+    close(client_sock);
+
+}
+
+
+static void create_mon_new(void){
+    close(31);
+    start_socket("qemu_monitor.sock");
+}
+
+
 static void do_ski_fork(void){
     // do a simple fork and print the exit in the child 
     // h_cpu_kick();
@@ -988,18 +1065,15 @@ static void do_ski_fork(void){
     if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
         printf("I am the child\n");
-        
+        create_mon_new();
+                
         // this waits for the setup to complete on other threads => by establish_child
         forkall_child_wait();
+
     } else {
         printf("I am the parent\n");
         h_wait_for_load_snapshot();
     }  
-}
-
-static void create_mon(void){
-    event_notifier_test_and_clear(&mon_create_event);
-    event_notifier_set(&mon_create_event);
 }
 
 void hmp_vmfork(Monitor *mon, const QDict *qdict)
@@ -1028,10 +1102,11 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
 
     // only load in the child
     if(forkall_check_child()){
+        // close(31);
         load_vm("newtest", &err);
         hmp_handle_error(mon, err);
 
-        // create_mon();        
+        // create_mon();
     }
     
 

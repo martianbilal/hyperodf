@@ -1325,6 +1325,34 @@ int monitor_get_fd(Monitor *mon, const char *fdname, Error **errp)
     return -1;
 }
 
+void monitor_print_fds(Monitor *mon, Error **errp)
+{
+    mon_fd_t *monfd;
+
+    QEMU_LOCK_GUARD(&mon->mon_lock);
+    QLIST_FOREACH(monfd, &mon->fds, next) {
+        printf("fd: %d\tfd_name: %s\n", monfd->fd, monfd->name);
+    }
+    return;
+}
+
+void monitor_print_fds_cur(void)
+{
+    Monitor *mon = monitor_cur();
+
+    if (mon) {
+        monitor_print_fds(mon, NULL);
+    }
+}
+
+
+int monitor_get_chardev_fd(Error **errp){
+    Monitor *mon = monitor_cur();
+    // check monitor_printf
+    return 0;
+}
+
+
 static void monitor_fdset_cleanup(MonFdset *mon_fdset)
 {
     MonFdsetFd *mon_fdset_fd;

@@ -67,6 +67,10 @@ void start_server(const char *path) {
             continue;  // Continue to the next iteration
         }
 
+        // write an intro message to the socket
+        char *message = "Connected to server\n";
+        write(client_sock, message, strlen(message));
+
         if (handle_client(client_sock)) {  // If handle_client returns 1, fork the server
             printf("handle_client returned 1, forking...\n");
             pid_t pid = fork();
