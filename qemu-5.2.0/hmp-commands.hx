@@ -287,6 +287,19 @@ SRST
 ``logfile`` *filename*
   Output logs to *filename*.
 ERST
+    
+    {
+        .name       = "debug_mon",
+        .args_type  = "filename:F",
+        .params     = "filename",
+        .help       = "prints helloworld to the file in tmp directory",
+        .cmd        = hmp_debug_mon,
+    },
+
+SRST
+``logfile`` *filename*
+  Output logs to *filename*.
+ERST
 
     {
         .name       = "trace-event",

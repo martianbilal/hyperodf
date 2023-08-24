@@ -28,6 +28,7 @@
 #include "monitor/qdev.h"
 #include "hw/usb.h"
 #include "hw/pci/pci.h"
+#include "qemu/typedefs.h"
 #include "sysemu/watchdog.h"
 #include "hw/loader.h"
 #include "exec/gdbstub.h"
@@ -468,6 +469,21 @@ static void hmp_logfile(Monitor *mon, const QDict *qdict)
     if (err) {
         error_report_err(err);
     }
+}
+
+static void hmp_debug_mon(Monitor *mon, const QDict *qdict){
+    const char *name = qdict_get_try_str(qdict, "filename");
+    if(name){
+        // create the file name in tmp and open it
+        char *filename = g_strdup_printf("/tmp/%s", name);
+        FILE *fp = fopen(filename, "w");
+        if(fp){
+            // write helloworld to the file
+            fprintf(fp, "Hello World!\n");
+            fclose(fp);
+        }
+    }
+    
 }
 
 static void hmp_log(Monitor *mon, const QDict *qdict)
