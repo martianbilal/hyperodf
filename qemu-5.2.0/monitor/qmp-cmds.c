@@ -43,6 +43,8 @@
 #include "migration/snapshot.h"
 #include "util/forkall-coop.h"
 #include "util/hodf-util.h"
+#include "qemu/main-loop.h"
+
 
 
 HelloResult *qmp_get_hello(Error **errp)
@@ -75,8 +77,90 @@ static void load_vm(const char* name, Error **errp){
     printf("load_vm[%s]\n", name);
 }
 
-static int do_ski_fork(void){
-    int pid = 0;
+static int create_socket(const char *path){
+    int sock;
+    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+    
+    return sock;
+}
+
+static void configure_server(struct sockaddr_un *server_addr, const char *path) {
+    memset(server_addr, 0, sizeof(*server_addr));
+    server_addr->sun_family = AF_UNIX;
+    strncpy(server_addr->sun_path, path, sizeof(server_addr->sun_path) - 1);
+    // Remove old socket file if it exists
+    unlink(path);
+}
+
+// bind and listen to the socket
+static void start_socket(const char *path){
+    int server_sock = create_socket(path);
+    
+    printf("server-sock : %d\n", server_sock);
+
+    struct sockaddr_un server_addr;
+    configure_server(&server_addr, path);
+
+    // Bind the socket to the server address
+    if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("bind");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for incoming connections
+    if (listen(server_sock, 5) == -1) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    struct sockaddr_un client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    int client_sock;
+
+    if ((client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &client_addr_len)) == -1) {
+        perror("accept");
+    }
+
+
+    // dup2(client_sock, 30); --> old hacky way
+    dup2(client_sock, h_get_monitor_fd());  // new way
+    close(client_sock);
+
+}
+
+static void create_mon_new(void){
+    start_socket("child-qmp.sock");
+}
+
+static pid_t do_ski_fork(void){
+    pid_t pid = 0;
+    int locked = qemu_mutex_iothread_locked();
+
+    kick_all();
+    if(locked) qemu_mutex_unlock_iothread();
+
+    pid = ski_forkall_master();
+    if(locked) qemu_mutex_lock_iothread();
+
+    if(pid == 0){
+        // child
+        printf("I am child\n");
+        create_mon_new();
+        forkall_child_wait();
+        return pid;
+    } else if(pid > 0) {
+        // parent
+        printf("I am parent\n");
+        h_wait_for_load_snapshot();
+        return pid;
+    } else {
+        // error
+        printf("fork error\n");
+        exit(-1);
+    }
+
     return pid;
 }
 
