@@ -40,6 +40,9 @@
 #include "qapi/qmp/qerror.h"
 #include "hw/mem/memory-device.h"
 #include "hw/acpi/acpi_dev_interface.h"
+#include "migration/snapshot.h"
+#include "util/forkall-coop.h"
+#include "util/hodf-util.h"
 
 
 HelloResult *qmp_get_hello(Error **errp)
@@ -49,9 +52,58 @@ HelloResult *qmp_get_hello(Error **errp)
     return res;
 }
 
+static void del_vm(const char* name, Error **errp){
+    BlockDriverState *bs;
+    if (bdrv_all_delete_snapshot(name, &bs, errp) < 0) {
+        error_prepend(errp,
+                      "deleting snapshot on device '%s': ",
+                      bdrv_get_device_name(bs));
+    }
+}
+
+static void save_vm(const char* name, Error **errp){
+    save_snapshot(name, errp);
+    printf("save_vm[%s]\n", name);
+}
+
+static void load_vm(const char* name, Error **errp){
+    load_snapshot(name, errp);
+
+    // signal completion of load_snapshot
+    h_signal_child_done();
+
+    printf("load_vm[%s]\n", name);
+}
+
+static int do_ski_fork(void){
+    int pid = 0;
+    return pid;
+}
+
 forkResult *qmp_vm_fork(Error **errp){
+    int pid = 0;
+    const char *name = "newtest";   // can get this name from user in future
     forkResult *res = g_malloc0(sizeof(*res));
-    res->childpid = 1234;   // sending a dummy pid
+    
+    // delete snapshot 
+    del_vm(name, errp);
+
+    // save vm
+    save_vm(name, errp);
+
+    // do fork
+    pid = do_ski_fork();
+    
+    // only load in child
+    if(forkall_check_child()){
+        load_vm(name, errp);
+    }
+
+
+    // only send pid in parent
+    if(pid) res->childpid = pid;
+
+    // child gets pid == 0
     return res;
 }
 
