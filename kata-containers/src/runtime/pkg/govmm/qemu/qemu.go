@@ -2998,7 +2998,7 @@ func LaunchQemu(config Config, logger QMPLog) (string, error) {
 	}
 
 	// open a file at the specified path
-	f, err := os.OpenFile("/tmp/test4.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile("/tmp/qemu_log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
