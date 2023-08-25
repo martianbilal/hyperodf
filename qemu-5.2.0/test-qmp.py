@@ -53,6 +53,18 @@ class QemuQmpTest:
         assert 'Hello' in result, "Did not get hello"
 
         return True
+    
+    def test_vm_fork(self):
+        self._send({"execute": "qmp_capabilities"})
+        response = self._recv()
+        assert 'return' in response, "Failed to set QMP capabilities"
+        
+        self._send({"execute": "vm_fork"})
+        result = self._recv()
+        result = json.dumps(result, indent=4)
+        print(result)
+        assert 'childpid' in result, "Did not get vm_fork"
+    
 
 
 if __name__ == "__main__":
@@ -61,7 +73,8 @@ if __name__ == "__main__":
 
     try:
         # if test.test_query_version():
-        if test.test_get_hello():
+        # if test.test_get_hello():
+        if test.test_vm_fork():
             print("Test passed!")
         else:
             print("Test failed!")

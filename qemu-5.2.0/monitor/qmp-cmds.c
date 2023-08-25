@@ -18,6 +18,7 @@
 #include "qemu/cutils.h"
 #include "qemu/option.h"
 #include "monitor/monitor.h"
+#include "qemu/typedefs.h"
 #include "sysemu/sysemu.h"
 #include "qemu/config-file.h"
 #include "qemu/uuid.h"
@@ -40,10 +41,17 @@
 #include "hw/mem/memory-device.h"
 #include "hw/acpi/acpi_dev_interface.h"
 
+
 HelloResult *qmp_get_hello(Error **errp)
 {
     HelloResult *res = g_malloc0(sizeof(*res));
     res->greeting = g_strdup("Hello from QEMU!");
+    return res;
+}
+
+forkResult *qmp_vm_fork(Error **errp){
+    forkResult *res = g_malloc0(sizeof(*res));
+    res->childpid = 1234;   // sending a dummy pid
     return res;
 }
 

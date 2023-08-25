@@ -9,6 +9,25 @@
 { 'include': 'common.json' }
 
 
+
+##
+# @forkResult:
+#
+# Returns VM Fork result
+#
+# Returns a @forkResult instance
+#
+##
+{ 'struct': 'forkResult',
+  'data': { 'childpid': 'int' } }
+##
+# @vm_fork:
+# Returns: @forkResult instance
+# 
+##
+{ 'command': 'vm_fork',
+  'returns': 'forkResult' }
+
 ##
 # @HelloResult:
 #

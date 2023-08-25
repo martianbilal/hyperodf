@@ -1061,7 +1061,10 @@ static int do_ski_fork(void){
     int locked = qemu_mutex_iothread_locked();
 
     kick_all();
+
+    // unlocking as it was needed by the the cpu thread at some point
     if(locked) qemu_mutex_unlock_iothread();
+    
     pid_t pid = ski_forkall_master();
     if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
