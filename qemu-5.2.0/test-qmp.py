@@ -41,13 +41,27 @@ class QemuQmpTest:
         print(f"QEMU Version: {version_info['return']['qemu']}")
 
         return True
+    def test_get_hello(self):
+        self._send({"execute": "qmp_capabilities"})
+        response = self._recv()
+        assert 'return' in response, "Failed to set QMP capabilities"
+
+        self._send({"execute": "get_hello"})
+        result = self._recv()
+        result = json.dumps(result, indent=4)
+        print(result)
+        assert 'Hello' in result, "Did not get hello"
+
+        return True
+
 
 if __name__ == "__main__":
     test = QemuQmpTest("./qmp.sock")
     test.connect()
 
     try:
-        if test.test_query_version():
+        # if test.test_query_version():
+        if test.test_get_hello():
             print("Test passed!")
         else:
             print("Test failed!")

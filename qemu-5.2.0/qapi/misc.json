@@ -8,6 +8,25 @@
 
 { 'include': 'common.json' }
 
+
+##
+# @HelloResult:
+#
+# Returns hello world
+#
+# Returns a @HelloResult instance
+#
+##
+{ 'struct': 'HelloResult',
+  'data': { 'greeting': 'str' } }
+##
+# @get_hello:
+# Returns: @HelloResult instance
+# 
+##
+{ 'command': 'get_hello',
+  'returns': 'HelloResult' }
+
 ##
 # @add_client:
 #

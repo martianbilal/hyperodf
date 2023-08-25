@@ -40,6 +40,13 @@
 #include "hw/mem/memory-device.h"
 #include "hw/acpi/acpi_dev_interface.h"
 
+HelloResult *qmp_get_hello(Error **errp)
+{
+    HelloResult *res = g_malloc0(sizeof(*res));
+    res->greeting = g_strdup("Hello from QEMU!");
+    return res;
+}
+
 NameInfo *qmp_query_name(Error **errp)
 {
     NameInfo *info = g_malloc0(sizeof(*info));
