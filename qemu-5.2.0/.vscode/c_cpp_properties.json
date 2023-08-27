@@ -16,7 +16,7 @@
             "name": "qemu",
             "includePath": [ "${default}", 
 "${workspaceFolder}/linux-headers/**", "${workspaceFolder}/include/**", 
-"${workspaceFolder}/${config:mesonbuild.buildFolder}/**"],
+"${workspaceFolder}/${config:mesonbuild.buildFolder}/**", "/usr/include/glib-2.0/**"],
             "compileCommands": 
 "${workspaceFolder}/${config:mesonbuild.buildFolder}/compile_commands.json",
             "intelliSenseMode": "linux-gcc-x64",

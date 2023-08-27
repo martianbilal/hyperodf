@@ -89,9 +89,6 @@ if __name__ == "__main__":
     test.connect()
 
     try:
-        # if test.test_query_version():
-        # if test.test_get_hello():
-        # switch to see which commmand to run based on cmdline arg
         if cmd == "query-version":
             if test.test_query_version():
                 print("Test passed!")

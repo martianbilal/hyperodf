@@ -71,7 +71,7 @@ static void *iothread_run(void *opaque)
          * iothread we need to pay some performance for functionality.
          */
         aio_poll(iothread->ctx, true);
-
+        printf("running iothread\n");
         /*
          * We must check the running state again in case it was
          * changed in previous aio_poll()
@@ -79,6 +79,7 @@ static void *iothread_run(void *opaque)
         if (iothread->running && qatomic_read(&iothread->run_gcontext)) {
             g_main_loop_run(iothread->main_loop);
         }
+        printf("iothread exited\n");
     }
 
     g_main_context_pop_thread_default(iothread->worker_context);

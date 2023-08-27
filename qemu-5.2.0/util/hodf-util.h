@@ -22,6 +22,8 @@
 extern EventNotifier mon_create_event;
 extern int parent_child_pipe[2];
 
+extern GMainLoop *h_iothread_main_loop;
+
 
 typedef struct hodf_metadata{
     pthread_t threadid;
@@ -38,6 +40,7 @@ void h_wait_for_load_snapshot(void);
 void h_signal_child_done(void);
 void h_register_monitor_fd(int fd);
 int h_get_monitor_fd(void);
+void h_save_iothread_loop(GMainLoop *main_loop);
 
 
 

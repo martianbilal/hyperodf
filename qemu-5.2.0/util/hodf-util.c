@@ -18,10 +18,17 @@
 // random number
 static int H_MAX_CPUS = 20;
 static int monitor_client_fd = 0;
+
+//======================Global Vars============================
 hodf_metadata *metadata_array;
 
 EventNotifier mon_create_event;
 int parent_child_pipe[2];
+
+GMainLoop *h_iothread_main_loop;
+
+//==============================================================
+
 
 // sorta hacky way to get the number of times the fd is registered
 static int times_registered_fd = 0;
@@ -45,6 +52,11 @@ void h_initialize(void){
 void h_save_metadata(QemuCond *halt_cond, pthread_t threadid, int cpu_index){
     memcpy(&metadata_array[cpu_index].halt_cond, halt_cond, sizeof(QemuCond));
     metadata_array[cpu_index].threadid = threadid;
+    return;
+}
+
+void h_save_iothread_loop(GMainLoop *main_loop){
+    h_iothread_main_loop = main_loop;
     return;
 }
 
