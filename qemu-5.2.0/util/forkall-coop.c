@@ -460,6 +460,7 @@ pid_t ski_forkall_master(){
 	while(1){
 		int threads_done;
 		int nthreads;
+		h_intrpt_iothread_loop();
 
 		pthread_mutex_lock(&forkall_mutex);
 		threads_done = forkall_threads_done;

@@ -24,6 +24,7 @@
 #include "qemu/rcu.h"
 #include "qemu/main-loop.h"
 #include "util/hodf-util.h"
+#include "util/forkall-coop.h"
 
 typedef ObjectClass IOThreadClass;
 
@@ -50,6 +51,8 @@ AioContext *qemu_get_current_aio_context(void)
 static void *iothread_run(void *opaque)
 {
     IOThread *iothread = opaque;
+    int did_fork = 0;
+    int is_child = 0;
 
     rcu_register_thread();
     /*
@@ -81,6 +84,7 @@ static void *iothread_run(void *opaque)
         if (iothread->running && qatomic_read(&iothread->run_gcontext)) {
             g_main_loop_run(iothread->main_loop);
         }
+        ski_forkall_slave(&did_fork, &is_child);
         printf("iothread exited\n");
     }
 
