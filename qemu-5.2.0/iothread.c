@@ -23,6 +23,7 @@
 #include "qemu/error-report.h"
 #include "qemu/rcu.h"
 #include "qemu/main-loop.h"
+#include "util/hodf-util.h"
 
 typedef ObjectClass IOThreadClass;
 
@@ -59,6 +60,7 @@ static void *iothread_run(void *opaque)
     my_iothread = iothread;
     iothread->thread_id = qemu_get_thread_id();
     qemu_sem_post(&iothread->init_done_sem);
+    h_save_iothread_loop(iothread->main_loop);
 
     while (iothread->running) {
         /*

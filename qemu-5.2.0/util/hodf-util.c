@@ -60,6 +60,12 @@ void h_save_iothread_loop(GMainLoop *main_loop){
     return;
 }
 
+void h_intrpt_iothread_loop(void){
+    DEBUG_PRINT("Interrupting iothread loop\n");
+    g_main_loop_quit(h_iothread_main_loop);
+    return;
+}
+
 void h_cpu_kick(void){
     DEBUG_PRINT("Kicking all threads\n");
     for(int i = 0; i < H_MAX_CPUS; i++){

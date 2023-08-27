@@ -41,6 +41,7 @@ void h_signal_child_done(void);
 void h_register_monitor_fd(int fd);
 int h_get_monitor_fd(void);
 void h_save_iothread_loop(GMainLoop *main_loop);
+void h_intrpt_iothread_loop(void);
 
 
 
