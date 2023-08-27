@@ -1,3 +1,5 @@
+  # -monitor unix:qemu-monitor-socket,server,nowait \
+
 gdb -q --args ./build/qemu-system-x86_64 \
   -m 1G \
   -cpu host,vmx=on \
@@ -10,5 +12,6 @@ gdb -q --args ./build/qemu-system-x86_64 \
   -nographic \
   -s \
   -monitor unix:qemu-monitor-socket,server,nowait \
+  -qmp unix:qmp.sock,server,nowait \
   -pidfile vm.pid \
   2>&1 | tee vm.log

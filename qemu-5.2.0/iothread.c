@@ -55,6 +55,7 @@ static void *iothread_run(void *opaque)
     int is_child = 0;
 
     rcu_register_thread();
+    ski_forkall_thread_add_self_tid();
     /*
      * g_main_context_push_thread_default() must be called before anything
      * in this new thread uses glib.
@@ -85,7 +86,7 @@ static void *iothread_run(void *opaque)
             g_main_loop_run(iothread->main_loop);
         }
         ski_forkall_slave(&did_fork, &is_child);
-        printf("iothread exited\n");
+        // printf("iothread exited\n");
     }
 
     g_main_context_pop_thread_default(iothread->worker_context);
