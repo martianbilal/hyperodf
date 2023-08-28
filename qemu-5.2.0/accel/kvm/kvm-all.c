@@ -4283,7 +4283,7 @@ end_loop:
 
     cpu_exec_end(cpu);
     // ski_forkall_slave(&did_fork, &is_child);
-    printf("RETURNED FROM SKI FORKALL SLAVE +++++++++++\n\n\n\n\n");
+    // printf("RETURNED FROM SKI FORKALL SLAVE +++++++++++\n\n\n\n\n");
     // if(did_fork && is_child && ){
         // printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
         // kvm_establish_child(cpu, &s, &run, prefork_state);
