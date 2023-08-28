@@ -108,6 +108,9 @@ qio_channel_socket_set_fd(QIOChannelSocket *sioc,
     if (sioc->localAddr.ss_family == AF_UNIX) {
         QIOChannel *ioc = QIO_CHANNEL(sioc);
         qio_channel_set_feature(ioc, QIO_CHANNEL_FEATURE_FD_PASS);
+        // TODO[Bilal]
+        // still hacky but better than earlier hardcoded value
+        h_set_qmp_server_fd(fd);
     }
 #endif /* WIN32 */
 

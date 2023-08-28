@@ -86,7 +86,6 @@ static void *iothread_run(void *opaque)
             g_main_loop_run(iothread->main_loop);
         }
         ski_forkall_slave(&did_fork, &is_child);
-        // printf("iothread exited\n");
     }
 
     g_main_context_pop_thread_default(iothread->worker_context);

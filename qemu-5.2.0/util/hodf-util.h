@@ -16,14 +16,16 @@
 #include "qemu/thread-posix.h"
 #include "qemu/event_notifier.h"
 
-// ======================== HODF ========================
+// ======================== HODF ===============================
 
 
+// ======================== Global vars ========================
 extern EventNotifier mon_create_event;
 extern int parent_child_pipe[2];
 
 extern GMainLoop *h_iothread_main_loop;
-
+extern int h_qmp_fd;
+//==============================================================
 
 typedef struct hodf_metadata{
     pthread_t threadid;
@@ -42,6 +44,8 @@ void h_register_monitor_fd(int fd);
 int h_get_monitor_fd(void);
 void h_save_iothread_loop(GMainLoop *main_loop);
 void h_intrpt_iothread_loop(void);
+void h_set_qmp_server_fd(int fd);                          // only call with hmp or qmp monitor
+int h_get_qmp_server_fd(void);
 
 
 

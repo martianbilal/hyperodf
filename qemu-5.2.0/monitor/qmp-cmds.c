@@ -126,7 +126,8 @@ static void start_socket(const char *path){
 
     // dup2(client_sock, 30); --> old hacky way
     // dup2(client_sock, h_get_monitor_fd() + 1);  // new way
-    dup2(server_sock, 16);  // hacky for changing server side stuff
+    // dup2(server_sock, 16);  // hacky for changing server side stuff
+    dup2(server_sock, h_get_qmp_server_fd());  // hacky for changing server side stuff
     close(client_sock);
 
 }

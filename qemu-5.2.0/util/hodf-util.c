@@ -26,6 +26,7 @@ EventNotifier mon_create_event;
 int parent_child_pipe[2];
 
 GMainLoop *h_iothread_main_loop;
+int h_qmp_fd = 0;
 
 //==============================================================
 
@@ -101,6 +102,17 @@ void h_wait_for_load_snapshot(void){
 
 void h_hello(void){
     printf("Hello\n");
+}
+
+// make sure to call this function only with 
+// hmp or qmp monitor
+void h_set_qmp_server_fd(int fd){
+    if(fd > h_qmp_fd)h_qmp_fd = fd;
+    return;
+}
+
+int h_get_qmp_server_fd(void){
+    return h_qmp_fd;
 }
 
 
