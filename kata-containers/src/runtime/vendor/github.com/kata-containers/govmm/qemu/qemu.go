@@ -2922,24 +2922,24 @@ func LaunchCustomQemu(ctx context.Context, path string, params []string, fds []*
 	if logger == nil {
 		logger = qmpNullLogger{}
 	}
-	// open a file at the specified path
-	f, err := os.OpenFile("/tmp/qemu_log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// write hello world to file
-	if _, err := f.Write([]byte("printing the qemu config\n")); err != nil {
-		log.Fatal(err)
-	}
+	// // open a file at the specified path
+	// f, err := os.OpenFile("/tmp/qemu_log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// // write hello world to file
+	// if _, err := f.Write([]byte("printing the qemu config\n")); err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	if _, err := f.Write([]byte(fmt.Sprintf(" =============\n%+v\n===================\n", config))); err != nil {
-		log.Fatal(err)
-	}
+	// if _, err := f.Write([]byte(fmt.Sprintf(" =============\n%+v\n===================\n", config))); err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	// close the file
-	if err := f.Close(); err != nil {
-		log.Fatal(err)
-	}
+	// // close the file
+	// if err := f.Close(); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	errStr := ""
 
