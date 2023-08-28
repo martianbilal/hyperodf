@@ -10,8 +10,11 @@ if get_option('virtiofsd').enabled()
       error('virtiofsd requires Linux')
     elif 'CONFIG_SECCOMP' not in config_host or 'CONFIG_LIBCAP_NG' not in config_host
       error('virtiofsd requires libcap-ng-devel and seccomp-devel')
-    elif not have_tools or 'CONFIG_VHOST_USER' not in config_host
-      error('virtiofsd needs tools and vhost-user support')
+    elif 'CONFIG_VHOST_USER' not in config_host
+      error('virtiofsd needs vhost-user support')
+    else
+      # Disabled all the tools but virtiofsd.
+      have_virtiofsd = true
     endif
   endif
 elif get_option('virtiofsd').disabled() or not have_system
