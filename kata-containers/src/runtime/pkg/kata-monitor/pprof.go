@@ -7,15 +7,12 @@ package katamonitor
 
 import (
 	"fmt"
+	cdshim "github.com/containerd/containerd/runtime/v2/shim"
 	"io"
 	"net"
 	"net/http"
-	"regexp"
-	"strings"
 
-	cdshim "github.com/containerd/containerd/runtime/v2/shim"
-
-	shim "github.com/kata-containers/kata-containers/src/runtime/pkg/containerd-shim-v2"
+	shim "github.com/kata-containers/kata-containers/src/runtime/containerd-shim-v2"
 )
 
 func serveError(w http.ResponseWriter, status int, txt string) {
@@ -35,13 +32,7 @@ func (km *KataMonitor) composeSocketAddress(r *http.Request) (string, error) {
 	return shim.SocketAddress(sandbox), nil
 }
 
-func (km *KataMonitor) proxyRequest(w http.ResponseWriter, r *http.Request,
-	proxyResponse func(req *http.Request, w io.Writer, r io.Reader) error) {
-
-	if proxyResponse == nil {
-		proxyResponse = copyResponse
-	}
-
+func (km *KataMonitor) proxyRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	socketAddress, err := km.composeSocketAddress(r)
@@ -63,10 +54,8 @@ func (km *KataMonitor) proxyRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	uri := fmt.Sprintf("http://shim%s", r.URL.String())
-	monitorLog.Debugf("proxyRequest to: %s, uri: %s", socketAddress, uri)
 	resp, err := client.Get(uri)
 	if err != nil {
-		serveError(w, http.StatusInternalServerError, fmt.Sprintf("failed to request %s through %s", uri, socketAddress))
 		return
 	}
 
@@ -83,68 +72,38 @@ func (km *KataMonitor) proxyRequest(w http.ResponseWriter, r *http.Request,
 		w.Header().Set("Content-Disposition", contentDisposition)
 	}
 
-	err = proxyResponse(r, w, output)
-	if err != nil {
-		monitorLog.WithError(err).Errorf("failed proxying %s from %s", uri, socketAddress)
-		serveError(w, http.StatusInternalServerError, "error retrieving resource")
-	}
+	io.Copy(w, output)
 }
 
 // ExpvarHandler handles other `/debug/vars` requests
 func (km *KataMonitor) ExpvarHandler(w http.ResponseWriter, r *http.Request) {
-	km.proxyRequest(w, r, nil)
+	km.proxyRequest(w, r)
 }
 
 // PprofIndex handles other `/debug/pprof/` requests
 func (km *KataMonitor) PprofIndex(w http.ResponseWriter, r *http.Request) {
-	if len(strings.TrimPrefix(r.URL.Path, "/debug/pprof/")) == 0 {
-		km.proxyRequest(w, r, copyResponseAddingSandboxIdToHref)
-	} else {
-		km.proxyRequest(w, r, nil)
-	}
+	km.proxyRequest(w, r)
 }
 
 // PprofCmdline handles other `/debug/cmdline` requests
 func (km *KataMonitor) PprofCmdline(w http.ResponseWriter, r *http.Request) {
-	km.proxyRequest(w, r, nil)
+	km.proxyRequest(w, r)
 }
 
 // PprofProfile handles other `/debug/profile` requests
 func (km *KataMonitor) PprofProfile(w http.ResponseWriter, r *http.Request) {
-	km.proxyRequest(w, r, nil)
+	km.proxyRequest(w, r)
 }
 
 // PprofSymbol handles other `/debug/symbol` requests
 func (km *KataMonitor) PprofSymbol(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	km.proxyRequest(w, r, nil)
+	km.proxyRequest(w, r)
 }
 
 // PprofTrace handles other `/debug/trace` requests
 func (km *KataMonitor) PprofTrace(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `attachment; filename="trace"`)
-	km.proxyRequest(w, r, nil)
-}
-
-func copyResponse(req *http.Request, w io.Writer, r io.Reader) error {
-	_, err := io.Copy(w, r)
-	return err
-}
-
-func copyResponseAddingSandboxIdToHref(req *http.Request, w io.Writer, r io.Reader) error {
-	sb, err := getSandboxIDFromReq(req)
-	if err != nil {
-		monitorLog.WithError(err).Warning("missing sandbox query in pprof url")
-		return copyResponse(req, w, r)
-	}
-	buf, err := io.ReadAll(r)
-	if err != nil {
-		return err
-	}
-
-	re := regexp.MustCompile(`<a href=(['"])(\w+)\?(\w+=\w+)['"]>`)
-	outHtml := re.ReplaceAllString(string(buf), fmt.Sprintf("<a href=$1$2?sandbox=%s&$3$1>", sb))
-	w.Write([]byte(outHtml))
-	return nil
+	km.proxyRequest(w, r)
 }

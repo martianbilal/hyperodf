@@ -12,7 +12,7 @@
 // payload, which allows the forwarder to know how many bytes it must read to
 // consume the trace span. The payload is a serialised version of the trace span.
 
-#![allow(unknown_lints)]
+#![allow(clippy::unknown_clippy_lints)]
 
 use async_trait::async_trait;
 use byteorder::{ByteOrder, NetworkEndian};
@@ -178,11 +178,13 @@ impl Builder {
     pub fn init(self) -> Exporter {
         let Builder { port, cid, logger } = self;
 
-        let cid_str: String = if self.cid == libc::VMADDR_CID_ANY {
-            ANY_CID.to_string()
+        let cid_str: String;
+
+        if self.cid == libc::VMADDR_CID_ANY {
+            cid_str = ANY_CID.to_string();
         } else {
-            format!("{}", self.cid)
-        };
+            cid_str = format!("{}", self.cid);
+        }
 
         Exporter {
             port,

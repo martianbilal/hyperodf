@@ -5,7 +5,7 @@
 
 use oci::Spec;
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Debug)]
 pub struct CreateOpts {
     pub cgroup_name: String,
     pub use_systemd_cgroup: bool,

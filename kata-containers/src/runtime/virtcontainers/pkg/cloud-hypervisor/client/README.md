@@ -58,7 +58,7 @@ Note, enum values are always validated and all unused variables are silently ign
 ### URLs Configuration per Operation
 
 Each operation can use different server URL defined using `OperationServers` map in the `Configuration`.
-An operation is uniquely identified by `"{classname}Service.{nickname}"` string.
+An operation is uniquely identifield by `"{classname}Service.{nickname}"` string.
 Similar rules for overriding default operation server index and variables applies by using `sw.ContextOperationServerIndices` and `sw.ContextOperationServerVariables` context maps.
 
 ```
@@ -92,17 +92,13 @@ Class | Method | HTTP request | Description
 *DefaultApi* | [**VmAddFsPut**](docs/DefaultApi.md#vmaddfsput) | **Put** /vm.add-fs | Add a new virtio-fs device to the VM
 *DefaultApi* | [**VmAddNetPut**](docs/DefaultApi.md#vmaddnetput) | **Put** /vm.add-net | Add a new network device to the VM
 *DefaultApi* | [**VmAddPmemPut**](docs/DefaultApi.md#vmaddpmemput) | **Put** /vm.add-pmem | Add a new pmem device to the VM
-*DefaultApi* | [**VmAddVdpaPut**](docs/DefaultApi.md#vmaddvdpaput) | **Put** /vm.add-vdpa | Add a new vDPA device to the VM
 *DefaultApi* | [**VmAddVsockPut**](docs/DefaultApi.md#vmaddvsockput) | **Put** /vm.add-vsock | Add a new vsock device to the VM
-*DefaultApi* | [**VmCoredumpPut**](docs/DefaultApi.md#vmcoredumpput) | **Put** /vm.coredump | Takes a VM coredump.
 *DefaultApi* | [**VmCountersGet**](docs/DefaultApi.md#vmcountersget) | **Get** /vm.counters | Get counters from the VM
 *DefaultApi* | [**VmInfoGet**](docs/DefaultApi.md#vminfoget) | **Get** /vm.info | Returns general information about the cloud-hypervisor Virtual Machine (VM) instance.
-*DefaultApi* | [**VmReceiveMigrationPut**](docs/DefaultApi.md#vmreceivemigrationput) | **Put** /vm.receive-migration | Receive a VM migration from URL
 *DefaultApi* | [**VmRemoveDevicePut**](docs/DefaultApi.md#vmremovedeviceput) | **Put** /vm.remove-device | Remove a device from the VM
 *DefaultApi* | [**VmResizePut**](docs/DefaultApi.md#vmresizeput) | **Put** /vm.resize | Resize the VM
 *DefaultApi* | [**VmResizeZonePut**](docs/DefaultApi.md#vmresizezoneput) | **Put** /vm.resize-zone | Resize a memory zone
 *DefaultApi* | [**VmRestorePut**](docs/DefaultApi.md#vmrestoreput) | **Put** /vm.restore | Restore a VM from a snapshot.
-*DefaultApi* | [**VmSendMigrationPut**](docs/DefaultApi.md#vmsendmigrationput) | **Put** /vm.send-migration | Send a VM migration to URL
 *DefaultApi* | [**VmSnapshotPut**](docs/DefaultApi.md#vmsnapshotput) | **Put** /vm.snapshot | Returns a VM snapshot.
 *DefaultApi* | [**VmmPingGet**](docs/DefaultApi.md#vmmpingget) | **Get** /vmm.ping | Ping the VMM to check for API server availability
 
@@ -110,36 +106,30 @@ Class | Method | HTTP request | Description
 ## Documentation For Models
 
  - [BalloonConfig](docs/BalloonConfig.md)
+ - [CmdLineConfig](docs/CmdLineConfig.md)
  - [ConsoleConfig](docs/ConsoleConfig.md)
- - [CpuAffinity](docs/CpuAffinity.md)
- - [CpuFeatures](docs/CpuFeatures.md)
  - [CpuTopology](docs/CpuTopology.md)
  - [CpusConfig](docs/CpusConfig.md)
  - [DeviceConfig](docs/DeviceConfig.md)
  - [DeviceNode](docs/DeviceNode.md)
  - [DiskConfig](docs/DiskConfig.md)
  - [FsConfig](docs/FsConfig.md)
+ - [InitramfsConfig](docs/InitramfsConfig.md)
+ - [KernelConfig](docs/KernelConfig.md)
  - [MemoryConfig](docs/MemoryConfig.md)
  - [MemoryZoneConfig](docs/MemoryZoneConfig.md)
  - [NetConfig](docs/NetConfig.md)
  - [NumaConfig](docs/NumaConfig.md)
  - [NumaDistance](docs/NumaDistance.md)
- - [PayloadConfig](docs/PayloadConfig.md)
  - [PciDeviceInfo](docs/PciDeviceInfo.md)
- - [PlatformConfig](docs/PlatformConfig.md)
  - [PmemConfig](docs/PmemConfig.md)
  - [RateLimiterConfig](docs/RateLimiterConfig.md)
- - [ReceiveMigrationData](docs/ReceiveMigrationData.md)
  - [RestoreConfig](docs/RestoreConfig.md)
  - [RngConfig](docs/RngConfig.md)
- - [SendMigrationData](docs/SendMigrationData.md)
  - [SgxEpcConfig](docs/SgxEpcConfig.md)
- - [TdxConfig](docs/TdxConfig.md)
  - [TokenBucket](docs/TokenBucket.md)
- - [VdpaConfig](docs/VdpaConfig.md)
  - [VmAddDevice](docs/VmAddDevice.md)
  - [VmConfig](docs/VmConfig.md)
- - [VmCoredumpData](docs/VmCoredumpData.md)
  - [VmInfo](docs/VmInfo.md)
  - [VmRemoveDevice](docs/VmRemoveDevice.md)
  - [VmResize](docs/VmResize.md)

@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // CreateSnapshotReader is a Reader for the CreateSnapshot structure.
@@ -23,18 +24,21 @@ type CreateSnapshotReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *CreateSnapshotReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewCreateSnapshotNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewCreateSnapshotBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewCreateSnapshotDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewCreateSnapshotNoContent() *CreateSnapshotNoContent {
 	return &CreateSnapshotNoContent{}
 }
 
-/* CreateSnapshotNoContent describes a response with status code 204, with default header values.
+/*CreateSnapshotNoContent handles this case with default header values.
 
 Snapshot created
 */
@@ -73,7 +77,7 @@ func NewCreateSnapshotBadRequest() *CreateSnapshotBadRequest {
 	return &CreateSnapshotBadRequest{}
 }
 
-/* CreateSnapshotBadRequest describes a response with status code 400, with default header values.
+/*CreateSnapshotBadRequest handles this case with default header values.
 
 Snapshot cannot be created due to bad input
 */
@@ -83,9 +87,6 @@ type CreateSnapshotBadRequest struct {
 
 func (o *CreateSnapshotBadRequest) Error() string {
 	return fmt.Sprintf("[PUT /snapshot/create][%d] createSnapshotBadRequest  %+v", 400, o.Payload)
-}
-func (o *CreateSnapshotBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *CreateSnapshotBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewCreateSnapshotDefault(code int) *CreateSnapshotDefault {
 	}
 }
 
-/* CreateSnapshotDefault describes a response with status code -1, with default header values.
+/*CreateSnapshotDefault handles this case with default header values.
 
 Internal server error
 */
@@ -124,9 +125,6 @@ func (o *CreateSnapshotDefault) Code() int {
 
 func (o *CreateSnapshotDefault) Error() string {
 	return fmt.Sprintf("[PUT /snapshot/create][%d] createSnapshot default  %+v", o._statusCode, o.Payload)
-}
-func (o *CreateSnapshotDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *CreateSnapshotDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

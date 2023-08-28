@@ -132,7 +132,7 @@ func RegisterMetrics() {
 
 // UpdateRuntimeMetrics update shim/hypervisor's metrics
 func (s *Sandbox) UpdateRuntimeMetrics() error {
-	pids := s.hypervisor.GetPids()
+	pids := s.hypervisor.getPids()
 	if len(pids) == 0 {
 		return nil
 	}
@@ -183,7 +183,7 @@ func (s *Sandbox) UpdateRuntimeMetrics() error {
 }
 
 func (s *Sandbox) UpdateVirtiofsdMetrics() error {
-	vfsPid := s.hypervisor.GetVirtioFsPid()
+	vfsPid := s.hypervisor.getVirtioFsPid()
 	if vfsPid == nil {
 		// virtiofsd is not mandatory for a VMM.
 		return nil

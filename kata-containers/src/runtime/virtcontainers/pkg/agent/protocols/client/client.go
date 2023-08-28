@@ -21,7 +21,7 @@ import (
 	"github.com/mdlayher/vsock"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
-	otelLabel "go.opentelemetry.io/otel/attribute"
+	otelLabel "go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -129,7 +129,7 @@ func TraceUnaryClientInterceptor() ttrpc.UnaryClientInterceptor {
 		}
 		// err can be nil, that will return an OK response code
 		if status, _ := status.FromError(err); status != nil {
-			span.SetAttributes(otelLabel.Key("RPC_CODE").Int((int)(status.Code())))
+			span.SetAttributes(otelLabel.Key("RPC_CODE").Uint((uint)(status.Code())))
 			span.SetAttributes(otelLabel.Key("RPC_MESSAGE").String(status.Message()))
 		}
 
@@ -151,15 +151,6 @@ func (s *metadataSupplier) Get(key string) string {
 
 func (s *metadataSupplier) Set(key string, value string) {
 	s.metadata.Set(key, value)
-}
-
-// Required to satisfy Opentelemetry TextMapCarrier interface
-func (s *metadataSupplier) Keys() []string {
-	keys := make([]string, 0, len(*s.metadata))
-	for k := range *s.metadata {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 func inject(ctx context.Context, metadata *ttrpc.MD) {
@@ -359,7 +350,7 @@ func VsockDialer(sock string, timeout time.Duration) (net.Conn, error) {
 	}
 
 	dialFunc := func() (net.Conn, error) {
-		return vsock.Dial(cid, port, nil)
+		return vsock.Dial(cid, port)
 	}
 
 	timeoutErr := grpcStatus.Errorf(codes.DeadlineExceeded, "timed out connecting to vsock %d:%d", cid, port)

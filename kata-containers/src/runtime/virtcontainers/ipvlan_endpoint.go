@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -14,7 +11,7 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
-	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
 )
 
 var ipvlanTrace = getNetworkTrace(IPVlanEndpointType)
@@ -96,7 +93,6 @@ func (endpoint *IPVlanEndpoint) NetworkPair() *NetworkInterfacePair {
 
 // Attach for ipvlan endpoint bridges the network pair and adds the
 // tap interface of the network pair to the hypervisor.
-// tap interface of the network pair to the Hypervisor.
 func (endpoint *IPVlanEndpoint) Attach(ctx context.Context, s *Sandbox) error {
 	span, ctx := ipvlanTrace(ctx, "Attach", endpoint)
 	defer span.End()
@@ -107,7 +103,7 @@ func (endpoint *IPVlanEndpoint) Attach(ctx context.Context, s *Sandbox) error {
 		return err
 	}
 
-	return h.AddDevice(ctx, endpoint, NetDev)
+	return h.addDevice(ctx, endpoint, netDev)
 }
 
 // Detach for the ipvlan endpoint tears down the tap and bridge
@@ -128,12 +124,12 @@ func (endpoint *IPVlanEndpoint) Detach(ctx context.Context, netNsCreated bool, n
 }
 
 // HotAttach for ipvlan endpoint not supported yet
-func (endpoint *IPVlanEndpoint) HotAttach(ctx context.Context, h Hypervisor) error {
+func (endpoint *IPVlanEndpoint) HotAttach(ctx context.Context, h hypervisor) error {
 	return fmt.Errorf("IPVlanEndpoint does not support Hot attach")
 }
 
 // HotDetach for ipvlan endpoint not supported yet
-func (endpoint *IPVlanEndpoint) HotDetach(ctx context.Context, h Hypervisor, netNsCreated bool, netNsPath string) error {
+func (endpoint *IPVlanEndpoint) HotDetach(ctx context.Context, h hypervisor, netNsCreated bool, netNsPath string) error {
 	return fmt.Errorf("IPVlanEndpoint does not support Hot detach")
 }
 

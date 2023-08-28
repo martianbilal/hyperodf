@@ -5,7 +5,7 @@
 - [Run Kata containers with `crictl`](run-kata-with-crictl.md)
 - [Run Kata Containers with Kubernetes](run-kata-with-k8s.md)
 - [How to use Kata Containers and Containerd](containerd-kata.md)
-- [How to use Kata Containers and CRI (containerd) with Kubernetes](how-to-use-k8s-with-cri-containerd-and-kata.md)
+- [How to use Kata Containers and CRI (containerd plugin) with Kubernetes](how-to-use-k8s-with-cri-containerd-and-kata.md)
 - [Kata Containers and service mesh for Kubernetes](service-mesh.md)
 - [How to import Kata Containers logs into Fluentd](how-to-import-kata-logs-with-fluentd.md)
 
@@ -15,16 +15,12 @@
 - `qemu`
 - `cloud-hypervisor`
 - `firecracker`
-
-   In the case of `firecracker` the use of a block device `snapshotter` is needed
-   for the VM rootfs. Refer to the following guide for additional configuration
-   steps:
-   - [Setup Kata containers with `firecracker`](how-to-use-kata-containers-with-firecracker.md)
 - `ACRN`
 
-  While `qemu` , `cloud-hypervisor` and `firecracker` work out of the box with installation of Kata,
-  some additional configuration is needed in case of `ACRN`.
+  While `qemu` and `cloud-hypervisor` work out of the box with installation of Kata,
+  some additional configuration is needed in case of `firecracker` and `ACRN`.
   Refer to the following guides for additional configuration steps:
+- [Kata Containers with Firecracker](https://github.com/kata-containers/documentation/wiki/Initial-release-of-Kata-Containers-with-Firecracker-support)
 - [Kata Containers with ACRN Hypervisor](how-to-use-kata-containers-with-acrn.md)
 
 ## Advanced Topics
@@ -39,7 +35,3 @@
 - [How to set sandbox Kata Containers configurations with pod annotations](how-to-set-sandbox-config-kata.md)
 - [How to monitor Kata Containers in K8s](how-to-set-prometheus-in-k8s.md)
 - [How to use hotplug memory on arm64 in Kata Containers](how-to-hotplug-memory-arm64.md)
-- [How to setup swap devices in guest kernel](how-to-setup-swap-devices-in-guest-kernel.md)
-- [How to run rootless vmm](how-to-run-rootless-vmm.md)
-- [How to run Docker with Kata Containers](how-to-run-docker-with-kata.md)
-- [How to run Kata Containers with `nydus`](how-to-use-virtio-fs-nydus-with-kata.md)

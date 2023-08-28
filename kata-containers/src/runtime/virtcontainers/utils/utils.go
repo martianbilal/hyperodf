@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
+	"github.com/vishvananda/netlink"
 
 	pbTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols"
 )
@@ -24,11 +24,6 @@ import (
 const cpBinaryName = "cp"
 
 const fileMode0755 = os.FileMode(0755)
-
-// The DefaultRateLimiterRefillTime is used for calculating the rate at
-// which a TokenBucket is replinished, in cases where a RateLimiter is
-// applied to either network or disk I/O.
-const DefaultRateLimiterRefillTimeMilliSecs = 1000
 
 // MibToBytesShift the number to shift needed to convert MiB to Bytes
 const MibToBytesShift = 20
@@ -76,8 +71,8 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-// reverseString reverses whole string
-func reverseString(s string) string {
+// ReverseString reverses whole string
+func ReverseString(s string) string {
 	r := []rune(s)
 
 	length := len(r)
@@ -117,7 +112,7 @@ func WriteToFile(path string, data []byte) error {
 	return nil
 }
 
-// CalculateMilliCPUs converts CPU quota and period to milli-CPUs
+//CalculateMilliCPUs converts CPU quota and period to milli-CPUs
 func CalculateMilliCPUs(quota int64, period uint64) uint32 {
 
 	// If quota is -1, it means the CPU resource request is
@@ -130,10 +125,25 @@ func CalculateMilliCPUs(quota int64, period uint64) uint32 {
 	return 0
 }
 
-// CalculateVCpusFromMilliCpus converts from mCPU to CPU, taking the ceiling
+//CalculateVCpusFromMilliCpus converts from mCPU to CPU, taking the ceiling
 // value when necessary
 func CalculateVCpusFromMilliCpus(mCPU uint32) uint32 {
 	return (mCPU + 999) / 1000
+}
+
+// ConstraintsToVCPUs converts CPU quota and period to vCPUs
+func ConstraintsToVCPUs(quota int64, period uint64) uint {
+	if quota != 0 && period != 0 {
+		// Use some math magic to round up to the nearest whole vCPU
+		// (that is, a partial part of a quota request ends up assigning
+		// a whole vCPU, for instance, a request of 1.5 'cpu quotas'
+		// will give 2 vCPUs).
+		// This also has the side effect that we will always allocate
+		// at least 1 vCPU.
+		return uint((uint64(quota) + (period - 1)) / period)
+	}
+
+	return 0
 }
 
 // GetVirtDriveName returns the disk name format for virtio-blk
@@ -165,7 +175,7 @@ func GetVirtDriveName(index int) (string, error) {
 		return "", fmt.Errorf("Index not supported")
 	}
 
-	diskName := prefix + reverseString(string(diskLetters[:i]))
+	diskName := prefix + ReverseString(string(diskLetters[:i]))
 	return diskName, nil
 }
 
@@ -295,11 +305,11 @@ const (
 	GiB          = MiB << 10
 )
 
-func ConvertAddressFamily(family int32) pbTypes.IPFamily {
-	switch family {
-	case unix.AF_INET6:
+func ConvertNetlinkFamily(netlinkFamily int32) pbTypes.IPFamily {
+	switch netlinkFamily {
+	case netlink.FAMILY_V6:
 		return pbTypes.IPFamily_v6
-	case unix.AF_INET:
+	case netlink.FAMILY_V4:
 		fallthrough
 	default:
 		return pbTypes.IPFamily_v4
@@ -326,7 +336,6 @@ func WaitLocalProcess(pid int, timeoutSecs uint, initialSignal syscall.Signal, l
 	if initialSignal != syscall.Signal(0) {
 		if err = syscall.Kill(pid, initialSignal); err != nil {
 			if err == syscall.ESRCH {
-				logger.WithField("pid", pid).Warnf("kill encounters ESRCH, process already finished")
 				return nil
 			}
 
@@ -380,102 +389,4 @@ outer:
 	}
 
 	return nil
-}
-
-// MkdirAllWithInheritedOwner creates a directory named path, along with any necessary parents.
-// It creates the missing directories with the ownership of the last existing parent.
-// The path needs to be absolute and the method doesn't handle symlink.
-func MkdirAllWithInheritedOwner(path string, perm os.FileMode) error {
-	if len(path) == 0 {
-		return fmt.Errorf("the path is empty")
-	}
-
-	// By default, use the uid and gid of the calling process.
-	var uid = os.Getuid()
-	var gid = os.Getgid()
-
-	paths := getAllParentPaths(path)
-	for _, curPath := range paths {
-		info, err := os.Stat(curPath)
-
-		if err != nil {
-			if err = os.Mkdir(curPath, perm); err != nil {
-				return fmt.Errorf("mkdir call failed: %v", err.Error())
-			}
-			if err = syscall.Chown(curPath, uid, gid); err != nil {
-				return fmt.Errorf("chown syscall failed: %v", err.Error())
-			}
-			continue
-		}
-
-		if !info.IsDir() {
-			return &os.PathError{Op: "mkdir", Path: curPath, Err: syscall.ENOTDIR}
-		}
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-			uid = int(stat.Uid)
-			gid = int(stat.Gid)
-		} else {
-			return fmt.Errorf("fail to retrieve the uid and gid of path %s", curPath)
-		}
-	}
-	return nil
-}
-
-// ChownToParent changes the owners of the path to the same of parent directory.
-// The path needs to be absolute and the method doesn't handle symlink.
-func ChownToParent(path string) error {
-	if len(path) == 0 {
-		return fmt.Errorf("the path is empty")
-	}
-
-	if !filepath.IsAbs(path) {
-		return fmt.Errorf("the path is not absolute")
-	}
-
-	info, err := os.Stat(filepath.Dir(path))
-	if err != nil {
-		return fmt.Errorf("os.Stat() error on %s: %s", filepath.Dir(path), err.Error())
-	}
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		if err = syscall.Chown(path, int(stat.Uid), int(stat.Gid)); err != nil {
-			return err
-		}
-		return nil
-	}
-	return fmt.Errorf("fail to retrieve the uid and gid of path %s", path)
-}
-
-// getAllParentPaths returns all the parent directories of a path, including itself but excluding root directory "/".
-// For example, "/foo/bar/biz" returns {"/foo", "/foo/bar", "/foo/bar/biz"}
-func getAllParentPaths(path string) []string {
-	if path == "/" || path == "." {
-		return []string{}
-	}
-
-	paths := []string{filepath.Clean(path)}
-	cur := path
-	var parent string
-	for cur != "/" && cur != "." {
-		parent = filepath.Dir(cur)
-		paths = append([]string{parent}, paths...)
-		cur = parent
-	}
-	// remove the "/" or "." from the return result
-	return paths[1:]
-}
-
-// In Cloud Hypervisor, as well as in Firecracker, the crate used by the VMMs
-// accepts the size of rate limiter in scaling factors of 2^10(1024).
-// But in kata-defined rate limiter, for better Human-readability, we prefer
-// scaling factors of 10^3(1000).
-//
-// func revertBytes reverts num from scaling factors of 1000 to 1024, e.g.
-// 10000000(10MB) to 10485760.
-func RevertBytes(num uint64) uint64 {
-	a := num / 1000
-	b := num % 1000
-	if a == 0 {
-		return num
-	}
-	return 1024*RevertBytes(a) + b
 }

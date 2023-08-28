@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Copyright (c) 2018-2021 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
@@ -8,7 +8,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o errtrace
 
 readonly project="kata-containers"
 
@@ -26,11 +25,8 @@ readonly firecracker_builder="${static_build_dir}/firecracker/build-static-firec
 readonly kernel_builder="${static_build_dir}/kernel/build.sh"
 readonly qemu_builder="${static_build_dir}/qemu/build-static-qemu.sh"
 readonly shimv2_builder="${static_build_dir}/shim-v2/build.sh"
-readonly virtiofsd_builder="${static_build_dir}/virtiofsd/build-static-virtiofsd.sh"
 
 readonly rootfs_builder="${repo_root_dir}/tools/packaging/guest-image/build_image.sh"
-
-ARCH=$(uname -m)
 
 workdir="${WORKDIR:-$PWD}"
 
@@ -52,7 +48,7 @@ error() {
 
 usage() {
 	return_code=${1:-0}
-	cat <<EOF
+	cat <<EOT
 This script is used as part of the ${project} release process.
 It is used to create a tarball with static binaries.
 
@@ -66,19 +62,16 @@ version: The kata version that will be use to create the tarball
 options:
 
 -h|--help      	      : Show this help
--s             	      : Silent mode (produce output in case of failure only)
 --build=<asset>       :
 	all
 	cloud-hypervisor
 	firecracker
 	kernel
-	kernel-experimental
 	qemu
 	rootfs-image
 	rootfs-initrd
 	shim-v2
-	virtiofsd
-EOF
+EOT
 
 	exit "${return_code}"
 }
@@ -98,16 +91,17 @@ install_initrd() {
 #Install kernel asset
 install_kernel() {
 	export kernel_version="$(yq r $versions_yaml assets.kernel.version)"
-	DESTDIR="${destdir}" PREFIX="${prefix}" "${kernel_builder}" -f -v "${kernel_version}"
+	DESTDIR="${destdir}" PREFIX="${prefix}" "${kernel_builder}" "${kernel_version}"
 }
-
 
 #Install experimental kernel asset
 install_experimental_kernel() {
 	info "build experimental kernel"
-	export kernel_version="$(yq r $versions_yaml assets.kernel-experimental.tag)"
-	info "Kernel version ${kernel_version}"
-	DESTDIR="${destdir}" PREFIX="${prefix}" "${kernel_builder}" -f -b experimental -v ${kernel_version}
+	export kernel_version="$(yq r $versions_yaml assets.kernel-experimental.version)"
+	"${kernel_builder}" -e setup
+	"${kernel_builder}" -e build
+	info "install experimental kernel"
+	DESTDIR="${destdir}" PREFIX="${prefix}" "${kernel_builder}" -e install
 }
 
 # Install static qemu asset
@@ -131,24 +125,17 @@ install_firecracker() {
 
 # Install static cloud-hypervisor asset
 install_clh() {
-	if [[ "${ARCH}" == "x86_64" ]]; then
-		export features="tdx"
-	fi
+	local cloud_hypervisor_repo
+	local cloud_hypervisor_version
+
+	cloud_hypervisor_repo="$(yq r $versions_yaml assets.hypervisor.cloud_hypervisor.url)"
+	cloud_hypervisor_version="$(yq r $versions_yaml assets.hypervisor.cloud_hypervisor.version)"
 
 	info "build static cloud-hypervisor"
 	"${clh_builder}"
 	info "Install static cloud-hypervisor"
 	mkdir -p "${destdir}/opt/kata/bin/"
 	sudo install -D --owner root --group root --mode 0744 cloud-hypervisor/cloud-hypervisor "${destdir}/opt/kata/bin/cloud-hypervisor"
-}
-
-# Install static virtiofsd asset
-install_virtiofsd() {
-	info "build static virtiofsd"
-	"${virtiofsd_builder}"
-	info "Install static virtiofsd"
-	mkdir -p "${destdir}/opt/kata/libexec/"
-	sudo install -D --owner root --group root --mode 0744 virtiofsd/virtiofsd "${destdir}/opt/kata/libexec/virtiofsd"
 }
 
 #Install all components that are not assets
@@ -171,13 +158,13 @@ handle_build() {
 	case "${build_target}" in
 	all)
 		install_clh
+		install_experimental_kernel
 		install_firecracker
 		install_image
 		install_initrd
 		install_kernel
 		install_qemu
 		install_shimv2
-		install_virtiofsd
 		;;
 
 	cloud-hypervisor) install_clh ;;
@@ -186,8 +173,6 @@ handle_build() {
 
 	kernel) install_kernel ;;
 
-	kernel-experimental) install_experimental_kernel;;
-
 	qemu) install_qemu ;;
 
 	rootfs-image) install_image ;;
@@ -195,8 +180,6 @@ handle_build() {
 	rootfs-initrd) install_initrd ;;
 
 	shim-v2) install_shimv2 ;;
-
-	virtiofsd) install_virtiofsd ;;
 
 	*)
 		die "Invalid build target ${build_target}"
@@ -211,18 +194,6 @@ handle_build() {
 	tar tvf "${tarball_name}"
 }
 
-silent_mode_error_trap() {
-	local stdout="$1"
-	local stderr="$2"
-	local t="$3"
-	local log_file="$4"
-	exec 1>&${stdout}
-	exec 2>&${stderr}
-	error "Failed to build: $t, logs:"
-	cat "${log_file}"
-	exit 1
-}
-
 main() {
 	local build_targets
 	local silent
@@ -230,12 +201,10 @@ main() {
 		cloud-hypervisor
 		firecracker
 		kernel
-		kernel-experimental
 		qemu
 		rootfs-image
 		rootfs-initrd
 		shim-v2
-		virtiofsd
 	)
 	silent=false
 	while getopts "hs-:" opt; do
@@ -276,15 +245,11 @@ main() {
 		(
 			cd "${builddir}"
 			if [ "${silent}" == true ]; then
-				local stdout
-				local stderr
-				# Save stdout and stderr, to be restored
-				# by silent_mode_error_trap() in case of
-				# build failure.
-				exec {stdout}>&1
-				exec {stderr}>&2
-				trap "silent_mode_error_trap $stdout $stderr $t \"$log_file\"" ERR
-				handle_build "${t}" &>"$log_file"
+				if ! handle_build "${t}" &>"$log_file"; then
+					error "Failed to build: $t, logs:"
+					cat "${log_file}"
+					exit 1
+				fi
 			else
 				handle_build "${t}"
 			fi

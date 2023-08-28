@@ -22,7 +22,7 @@ This document requires the presence of the ACRN hypervisor and Kata Containers o
 
 - ACRN supported [Hardware](https://projectacrn.github.io/latest/hardware.html#supported-hardware).
   > **Note:** Please make sure to have a minimum of 4 logical processors (HT) or cores.
-- ACRN [software](https://projectacrn.github.io/latest/tutorials/run_kata_containers.html) setup.
+- ACRN [software](https://projectacrn.github.io/latest/tutorials/kbl-nuc-sdc.html#use-the-script-to-set-up-acrn-automatically) setup.
 - For networking, ACRN supports either MACVTAP or TAP. If MACVTAP is not enabled in the Service OS, please follow the below steps to update the kernel:
 
   ```sh
@@ -101,7 +101,7 @@ Start an ACRN based Kata Container,
 $ sudo docker run -ti --runtime=kata-runtime busybox sh
 ```
 
-You will see ACRN(`acrn-dm`) is now running on your system, as well as a `kata-shim`. You should obtain an interactive shell prompt. Verify that all the Kata processes terminate once you exit the container.
+You will see ACRN(`acrn-dm`) is now running on your system, as well as a `kata-shim`, `kata-proxy`. You should obtain an interactive shell prompt. Verify that all the Kata processes terminate once you exit the container.
 
 ```bash
 $ ps -ef | grep -E "kata|acrn"

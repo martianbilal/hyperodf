@@ -7,19 +7,19 @@ package virtcontainers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 
 	merr "github.com/hashicorp/go-multierror"
-	volume "github.com/kata-containers/kata-containers/src/runtime/pkg/direct-volume"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	otelLabel "go.opentelemetry.io/otel/attribute"
+	otelLabel "go.opentelemetry.io/otel/label"
 )
 
 // DefaultShmSize is the default shm size to be used in case host
@@ -29,22 +29,9 @@ const DefaultShmSize = 65536 * 1024
 // Sadly golang/sys doesn't have UmountNoFollow although it's there since Linux 2.6.34
 const UmountNoFollow = 0x8
 
-const (
-	rootfsDir   = "rootfs"
-	lowerDir    = "lowerdir"
-	upperDir    = "upperdir"
-	workDir     = "workdir"
-	snapshotDir = "snapshotdir"
-)
+var rootfsDir = "rootfs"
 
 var systemMountPrefixes = []string{"/proc", "/sys"}
-
-// mountTracingTags defines tags for the trace span
-var mountTracingTags = map[string]string{
-	"source":    "runtime",
-	"package":   "virtcontainers",
-	"subsystem": "mount",
-}
 
 func mountLogger() *logrus.Entry {
 	return virtLog.WithField("subsystem", "mount")
@@ -145,8 +132,8 @@ func getDeviceForPath(path string) (device, error) {
 
 	if isHostDevice(path) {
 		// stat.Rdev describes the device that this file (inode) represents.
-		devMajor = major(uint64(stat.Rdev))
-		devMinor = minor(uint64(stat.Rdev))
+		devMajor = major(stat.Rdev)
+		devMinor = minor(stat.Rdev)
 
 		return device{
 			major:      devMajor,
@@ -155,8 +142,8 @@ func getDeviceForPath(path string) (device, error) {
 		}, nil
 	}
 	// stat.Dev points to the underlying device containing the file
-	devMajor = major(uint64(stat.Dev))
-	devMinor = minor(uint64(stat.Dev))
+	devMajor = major(stat.Dev)
+	devMinor = minor(stat.Dev)
 
 	path, err = filepath.Abs(path)
 	if err != nil {
@@ -173,7 +160,7 @@ func getDeviceForPath(path string) (device, error) {
 		}, nil
 	}
 
-	// We get the mount point by recursively performing stat on the path
+	// We get the mount point by recursively peforming stat on the path
 	// The point where the device changes indicates the mountpoint
 	for {
 		if mountPoint == "/" {
@@ -248,6 +235,22 @@ func evalMountPath(source, destination string) (string, string, error) {
 	return absSource, destination, nil
 }
 
+// moveMount moves a mountpoint to another path with some bookkeeping:
+// * evaluate all symlinks
+// * ensure the source exists
+// * recursively create the destination
+func moveMount(ctx context.Context, source, destination string) error {
+	span, _ := katatrace.Trace(ctx, nil, "moveMount", apiTracingTags)
+	defer span.End()
+
+	source, destination, err := evalMountPath(source, destination)
+	if err != nil {
+		return err
+	}
+
+	return syscall.Mount(source, destination, "move", syscall.MS_MOVE, "")
+}
+
 // bindMount bind mounts a source in to a destination. This will
 // do some bookkeeping:
 // * evaluate all symlinks
@@ -255,7 +258,7 @@ func evalMountPath(source, destination string) (string, string, error) {
 // * recursively create the destination
 // pgtypes stands for propagation types, which are shared, private, slave, and ubind.
 func bindMount(ctx context.Context, source, destination string, readonly bool, pgtypes string) error {
-	span, _ := katatrace.Trace(ctx, nil, "bindMount", mountTracingTags)
+	span, _ := katatrace.Trace(ctx, nil, "bindMount", apiTracingTags)
 	defer span.End()
 	span.SetAttributes(otelLabel.String("source", source), otelLabel.String("destination", destination))
 
@@ -292,7 +295,7 @@ func bindMount(ctx context.Context, source, destination string, readonly bool, p
 // The mountflags should match the values used in the original mount() call,
 // except for those parameters that you are trying to change.
 func remount(ctx context.Context, mountflags uintptr, src string) error {
-	span, _ := katatrace.Trace(ctx, nil, "remount", mountTracingTags)
+	span, _ := katatrace.Trace(ctx, nil, "remount", apiTracingTags)
 	defer span.End()
 	span.SetAttributes(otelLabel.String("source", src))
 
@@ -317,7 +320,7 @@ func remountRo(ctx context.Context, src string) error {
 // bindMountContainerRootfs bind mounts a container rootfs into a 9pfs shared
 // directory between the guest and the host.
 func bindMountContainerRootfs(ctx context.Context, shareDir, cid, cRootFs string, readonly bool) error {
-	span, _ := katatrace.Trace(ctx, nil, "bindMountContainerRootfs", mountTracingTags)
+	span, _ := katatrace.Trace(ctx, nil, "bindMountContainerRootfs", apiTracingTags)
 	defer span.End()
 
 	rootfsDest := filepath.Join(shareDir, cid, rootfsDir)
@@ -326,11 +329,8 @@ func bindMountContainerRootfs(ctx context.Context, shareDir, cid, cRootFs string
 }
 
 // Mount describes a container mount.
-// nolint: govet
 type Mount struct {
-	// Source is the source of the mount.
-	Source string
-	// Destination is the destination of the mount (within the container).
+	Source      string
 	Destination string
 
 	// Type specifies the type of filesystem to mount.
@@ -338,11 +338,6 @@ type Mount struct {
 
 	// HostPath used to store host side bind mount path
 	HostPath string
-
-	// GuestDeviceMount represents the path within the VM that the device
-	// is mounted. Only relevant for block devices. This is tracked in the event
-	// runtime wants to query the agent for mount stats.
-	GuestDeviceMount string
 
 	// BlockDeviceID represents block device that is attached to the
 	// VM in case this mount is a block device file or a directory
@@ -354,14 +349,6 @@ type Mount struct {
 
 	// ReadOnly specifies if the mount should be read only or not
 	ReadOnly bool
-
-	// FSGroup a group ID that the group ownership of the files for the mounted volume
-	// will need to be changed when set.
-	FSGroup *int
-
-	// FSGroupChangePolicy specifies the policy that will be used when applying
-	// group id ownership change for a volume.
-	FSGroupChangePolicy volume.FSGroupChangePolicy
 }
 
 func isSymlink(path string) bool {
@@ -372,75 +359,33 @@ func isSymlink(path string) bool {
 	return stat.Mode()&os.ModeSymlink != 0
 }
 
-func bindUnmountContainerShareDir(ctx context.Context, sharedDir, cID, target string) error {
-	destDir := filepath.Join(sharedDir, cID, target)
-	if isSymlink(filepath.Join(sharedDir, cID)) || isSymlink(destDir) {
+func bindUnmountContainerRootfs(ctx context.Context, sharedDir, cID string) error {
+	span, _ := katatrace.Trace(ctx, nil, "bindUnmountContainerRootfs", apiTracingTags)
+	defer span.End()
+	span.SetAttributes(otelLabel.String("shared_dir", sharedDir), otelLabel.String("container_id", cID))
+
+	rootfsDest := filepath.Join(sharedDir, cID, rootfsDir)
+	if isSymlink(filepath.Join(sharedDir, cID)) || isSymlink(rootfsDest) {
 		mountLogger().WithField("container", cID).Warnf("container dir is a symlink, malicious guest?")
 		return nil
 	}
 
-	err := syscall.Unmount(destDir, syscall.MNT_DETACH|UmountNoFollow)
+	err := syscall.Unmount(rootfsDest, syscall.MNT_DETACH|UmountNoFollow)
 	if err == syscall.ENOENT {
-		mountLogger().WithError(err).WithField("share-dir", destDir).Warn()
+		mountLogger().WithError(err).WithField("rootfs-dir", rootfsDest).Warn()
 		return nil
 	}
-	if err := syscall.Rmdir(destDir); err != nil {
-		mountLogger().WithError(err).WithField("share-dir", destDir).Warn("Could not remove container share dir")
+	if err := syscall.Rmdir(rootfsDest); err != nil {
+		mountLogger().WithError(err).WithField("rootfs-dir", rootfsDest).Warn("Could not remove container rootfs dir")
 	}
 
 	return err
 }
 
-func bindUnmountContainerRootfs(ctx context.Context, sharedDir, cID string) error {
-	span, _ := katatrace.Trace(ctx, nil, "bindUnmountContainerRootfs", mountTracingTags)
-	defer span.End()
-	span.SetAttributes(otelLabel.String("shared-dir", sharedDir), otelLabel.String("container-id", cID))
-	return bindUnmountContainerShareDir(ctx, sharedDir, cID, rootfsDir)
-}
-
-func bindUnmountContainerSnapshotDir(ctx context.Context, sharedDir, cID string) error {
-	span, _ := katatrace.Trace(ctx, nil, "bindUnmountContainerSnapshotDir", mountTracingTags)
-	defer span.End()
-	span.SetAttributes(otelLabel.String("shared-dir", sharedDir), otelLabel.String("container-id", cID))
-	return bindUnmountContainerShareDir(ctx, sharedDir, cID, snapshotDir)
-}
-
-func getVirtiofsDaemonForNydus(sandbox *Sandbox) (VirtiofsDaemon, error) {
-	var virtiofsDaemon VirtiofsDaemon
-	switch sandbox.GetHypervisorType() {
-	case string(QemuHypervisor):
-		virtiofsDaemon = sandbox.hypervisor.(*qemu).virtiofsDaemon
-	case string(ClhHypervisor):
-		virtiofsDaemon = sandbox.hypervisor.(*cloudHypervisor).virtiofsDaemon
-	default:
-		return nil, errNydusdNotSupport
-	}
-	return virtiofsDaemon, nil
-}
-
-func nydusContainerCleanup(ctx context.Context, sharedDir string, c *Container) error {
-	sandbox := c.sandbox
-	virtiofsDaemon, err := getVirtiofsDaemonForNydus(sandbox)
-	if err != nil {
-		return err
-	}
-	if err := virtiofsDaemon.Umount(rafsMountPath(c.id)); err != nil {
-		return errors.Wrap(err, "umount rafs failed")
-	}
-	if err := bindUnmountContainerSnapshotDir(ctx, sharedDir, c.id); err != nil {
-		return errors.Wrap(err, "umount snapshotdir err")
-	}
-	destDir := filepath.Join(sharedDir, c.id, c.rootfsSuffix)
-	if err := syscall.Rmdir(destDir); err != nil {
-		return errors.Wrap(err, "remove container rootfs err")
-	}
-	return nil
-}
-
 func bindUnmountAllRootfs(ctx context.Context, sharedDir string, sandbox *Sandbox) error {
-	span, ctx := katatrace.Trace(ctx, nil, "bindUnmountAllRootfs", mountTracingTags)
+	span, ctx := katatrace.Trace(ctx, nil, "bindUnmountAllRootfs", apiTracingTags)
 	defer span.End()
-	span.SetAttributes(otelLabel.String("shared-dir", sharedDir), otelLabel.String("sandbox-id", sandbox.id))
+	span.SetAttributes(otelLabel.String("shared_dir", sharedDir), otelLabel.String("sandbox_id", sandbox.id))
 
 	var errors *merr.Error
 	for _, c := range sandbox.containers {
@@ -452,11 +397,7 @@ func bindUnmountAllRootfs(ctx context.Context, sharedDir string, sandbox *Sandbo
 		if c.state.Fstype == "" {
 			// even if error found, don't break out of loop until all mounts attempted
 			// to be unmounted, and collect all errors
-			if c.rootFs.Type == NydusRootFSType {
-				errors = merr.Append(errors, nydusContainerCleanup(ctx, sharedDir, c))
-			} else {
-				errors = merr.Append(errors, bindUnmountContainerRootfs(ctx, sharedDir, c.id))
-			}
+			errors = merr.Append(errors, bindUnmountContainerRootfs(ctx, sharedDir, c.id))
 		}
 	}
 	return errors.ErrorOrNil()
@@ -498,7 +439,7 @@ func IsEphemeralStorage(path string) bool {
 		return false
 	}
 
-	if _, fsType, _, _ := utils.GetDevicePathAndFsTypeOptions(path); fsType == "tmpfs" {
+	if _, fsType, _ := utils.GetDevicePathAndFsType(path); fsType == "tmpfs" {
 		return true
 	}
 
@@ -513,7 +454,7 @@ func Isk8sHostEmptyDir(path string) bool {
 		return false
 	}
 
-	if _, fsType, _, _ := utils.GetDevicePathAndFsTypeOptions(path); fsType != "tmpfs" {
+	if _, fsType, _ := utils.GetDevicePathAndFsType(path); fsType != "tmpfs" {
 		return true
 	}
 	return false
@@ -547,7 +488,7 @@ func isSecret(path string) bool {
 // files observed is greater than limit, break and return -1
 func countFiles(path string, limit int) (numFiles int, err error) {
 
-	// First, Check to see if the path exists
+	// First, check to see if the path exists
 	file, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return 0, err
@@ -558,7 +499,7 @@ func countFiles(path string, limit int) (numFiles int, err error) {
 		return 1, nil
 	}
 
-	files, err := os.ReadDir(path)
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		return 0, err
 	}
@@ -583,7 +524,7 @@ func countFiles(path string, limit int) (numFiles int, err error) {
 func isWatchableMount(path string) bool {
 	if isSecret(path) || isConfigMap(path) {
 		// we have a cap on number of FDs which can be present in mount
-		// to determine if watchable. A similar Check exists within the agent,
+		// to determine if watchable. A similar check exists within the agent,
 		// which may or may not help handle case where extra files are added to
 		// a mount after the fact
 		count, _ := countFiles(path, 8)

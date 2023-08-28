@@ -4,11 +4,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-[ -z "${DEBUG}" ] || set -x
+set -e
 
-set -o errexit
-# set -o nounset
-set -o pipefail
+[ -n "${DEBUG}" ] && set -x
 
 DOCKER_RUNTIME=${DOCKER_RUNTIME:-runc}
 
@@ -72,22 +70,21 @@ readonly mem_boundary_mb=128
 source "${lib_file}"
 
 usage() {
-	cat <<EOF
+	cat <<EOT
 Usage: ${script_name} [options] <rootfs-dir>
 	This script will create a Kata Containers image file of
 	an adequate size based on the <rootfs-dir> directory.
 
 Options:
 	-h Show this help
-	-o Path to generate image file. ENV: IMAGE
-	-r Free space of the root partition in MB. ENV: ROOT_FREE_SPACE
-	-f Filesystem type to use, only xfs and ext4 are supported. ENV: FS_TYPE
+	-o path to generate image file ENV: IMAGE
+	-r Free space of the root partition in MB ENV: ROOT_FREE_SPACE
 
 Extra environment variables:
 	AGENT_BIN:      Use it to change the expected agent binary name
 	AGENT_INIT:     Use kata agent as init process
-	BLOCK_SIZE:     Use to specify the size of blocks in bytes. DEFAULT: 4096
 	IMAGE_REGISTRY: Hostname for the image registry used to pull down the rootfs build image.
+	FS_TYPE:        Filesystem type to use. Only xfs and ext4 are supported.
 	NSDAX_BIN:      Use to specify path to pre-compiled 'nsdax' tool.
 	USE_DOCKER:     If set will build image in a Docker Container (requries docker)
 	                DEFAULT: not set
@@ -117,7 +114,7 @@ Kernels and hypervisors that support DAX/NVDIMM read the MBR #2, otherwise MBR #
 [1] - https://github.com/kata-containers/kata-containers/blob/main/tools/osbuilder/image-builder/nsdax.gpl.c
 [2] - https://github.com/torvalds/linux/blob/master/drivers/nvdimm/pfn.h
 
-EOF
+EOT
 }
 
 
@@ -138,16 +135,13 @@ build_with_container() {
 	image_dir=$(readlink -f "$(dirname "${image}")")
 	image_name=$(basename "${image}")
 
-	engine_build_args=""
+	REGISTRY_ARG=""
 	if [ -n "${IMAGE_REGISTRY}" ]; then
-		engine_build_args+=" --build-arg IMAGE_REGISTRY=${IMAGE_REGISTRY}"
-	fi
-	if [ -n "${USE_PODMAN}" ]; then
-		engine_build_args+=" --runtime ${DOCKER_RUNTIME}"
+		REGISTRY_ARG="--build-arg IMAGE_REGISTRY=${IMAGE_REGISTRY}"
 	fi
 
 	"${container_engine}" build  \
-		   ${engine_build_args} \
+		   ${REGISTRY_ARG} \
 		   --build-arg http_proxy="${http_proxy}" \
 		   --build-arg https_proxy="${https_proxy}" \
 		   -t "${container_image_name}" "${script_dir}"
@@ -248,7 +242,7 @@ calculate_required_disk_size() {
 	local fs_type="$2"
 	local block_size="$3"
 
-	readonly rootfs_size_mb=$(du -B 1M -s "${rootfs}" | awk '{print $1}')
+	readonly rootfs_size_mb=$(du -B 1MB -s "${rootfs}" | awk '{print $1}')
 	readonly image="$(mktemp)"
 	readonly mount_dir="$(mktemp -d)"
 	readonly max_tries=20
@@ -474,7 +468,6 @@ set_dax_header() {
 
 main() {
 	[ "$(id -u)" -eq 0 ] || die "$0: must be run as root"
-	[ "$#" -eq 0 ] && usage && return 0
 
 	# variables that can be overwritten by environment variables
 	local agent_bin="${AGENT_BIN:-kata-agent}"

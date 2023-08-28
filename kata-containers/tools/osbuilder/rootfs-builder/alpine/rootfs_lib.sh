@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2018 HyperHQ Inc.
 #
@@ -8,8 +8,6 @@
 # rootfs_dir=$1
 #
 # - Optional environment variables
-#
-# EXTRA_PKGS: Variable to add extra PKGS provided by the user
 #
 # BIN_AGENT: Name of the Kata-Agent binary
 #
@@ -24,20 +22,13 @@ build_rootfs() {
 	# Mandatory
 	local ROOTFS_DIR=$1
 
-	# Add extra packages to the rootfs when specified
-	local EXTRA_PKGS=${EXTRA_PKGS:-}
-
 	# Populate ROOTFS_DIR
 	check_root
 	mkdir -p "${ROOTFS_DIR}"
 
-	/sbin/apk.static \
-	    -X ${MIRROR}/v${OS_VERSION}/main \
-	    -U \
-	    --allow-untrusted \
-	    --root ${ROOTFS_DIR} \
-	    --initdb add ${BASE_PACKAGES} ${EXTRA_PKGS} ${PACKAGES}
+	rm -rf ${ROOTFS_DIR}/var/tmp
+	cp -a -r -f /bin /etc /lib /sbin /usr /var ${ROOTFS_DIR}
+	mkdir -p ${ROOTFS_DIR}{/root,/proc,/dev,/home,/media,/mnt,/opt,/run,/srv,/sys,/tmp}
 
-	mkdir -p ${ROOTFS_DIR}{/root,/etc/apk,/proc}
-	echo "${MIRROR}/v${OS_VERSION}/main" >  ${ROOTFS_DIR}/etc/apk/repositories
+	echo "${MIRROR}/${OS_VERSION}/main" >  ${ROOTFS_DIR}/etc/apk/repositories
 }

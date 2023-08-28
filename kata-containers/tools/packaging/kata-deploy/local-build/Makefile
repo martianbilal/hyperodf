@@ -7,62 +7,47 @@ MK_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_PATH))
 
 # Verbose build
-V := 1
+V ?=
+ifneq ($(V),)
+SILENT_BUILD_FLAG =
+else
+SILENT_BUILD_FLAG = -s
+endif
 
 define BUILD
-	$(MK_DIR)/kata-deploy-binaries-in-docker.sh $(if $(V),,-s) --build=$1
+	$(MK_DIR)/kata-deploy-binaries-in-docker.sh $(SILENT_BUILD_FLAG) --build=$1
 endef
 
 kata-tarball: | all-parallel merge-builds
 
-$(MK_DIR)/dockerbuild/install_yq.sh:
-	$(MK_DIR)/kata-deploy-copy-yq-installer.sh
+all-parallel:
+	make -f $(MK_PATH) all -j$$(( $$(nproc) - 1  )) NO_TTY="true"
 
-all-parallel: $(MK_DIR)/dockerbuild/install_yq.sh
-	${MAKE} -f $(MK_PATH) all -j$$(( $$(nproc) - 1  )) V=
+all: cloud-hypervisor firecracker kernel qemu rootfs-image rootfs-initrd shim-v2
 
-all: cloud-hypervisor-tarball \
-	firecracker-tarball \
-	kernel-tarball \
-	qemu-tarball \
-	rootfs-image-tarball \
-	rootfs-initrd-tarball \
-	shim-v2-tarball \
-	virtiofsd-tarball
+cloud-hypervisor:
+	$(call BUILD,$@)
 
-%-tarball-build: $(MK_DIR)/dockerbuild/install_yq.sh
-	$(call BUILD,$*)
+firecracker:
+	$(call BUILD,$@)
 
-cloud-hypervisor-tarball:
-	${MAKE} $@-build
+kernel:
+	$(call BUILD,$@)
 
-firecracker-tarball:
-	${MAKE} $@-build
+qemu:
+	$(call BUILD,$@)
 
-kernel-tarball:
-	${MAKE} $@-build
+rootfs-image:
+	$(call BUILD,$@)
 
-kernel-experimental-tarball:
-	${MAKE} $@-build
+rootfs-initrd:
+	$(call BUILD,$@)
 
-
-qemu-tarball:
-	${MAKE} $@-build
-
-rootfs-image-tarball:
-	${MAKE} $@-build
-
-rootfs-initrd-tarball:
-	${MAKE} $@-build
-
-shim-v2-tarball:
-	${MAKE} $@-build
-
-virtiofsd-tarball:
-	${MAKE} $@-build
+shim-v2:
+	$(call BUILD,$@)
 
 merge-builds:
 	$(MK_DIR)/kata-deploy-merge-builds.sh build
 
-install-tarball:
+install:
 	tar -xvf ./kata-static.tar.xz -C /

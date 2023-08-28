@@ -30,6 +30,12 @@ const (
 	tracestateHeader  = "tracestate"
 )
 
+type traceContextPropagatorKeyType uint
+
+const (
+	tracestateKey traceContextPropagatorKeyType = 0
+)
+
 // TraceContext is a propagator that supports the W3C Trace Context format
 // (https://www.w3.org/TR/trace-context/)
 //
@@ -45,32 +51,30 @@ var traceCtxRegExp = regexp.MustCompile("^(?P<version>[0-9a-f]{2})-(?P<traceID>[
 
 // Inject set tracecontext from the Context into the carrier.
 func (tc TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
+	tracestate := ctx.Value(tracestateKey)
+	if state, ok := tracestate.(string); tracestate != nil && ok {
+		carrier.Set(tracestateHeader, state)
+	}
+
 	sc := trace.SpanContextFromContext(ctx)
 	if !sc.IsValid() {
 		return
 	}
-
-	if ts := sc.TraceState().String(); ts != "" {
-		carrier.Set(tracestateHeader, ts)
-	}
-
-	// Clear all flags other than the trace-context supported sampling bit.
-	flags := sc.TraceFlags() & trace.FlagsSampled
-
-	h := fmt.Sprintf("%.2x-%s-%s-%s",
+	h := fmt.Sprintf("%.2x-%s-%s-%.2x",
 		supportedVersion,
-		sc.TraceID(),
-		sc.SpanID(),
-		flags)
+		sc.TraceID,
+		sc.SpanID,
+		sc.TraceFlags&trace.FlagsSampled)
 	carrier.Set(traceparentHeader, h)
 }
 
 // Extract reads tracecontext from the carrier into a returned Context.
-//
-// The returned Context will be a copy of ctx and contain the extracted
-// tracecontext as the remote SpanContext. If the extracted tracecontext is
-// invalid, the passed ctx will be returned directly instead.
 func (tc TraceContext) Extract(ctx context.Context, carrier TextMapCarrier) context.Context {
+	state := carrier.Get(tracestateHeader)
+	if state != "" {
+		ctx = context.WithValue(ctx, tracestateKey, state)
+	}
+
 	sc := tc.extract(carrier)
 	if !sc.IsValid() {
 		return ctx
@@ -114,9 +118,9 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 		return trace.SpanContext{}
 	}
 
-	var scc trace.SpanContextConfig
+	var sc trace.SpanContext
 
-	scc.TraceID, err = trace.TraceIDFromHex(matches[2][:32])
+	sc.TraceID, err = trace.TraceIDFromHex(matches[2][:32])
 	if err != nil {
 		return trace.SpanContext{}
 	}
@@ -124,7 +128,7 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	if len(matches[3]) != 16 {
 		return trace.SpanContext{}
 	}
-	scc.SpanID, err = trace.SpanIDFromHex(matches[3])
+	sc.SpanID, err = trace.SpanIDFromHex(matches[3])
 	if err != nil {
 		return trace.SpanContext{}
 	}
@@ -137,15 +141,8 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 		return trace.SpanContext{}
 	}
 	// Clear all flags other than the trace-context supported sampling bit.
-	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled
+	sc.TraceFlags = opts[0] & trace.FlagsSampled
 
-	// Ignore the error returned here. Failure to parse tracestate MUST NOT
-	// affect the parsing of traceparent according to the W3C tracecontext
-	// specification.
-	scc.TraceState, _ = trace.ParseTraceState(carrier.Get(tracestateHeader))
-	scc.Remote = true
-
-	sc := trace.NewSpanContext(scc)
 	if !sc.IsValid() {
 		return trace.SpanContext{}
 	}

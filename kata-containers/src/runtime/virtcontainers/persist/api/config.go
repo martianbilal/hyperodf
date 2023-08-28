@@ -80,9 +80,6 @@ type HypervisorConfig struct {
 	// related folders, sockets and device nodes should be.
 	VhostUserStorePath string
 
-	// SeccompSandbox is the qemu function which enables the seccomp feature
-	SeccompSandbox string
-
 	// GuestHookPath is the path within the VM that will be used for 'drop-in' hooks
 	GuestHookPath string
 
@@ -187,6 +184,14 @@ type HypervisorConfig struct {
 	// VirtioMem is used to enable/disable virtio-mem
 	VirtioMem bool
 
+	// Realtime Used to enable/disable realtime
+	Realtime bool
+
+	// Mlock is used to control memory locking when Realtime is enabled
+	// Realtime=true and Mlock=false, allows for swapping out of VM memory
+	// enabling higher density
+	Mlock bool
+
 	// DisableNestingChecks is used to override customizations performed
 	// when running on top of another VMM.
 	DisableNestingChecks bool
@@ -226,9 +231,9 @@ type ShimConfig struct {
 
 // NetworkConfig is the network configuration related to a network.
 type NetworkConfig struct {
-	NetworkID         string
-	NetworkCreated    bool
-	DisableNewNetwork bool
+	NetNSPath         string
+	NetNsCreated      bool
+	DisableNewNetNs   bool
 	InterworkingModel int
 }
 

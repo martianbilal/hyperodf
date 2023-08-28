@@ -9,15 +9,7 @@ export GOPATH=${GOPATH:-${HOME}/go}
 export tests_repo="${tests_repo:-github.com/kata-containers/tests}"
 export tests_repo_dir="$GOPATH/src/$tests_repo"
 
-# echo "${BASH_SOURCE[0]}"
-# echo "before"
-# echo ${this_script_dir}
-
-
-# this_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-this_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")")"
-# echo ${this_script_dir}
-# echo "after"
+this_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 short_commit_length=10
 
@@ -42,16 +34,9 @@ install_yq() {
 
 get_from_kata_deps() {
 	local dependency="$1"
-	# echo $versions_file
 	versions_file="${this_script_dir}/../../../versions.yaml"
 
-	command -v yq &>/dev/null || die 'yq command is not in your $PATH'
-	# echo "printing the version file and dependency"
-	# echo $versions_file
-	# echo $dependency
-
-	# echo "running the command"
-	result=$(yq read -X "$versions_file" "$dependency")
+	result=$("yq" read -X "$versions_file" "$dependency")
 	[ "$result" = "null" ] && result=""
 	echo "$result"
 }

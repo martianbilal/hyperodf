@@ -86,16 +86,6 @@ One of the `initrd` and `image` options in Kata runtime config file **MUST** be 
 The main difference between the options is that the size of `initrd`(10MB+) is significantly smaller than
 rootfs `image`(100MB+).
 
-## Enable seccomp
-
-Enable seccomp as follows:
-
-```
-$ sudo sed -i '/^disable_guest_seccomp/ s/true/false/' /etc/kata-containers/configuration.toml
-```
-
-This will pass container seccomp profiles to the kata agent.
-
 ## Enable full debug
 
 Enable full debug as follows:
@@ -116,7 +106,7 @@ detailed below.
 The Kata logs appear in the `containerd` log files, along with logs from `containerd` itself.
 
 For more information about `containerd` debug, please see the
-[`containerd` documentation](https://github.com/containerd/containerd/blob/main/docs/getting-started.md).
+[`containerd` documentation](https://github.com/containerd/containerd/blob/master/docs/getting-started.md).
 
 #### Enabling full `containerd` debug
 
@@ -212,13 +202,11 @@ $ sudo systemctl restart systemd-journald
 >
 > - You should only do this step if you are testing with the latest version of the agent.
 
-The agent is built with a statically linked `musl.` The default `libc` used is `musl`, but on `ppc64le` and `s390x`, `gnu` should be used. To configure this:
+The rust-agent is built with a static linked `musl.` To configure this:
 
 ```
-$ export ARCH=$(uname -m)
-$ if [ "$ARCH" = "ppc64le" -o "$ARCH" = "s390x" ]; then export LIBC=gnu; else export LIBC=musl; fi
-$ [ ${ARCH} == "ppc64le" ] && export ARCH=powerpc64le
-$ rustup target add ${ARCH}-unknown-linux-${LIBC}
+rustup target add x86_64-unknown-linux-musl
+sudo ln -s /usr/bin/g++ /bin/musl-g++
 ```
 
 To build the agent:
@@ -227,18 +215,6 @@ To build the agent:
 $ go get -d -u github.com/kata-containers/kata-containers
 $ cd $GOPATH/src/github.com/kata-containers/kata-containers/src/agent && make
 ```
-
-The agent is built with seccomp capability by default.
-If you want to build the agent without the seccomp capability, you need to run `make` with `SECCOMP=no` as follows.
-
-```
-$ make -C $GOPATH/src/github.com/kata-containers/kata-containers/src/agent SECCOMP=no
-```
-
-> **Note:**
->
-> - If you enable seccomp in the main configuration file but build the agent without seccomp capability,
->   the runtime exits conservatively with an error message.
 
 ## Get the osbuilder
 
@@ -258,21 +234,9 @@ the following example.
 $ export ROOTFS_DIR=${GOPATH}/src/github.com/kata-containers/kata-containers/tools/osbuilder/rootfs-builder/rootfs
 $ sudo rm -rf ${ROOTFS_DIR}
 $ cd $GOPATH/src/github.com/kata-containers/kata-containers/tools/osbuilder/rootfs-builder
-$ script -fec 'sudo -E GOPATH=$GOPATH USE_DOCKER=true ./rootfs.sh ${distro}'
+$ script -fec 'sudo -E GOPATH=$GOPATH USE_DOCKER=true SECCOMP=no ./rootfs.sh ${distro}'
 ```
-
-You MUST choose a distribution (e.g., `ubuntu`) for `${distro}`.
-You can get a supported distributions list in the Kata Containers by running the following.
-
-```
-$ ./rootfs.sh -l
-```
-
-If you want to build the agent without seccomp capability, you need to run the `rootfs.sh` script with `SECCOMP=no` as follows.
-
-```
-$ script -fec 'sudo -E GOPATH=$GOPATH AGENT_INIT=yes USE_DOCKER=true SECCOMP=no ./rootfs.sh ${distro}'
-```
+You MUST choose one of `alpine`, `centos`, `clearlinux`, `debian`, `euleros`, `fedora`, `suse`, and `ubuntu` for `${distro}`. By default `seccomp` packages are not included in the rootfs image. Set `SECCOMP` to `yes` to include them.
 
 > **Note:**
 >
@@ -308,7 +272,6 @@ $ script -fec 'sudo -E USE_DOCKER=true ./image_builder.sh ${ROOTFS_DIR}'
 > - If you do *not* wish to build under Docker, remove the `USE_DOCKER`
 >   variable in the previous command and ensure the `qemu-img` command is
 >   available on your system.
->   - If `qemu-img` is not installed, you will likely see errors such as `ERROR: File /dev/loop19p1 is not a block device` and `losetup: /tmp/tmp.bHz11oY851: Warning: file is smaller than 512 bytes; the loop device may be useless or invisible for system tools`. These can be mitigated by installing the `qemu-img` command (available in the `qemu-img` package on Fedora or the `qemu-utils` package on Debian).
 
 
 ### Install the rootfs image
@@ -327,23 +290,12 @@ $ (cd /usr/share/kata-containers && sudo ln -sf "$image" kata-containers.img)
 $ export ROOTFS_DIR="${GOPATH}/src/github.com/kata-containers/kata-containers/tools/osbuilder/rootfs-builder/rootfs"
 $ sudo rm -rf ${ROOTFS_DIR}
 $ cd $GOPATH/src/github.com/kata-containers/kata-containers/tools/osbuilder/rootfs-builder
-$ script -fec 'sudo -E GOPATH=$GOPATH AGENT_INIT=yes USE_DOCKER=true ./rootfs.sh ${distro}'
-```
-`AGENT_INIT` controls if the guest image uses the Kata agent as the guest `init` process. When you create an initrd image,
-always set `AGENT_INIT` to `yes`.
-
-You MUST choose a distribution (e.g., `ubuntu`) for `${distro}`.
-You can get a supported distributions list in the Kata Containers by running the following.
-
-```
-$ ./rootfs.sh -l
-```
-
-If you want to build the agent without seccomp capability, you need to run the `rootfs.sh` script with `SECCOMP=no` as follows.
-
-```
 $ script -fec 'sudo -E GOPATH=$GOPATH AGENT_INIT=yes USE_DOCKER=true SECCOMP=no ./rootfs.sh ${distro}'
 ```
+`AGENT_INIT` controls if the guest image uses the Kata agent as the guest `init` process. When you create an initrd image,
+always set `AGENT_INIT` to `yes`. By default `seccomp` packages are not included in the initrd image. Set `SECCOMP` to `yes` to include them.
+
+You MUST choose one of `alpine`, `centos`, `clearlinux`, `euleros`, and `fedora` for `${distro}`.
 
 > **Note:**
 >
@@ -465,7 +417,7 @@ script and paste its output directly into a
 > [runtime](../src/runtime) repository.
 
 To perform analysis on Kata logs, use the
-[`kata-log-parser`](../src/tools/log-parser)
+[`kata-log-parser`](https://github.com/kata-containers/tests/tree/main/cmd/log-parser)
 tool, which can convert the logs into formats (e.g. JSON, TOML, XML, and YAML).
 
 See [Set up a debug console](#set-up-a-debug-console).
@@ -700,11 +652,11 @@ options to have the kernel boot messages logged into the system journal.
 For generic information on enabling debug in the configuration file, see the
 [Enable full debug](#enable-full-debug) section.
 
-The kernel boot messages will appear in the `kata` logs (and in the `containerd` or `CRI-O` log appropriately).
+The kernel boot messages will appear in the `containerd` or `CRI-O` log appropriately,
 such as:
 
 ```bash
-$ sudo journalctl -t kata
+$ sudo journalctl -t containerd
 -- Logs begin at Thu 2020-02-13 16:20:40 UTC, end at Thu 2020-02-13 16:30:23 UTC. --
 ...
 time="2020-09-15T14:56:23.095113803+08:00" level=debug msg="reading guest console" console-protocol=unix console-url=/run/vc/vm/ab9f633385d4987828d342e47554fc6442445b32039023eeddaa971c1bb56791/console.sock pid=107642 sandbox=ab9f633385d4987828d342e47554fc6442445b32039023eeddaa971c1bb56791 source=virtcontainers subsystem=sandbox vmconsole="[    0.395399] brd: module loaded"
@@ -714,4 +666,3 @@ time="2020-09-15T14:56:23.105268162+08:00" level=debug msg="reading guest consol
 time="2020-09-15T14:56:23.121121598+08:00" level=debug msg="reading guest console" console-protocol=unix console-url=/run/vc/vm/ab9f633385d4987828d342e47554fc6442445b32039023eeddaa971c1bb56791/console.sock pid=107642 sandbox=ab9f633385d4987828d342e47554fc6442445b32039023eeddaa971c1bb56791 source=virtcontainers subsystem=sandbox vmconsole="[    0.421324] memmap_init_zone_device initialised 32768 pages in 12ms"
 ...
 ```
-Refer to the [kata-log-parser documentation](../src/tools/log-parser/README.md) which is useful to fetch these.

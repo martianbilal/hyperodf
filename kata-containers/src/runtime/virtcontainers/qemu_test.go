@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2016 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -11,17 +8,16 @@ package virtcontainers
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/govmm"
-	govmmQemu "github.com/kata-containers/kata-containers/src/runtime/pkg/govmm/qemu"
+	govmmQemu "github.com/kata-containers/govmm/qemu"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
-	"github.com/pbnjay/memory"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,13 +25,14 @@ import (
 func newQemuConfig() HypervisorConfig {
 	return HypervisorConfig{
 		KernelPath:        testQemuKernelPath,
+		ImagePath:         testQemuImagePath,
 		InitrdPath:        testQemuInitrdPath,
 		HypervisorPath:    testQemuPath,
 		NumVCPUs:          defaultVCPUs,
 		MemorySize:        defaultMemSzMiB,
 		DefaultBridges:    defaultBridges,
 		BlockDeviceDriver: defaultBlockDriver,
-		DefaultMaxVCPUs:   defaultMaxVCPUs,
+		DefaultMaxVCPUs:   defaultMaxQemuVCPUs,
 		Msize9p:           defaultMsize9p,
 	}
 }
@@ -59,7 +56,7 @@ func testQemuKernelParameters(t *testing.T, kernelParams []Param, expected strin
 }
 
 func TestQemuKernelParameters(t *testing.T) {
-	expectedOut := fmt.Sprintf("panic=1 nr_cpus=%d foo=foo bar=bar", govmm.MaxVCPUs())
+	expectedOut := fmt.Sprintf("panic=1 nr_cpus=%d foo=foo bar=bar", MaxQemuVCPUs())
 	params := []Param{
 		{
 			Key:   "foo",
@@ -75,17 +72,14 @@ func TestQemuKernelParameters(t *testing.T) {
 	testQemuKernelParameters(t, params, expectedOut, false)
 }
 
-func TestQemuCreateVM(t *testing.T) {
+func TestQemuCreateSandbox(t *testing.T) {
 	qemuConfig := newQemuConfig()
 	assert := assert.New(t)
 
 	store, err := persist.GetDriver()
 	assert.NoError(err)
 	q := &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  store.RunVMStoragePath(),
-			RunStorePath: store.RunStoragePath(),
-		},
+		store: store,
 	}
 	sandbox := &Sandbox{
 		ctx: context.Background(),
@@ -101,28 +95,23 @@ func TestQemuCreateVM(t *testing.T) {
 	assert.NoError(err)
 
 	// Create parent dir path for hypervisor.json
-	parentDir := filepath.Join(store.RunStoragePath(), sandbox.id)
+	parentDir := filepath.Join(q.store.RunStoragePath(), sandbox.id)
 	assert.NoError(os.MkdirAll(parentDir, DirMode))
 
-	network, err := NewNetwork()
-	assert.NoError(err)
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 	assert.NoError(err)
 	assert.NoError(os.RemoveAll(parentDir))
 	assert.Exactly(qemuConfig, q.config)
 }
 
-func TestQemuCreateVMMissingParentDirFail(t *testing.T) {
+func TestQemuCreateSandboxMissingParentDirFail(t *testing.T) {
 	qemuConfig := newQemuConfig()
 	assert := assert.New(t)
 
 	store, err := persist.GetDriver()
 	assert.NoError(err)
 	q := &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  store.RunVMStoragePath(),
-			RunStorePath: store.RunStoragePath(),
-		},
+		store: store,
 	}
 	sandbox := &Sandbox{
 		ctx: context.Background(),
@@ -138,12 +127,10 @@ func TestQemuCreateVMMissingParentDirFail(t *testing.T) {
 	assert.NoError(err)
 
 	// Ensure parent dir path for hypervisor.json does not exist.
-	parentDir := filepath.Join(store.RunStoragePath(), sandbox.id)
+	parentDir := filepath.Join(q.store.RunStoragePath(), sandbox.id)
 	assert.NoError(os.RemoveAll(parentDir))
 
-	network, err := NewNetwork()
-	assert.NoError(err)
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 	assert.NoError(err)
 }
 
@@ -173,20 +160,20 @@ func TestQemuCPUTopology(t *testing.T) {
 
 func TestQemuMemoryTopology(t *testing.T) {
 	mem := uint32(1000)
-	maxMem := memory.TotalMemory() / 1024 / 1024 //MiB
 	slots := uint32(8)
 	assert := assert.New(t)
 
 	q := &qemu{
 		arch: &qemuArchBase{},
 		config: HypervisorConfig{
-			MemorySize:           mem,
-			MemSlots:             slots,
-			DefaultMaxMemorySize: maxMem,
+			MemorySize: mem,
+			MemSlots:   slots,
 		},
 	}
 
-	memMax := fmt.Sprintf("%dM", int(maxMem))
+	hostMemKb, err := getHostMemorySizeKb(procMemInfo)
+	assert.NoError(err)
+	memMax := fmt.Sprintf("%dM", int(float64(hostMemKb)/1024))
 
 	expectedOut := govmmQemu.Memory{
 		Size:   fmt.Sprintf("%dM", mem),
@@ -206,14 +193,9 @@ func TestQemuKnobs(t *testing.T) {
 	assert.NoError(err)
 
 	q := &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  sandbox.store.RunVMStoragePath(),
-			RunStorePath: sandbox.store.RunStoragePath(),
-		},
+		store: sandbox.store,
 	}
-	network, err := NewNetwork()
-	assert.NoError(err)
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 	assert.NoError(err)
 
 	assert.Equal(q.qemuConfig.Knobs.NoUserConfig, true)
@@ -222,14 +204,14 @@ func TestQemuKnobs(t *testing.T) {
 	assert.Equal(q.qemuConfig.Knobs.NoReboot, true)
 }
 
-func testQemuAddDevice(t *testing.T, devInfo interface{}, devType DeviceType, expected []govmmQemu.Device) {
+func testQemuAddDevice(t *testing.T, devInfo interface{}, devType deviceType, expected []govmmQemu.Device) {
 	assert := assert.New(t)
 	q := &qemu{
 		ctx:  context.Background(),
 		arch: &qemuArchBase{},
 	}
 
-	err := q.AddDevice(context.Background(), devInfo, devType)
+	err := q.addDevice(context.Background(), devInfo, devType)
 	assert.NoError(err)
 	assert.Exactly(q.qemuConfig.Devices, expected)
 }
@@ -255,7 +237,7 @@ func TestQemuAddDeviceFsDev(t *testing.T) {
 		HostPath: hostPath,
 	}
 
-	testQemuAddDevice(t, volume, FsDev, expectedOut)
+	testQemuAddDevice(t, volume, fsDev, expectedOut)
 }
 
 func TestQemuAddDeviceVhostUserBlk(t *testing.T) {
@@ -276,7 +258,7 @@ func TestQemuAddDeviceVhostUserBlk(t *testing.T) {
 		Type:       config.VhostUserBlk,
 	}
 
-	testQemuAddDevice(t, vDevice, VhostuserDev, expectedOut)
+	testQemuAddDevice(t, vDevice, vhostuserDev, expectedOut)
 }
 
 func TestQemuAddDeviceSerialPortDev(t *testing.T) {
@@ -303,13 +285,15 @@ func TestQemuAddDeviceSerialPortDev(t *testing.T) {
 		Name:     name,
 	}
 
-	testQemuAddDevice(t, socket, SerialPortDev, expectedOut)
+	testQemuAddDevice(t, socket, serialPortDev, expectedOut)
 }
 
 func TestQemuAddDeviceKataVSOCK(t *testing.T) {
 	assert := assert.New(t)
 
-	dir := t.TempDir()
+	dir, err := ioutil.TempDir("", "")
+	assert.NoError(err)
+	defer os.RemoveAll(dir)
 
 	vsockFilename := filepath.Join(dir, "vsock")
 
@@ -334,7 +318,7 @@ func TestQemuAddDeviceKataVSOCK(t *testing.T) {
 		VhostFd:   vsockFile,
 	}
 
-	testQemuAddDevice(t, vsock, VSockPCIDev, expectedOut)
+	testQemuAddDevice(t, vsock, vSockPCIDev, expectedOut)
 }
 
 func TestQemuGetSandboxConsole(t *testing.T) {
@@ -342,16 +326,13 @@ func TestQemuGetSandboxConsole(t *testing.T) {
 	store, err := persist.GetDriver()
 	assert.NoError(err)
 	q := &qemu{
-		ctx: context.Background(),
-		config: HypervisorConfig{
-			VMStorePath:  store.RunVMStoragePath(),
-			RunStorePath: store.RunStoragePath(),
-		},
+		ctx:   context.Background(),
+		store: store,
 	}
 	sandboxID := "testSandboxID"
-	expected := filepath.Join(store.RunVMStoragePath(), sandboxID, consoleSocket)
+	expected := filepath.Join(q.store.RunVMStoragePath(), sandboxID, consoleSocket)
 
-	proto, result, err := q.GetVMConsole(q.ctx, sandboxID)
+	proto, result, err := q.getSandboxConsole(q.ctx, sandboxID)
 	assert.NoError(err)
 	assert.Equal(result, expected)
 	assert.Equal(proto, consoleProtoUnix)
@@ -364,14 +345,14 @@ func TestQemuCapabilities(t *testing.T) {
 		arch: &qemuArchBase{},
 	}
 
-	caps := q.Capabilities(q.ctx)
+	caps := q.capabilities(q.ctx)
 	assert.True(caps.IsBlockDeviceHotplugSupported())
 }
 
 func TestQemuQemuPath(t *testing.T) {
 	assert := assert.New(t)
 
-	f, err := os.CreateTemp("", "qemu")
+	f, err := ioutil.TempFile("", "qemu")
 	assert.NoError(err)
 	defer func() { _ = f.Close() }()
 	defer func() { _ = os.Remove(f.Name()) }()
@@ -420,9 +401,9 @@ func TestHotplugUnsupportedDeviceType(t *testing.T) {
 		config: qemuConfig,
 	}
 
-	_, err := q.HotplugAddDevice(context.Background(), &MemoryDevice{0, 128, uint64(0), false}, FsDev)
+	_, err := q.hotplugAddDevice(context.Background(), &memoryDevice{0, 128, uint64(0), false}, fsDev)
 	assert.Error(err)
-	_, err = q.HotplugRemoveDevice(context.Background(), &MemoryDevice{0, 128, uint64(0), false}, FsDev)
+	_, err = q.hotplugRemoveDevice(context.Background(), &memoryDevice{0, 128, uint64(0), false}, fsDev)
 	assert.Error(err)
 }
 
@@ -449,7 +430,7 @@ func TestQemuCleanup(t *testing.T) {
 		config: newQemuConfig(),
 	}
 
-	err := q.Cleanup(q.ctx)
+	err := q.cleanup(q.ctx)
 	assert.Nil(err)
 }
 
@@ -479,17 +460,11 @@ func TestQemuFileBackedMem(t *testing.T) {
 	sandbox, err := createQemuSandboxConfig()
 	assert.NoError(err)
 
-	network, err := NewNetwork()
-	assert.NoError(err)
-
 	q := &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  sandbox.store.RunVMStoragePath(),
-			RunStorePath: sandbox.store.RunStoragePath(),
-		},
+		store: sandbox.store,
 	}
 	sandbox.config.HypervisorConfig.SharedFS = config.VirtioFS
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 	assert.NoError(err)
 
 	assert.Equal(q.qemuConfig.Knobs.FileBackedMem, true)
@@ -501,16 +476,13 @@ func TestQemuFileBackedMem(t *testing.T) {
 	assert.NoError(err)
 
 	q = &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  sandbox.store.RunVMStoragePath(),
-			RunStorePath: sandbox.store.RunStoragePath(),
-		},
+		store: sandbox.store,
 	}
 	sandbox.config.HypervisorConfig.BootToBeTemplate = true
 	sandbox.config.HypervisorConfig.SharedFS = config.VirtioFS
 	sandbox.config.HypervisorConfig.MemoryPath = fallbackFileBackedMemDir
 
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 
 	expectErr := errors.New("VM templating has been enabled with either virtio-fs or file backed memory and this configuration will not work")
 	assert.Equal(expectErr.Error(), err.Error())
@@ -520,13 +492,10 @@ func TestQemuFileBackedMem(t *testing.T) {
 	assert.NoError(err)
 
 	q = &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  sandbox.store.RunVMStoragePath(),
-			RunStorePath: sandbox.store.RunStoragePath(),
-		},
+		store: sandbox.store,
 	}
 	sandbox.config.HypervisorConfig.FileBackedMemRootDir = "/tmp/xyzabc"
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 	assert.NoError(err)
 	assert.Equal(q.qemuConfig.Knobs.FileBackedMem, false)
 	assert.Equal(q.qemuConfig.Knobs.MemShared, false)
@@ -537,14 +506,11 @@ func TestQemuFileBackedMem(t *testing.T) {
 	assert.NoError(err)
 
 	q = &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  sandbox.store.RunVMStoragePath(),
-			RunStorePath: sandbox.store.RunStoragePath(),
-		},
+		store: sandbox.store,
 	}
 	sandbox.config.HypervisorConfig.EnableVhostUserStore = true
 	sandbox.config.HypervisorConfig.HugePages = true
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 	assert.NoError(err)
 	assert.Equal(q.qemuConfig.Knobs.MemShared, true)
 
@@ -553,14 +519,11 @@ func TestQemuFileBackedMem(t *testing.T) {
 	assert.NoError(err)
 
 	q = &qemu{
-		config: HypervisorConfig{
-			VMStorePath:  sandbox.store.RunVMStoragePath(),
-			RunStorePath: sandbox.store.RunStoragePath(),
-		},
+		store: sandbox.store,
 	}
 	sandbox.config.HypervisorConfig.EnableVhostUserStore = true
 	sandbox.config.HypervisorConfig.HugePages = false
-	err = q.CreateVM(context.Background(), sandbox.id, network, &sandbox.config.HypervisorConfig)
+	err = q.createSandbox(context.Background(), sandbox.id, NetworkNamespace{}, &sandbox.config.HypervisorConfig)
 
 	expectErr = errors.New("Vhost-user-blk/scsi is enabled without HugePages. This configuration will not work")
 	assert.Equal(expectErr.Error(), err.Error())
@@ -591,7 +554,7 @@ func TestQemuGetpids(t *testing.T) {
 
 	qemuConfig := newQemuConfig()
 	q := &qemu{}
-	pids := q.GetPids()
+	pids := q.getPids()
 	assert.NotNil(pids)
 	assert.True(len(pids) == 1)
 	assert.True(pids[0] == 0)
@@ -599,40 +562,26 @@ func TestQemuGetpids(t *testing.T) {
 	q = &qemu{
 		config: qemuConfig,
 	}
-	f, err := os.CreateTemp("", "qemu-test-")
+	f, err := ioutil.TempFile("", "qemu-test-")
 	assert.Nil(err)
 	tmpfile := f.Name()
 	f.Close()
 	defer os.Remove(tmpfile)
 
 	q.qemuConfig.PidFile = tmpfile
-	pids = q.GetPids()
+	pids = q.getPids()
 	assert.True(len(pids) == 1)
 	assert.True(pids[0] == 0)
 
-	err = os.WriteFile(tmpfile, []byte("100"), 0)
+	err = ioutil.WriteFile(tmpfile, []byte("100"), 0)
 	assert.Nil(err)
-	pids = q.GetPids()
+	pids = q.getPids()
 	assert.True(len(pids) == 1)
 	assert.True(pids[0] == 100)
 
-	q.state.VirtiofsDaemonPid = 200
-	pids = q.GetPids()
+	q.state.VirtiofsdPid = 200
+	pids = q.getPids()
 	assert.True(len(pids) == 2)
 	assert.True(pids[0] == 100)
 	assert.True(pids[1] == 200)
-}
-
-func TestQemuSetConfig(t *testing.T) {
-	assert := assert.New(t)
-
-	config := newQemuConfig()
-
-	q := &qemu{}
-
-	assert.Equal(q.config, HypervisorConfig{})
-	err := q.setConfig(&config)
-	assert.NoError(err)
-
-	assert.Equal(q.config, config)
 }

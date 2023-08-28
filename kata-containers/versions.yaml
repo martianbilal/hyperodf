@@ -75,7 +75,7 @@ assets:
       url: "https://github.com/cloud-hypervisor/cloud-hypervisor"
       uscan-url: >-
         https://github.com/cloud-hypervisor/cloud-hypervisor/tags.*/v?(\d\S+)\.tar\.gz
-      version: "v26.0"
+      version: "v17.0"
 
     firecracker:
       description: "Firecracker micro-VMM"
@@ -83,13 +83,13 @@ assets:
       uscan-url: >-
         https://github.com/firecracker-microvm/firecracker/tags
         .*/v?(\d\S+)\.tar\.gz
-      version: "v1.1.0"
+      version: "v0.23.1"
 
     qemu:
       description: "VMM that uses KVM"
       url: "https://github.com/qemu/qemu"
-      version: "v6.2.0"
-      tag: "v6.2.0"
+      version: "v5.2.0"
+      tag: "v5.2.0"
       # Do not include any non-full release versions
       # Break the line *without CR or space being appended*, to appease
       # yamllint, and note the deliberate ' ' at the end of the expression.
@@ -98,15 +98,17 @@ assets:
       uscan-url: >-
         https://github.com/qemu/qemu/tags
         .*/v?(\d\S+)\.tar\.gz
-      tdx:
-        description: "VMM that uses KVM and supports TDX"
-        url: "https://github.com/intel/qemu-dcp"
-        tag: "SPR-BKC-QEMU-v2.2"
+      architecture:
+        aarch64:
+          version: "v5.1.0"
+          branch: "master"
+          tag: "v5.1.0"
+          commit: "d0ed6a69d399ae193959225cdeaa9382746c91cc"
 
     qemu-experimental:
       description: "QEMU with virtiofs support"
       url: "https://github.com/qemu/qemu"
-      version: "7a800cf9496fddddf71b21a00991e0ec757a170a"
+      version: "470dd6bd360782f5137f7e3376af6a44658eb1d3"
 
   image:
     description: |
@@ -118,7 +120,7 @@ assets:
         name: "ubuntu"
         version: "latest"
       ppc64le:
-        name: "ubuntu"
+        name: "centos"
         version: "latest"
       s390x:
         name: "ubuntu"
@@ -137,15 +139,13 @@ assets:
     architecture:
       aarch64:
         name: &default-initrd-name "alpine"
-        version: &default-initrd-version "3.15"
-      # Do not use Alpine on ppc64le & s390x, the agent cannot use musl because
-      # there is no such Rust target
+        version: &default-initrd-version "3.13.5"
       ppc64le:
-        name: &glibc-initrd-name "ubuntu"
-        version: &glibc-initrd-version "20.04"
+        name: *default-initrd-name
+        version: *default-initrd-version
       s390x:
-        name: *glibc-initrd-name
-        version: *glibc-initrd-version
+        name: *default-initrd-name
+        version: *default-initrd-version
       x86_64:
         name: *default-initrd-name
         version: *default-initrd-version
@@ -153,26 +153,14 @@ assets:
   kernel:
     description: "Linux kernel optimised for virtual machines"
     url: "https://cdn.kernel.org/pub/linux/kernel/v5.x/"
-    version: "v5.19.2"
-    tdx:
-      description: "Linux kernel that supports TDX"
-      url: "https://github.com/intel/tdx/archive/refs/tags"
-      tag: "tdx-guest-v5.15-4"
-    sev:
-      description: "Linux kernel with efi_secret support"
-      url: "https://github.com/confidential-containers-demo/\
-      linux/archive/refs/tags/"
-      tag: "efi-secret-v5.17-rc6"
+    uscan-url: >-
+      https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-(5\.4\..+)\.tar\.gz
+    version: "v5.10.25"
 
   kernel-experimental:
     description: "Linux kernel with virtio-fs support"
     url: "https://cdn.kernel.org/pub/linux/kernel/v5.x/"
-    tag: "v5.13.10"
-
-  arm-kernel-experimental:
-    description: "Linux kernel with cpu/mem hotplug support on arm64"
-    url: "https://cdn.kernel.org/pub/linux/kernel/v5.x/"
-    version: "v5.15.7"
+    tag: "v5.10.25"
 
 externals:
   description: "Third-party projects used by the system"
@@ -191,11 +179,11 @@ externals:
     description: |
       OCI-based Kubernetes Container Runtime Interface implementation
     url: "https://github.com/cri-o/cri-o"
-    branch: "release-1.23"
+    branch: "release-1.21"
 
-  containerd:
+  cri-containerd:
     description: |
-      Containerd for Kubernetes Container Runtime Interface.
+      Containerd Plugin for Kubernetes Container Runtime Interface.
     url: "github.com/containerd/containerd"
     tarball_url: "https://github.com/containerd/containerd/releases/download"
     # containerd from v1.5.0 used the path unix socket
@@ -206,12 +194,7 @@ externals:
   critools:
     description: "CLI tool for Container Runtime Interface (CRI)"
     url: "https://github.com/kubernetes-sigs/cri-tools"
-    version: "1.23.0"
-
-  gperf:
-    description: "GNU gperf is a perfect hash function generator"
-    url: "https://ftp.gnu.org/gnu/gperf"
-    version: "3.1"
+    version: "1.21.0"
 
   kubernetes:
     description: "Kubernetes project container manager"
@@ -221,12 +204,7 @@ externals:
     uscan-url: >-
       https://github.com/kubernetes/kubernetes/tags
       .*/v?([\d\.]+)\.tar\.gz
-    version: "1.23.1-00"
-
-  libseccomp:
-    description: "High level interface to Linux seccomp filter"
-    url: "https://github.com/seccomp/libseccomp"
-    version: "2.5.1"
+    version: "1.21.1-00"
 
   runc:
     description: "OCI CLI reference runtime implementation"
@@ -238,26 +216,18 @@ externals:
       .*/v?(\d\S+)\.tar\.gz
     version: "v1.0.1"
 
-  nydus:
-    description: "Nydus image acceleration service"
-    url: "https://github.com/dragonflyoss/image-service"
-    version: "v2.1.0-alpha.4"
-
-  nydus-snapshotter:
-    description: "Snapshotter for Nydus image acceleration service"
-    url: "https://github.com/containerd/nydus-snapshotter"
-    version: "v0.2.3"
-
-  virtiofsd:
-    description: "vhost-user virtio-fs device backend written in Rust"
-    url: "https://gitlab.com/virtio-fs/virtiofsd"
-    version: "v1.3.0"
+  musl:
+    description: |
+      The musl library is used to build the rust agent.
+    url: "https://www.musl-libc.org/"
+    uscan-url: >-
+      https://www.musl-libc.org/releases/
+      musl-([\d\.]+)\.tar\.gz
+    version: "1.1.23"
     meta:
-      # From https://gitlab.com/virtio-fs/virtiofsd/-/releases/v1.3.0,
-      # this is the link labelled virtiofsd-v1.3.0.zip
-      #
-      # yamllint disable-line rule:line-length
-      binary: "https://gitlab.com/virtio-fs/virtiofsd/uploads/9a4f2261fcb1701f1e709694b5c5d980/virtiofsd-v1.3.0.zip"
+      description: |
+        'newest-version' is the latest version known to work.
+      newest-version: "1.1.23"
 
 languages:
   description: |
@@ -270,22 +240,22 @@ languages:
     issue: "https://github.com/golang/go/issues/20676"
     uscan-url: >-
       https://github.com/golang/go/tags .*/go?([\d\.]+)\.tar\.gz
-    version: "1.16.10"
+    version: "1.11.10"
     meta:
       description: |
         'newest-version' is the latest version known to work when
         building Kata
-      newest-version: "1.17.3"
+      newest-version: "1.16.5"
 
   rust:
     description: "Rust language"
     notes: "'version' is the default minimum version used by this project."
-    version: "1.59.0"
+    version: "1.45.0"
     meta:
       description: |
         'newest-version' is the latest version known to work when
         building Kata
-      newest-version: "1.59.0"
+      newest-version: "1.47.0"
 
 specs:
   description: "Details of important specifications"

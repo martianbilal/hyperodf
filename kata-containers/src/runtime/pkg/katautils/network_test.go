@@ -7,6 +7,7 @@ package katautils
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -23,13 +24,15 @@ import (
 func TestGetNetNsFromBindMount(t *testing.T) {
 	assert := assert.New(t)
 
-	tmpdir := t.TempDir()
+	tmpdir, err := ioutil.TempDir("", "")
+	assert.NoError(err)
+	defer os.RemoveAll(tmpdir)
 
 	mountFile := filepath.Join(tmpdir, "mountInfo")
 	nsPath := filepath.Join(tmpdir, "ns123")
 
 	// Non-existent namespace path
-	_, err := getNetNsFromBindMount(nsPath, mountFile)
+	_, err = getNetNsFromBindMount(nsPath, mountFile)
 	assert.NotNil(err)
 
 	tmpNSPath := filepath.Join(tmpdir, "testNetNs")
@@ -50,7 +53,7 @@ func TestGetNetNsFromBindMount(t *testing.T) {
 	}
 
 	for i, d := range data {
-		err := os.WriteFile(mountFile, []byte(d.contents), 0640)
+		err := ioutil.WriteFile(mountFile, []byte(d.contents), 0640)
 		assert.NoError(err)
 
 		path, err := getNetNsFromBindMount(tmpNSPath, mountFile)
@@ -83,7 +86,9 @@ func TestHostNetworkingRequested(t *testing.T) {
 	assert.Error(err)
 
 	// Bind-mounted Netns
-	tmpdir := t.TempDir()
+	tmpdir, err := ioutil.TempDir("", "")
+	assert.NoError(err)
+	defer os.RemoveAll(tmpdir)
 
 	// Create a bind mount to the current network namespace.
 	tmpFile := filepath.Join(tmpdir, "testNetNs")
@@ -110,14 +115,14 @@ func TestSetupNetworkNamespace(t *testing.T) {
 
 	// Network namespace same as the host
 	config := &vc.NetworkConfig{
-		NetworkID: "/proc/self/ns/net",
+		NetNSPath: "/proc/self/ns/net",
 	}
 	err := SetupNetworkNamespace(config)
 	assert.Error(err)
 
 	// Non-existent netns path
 	config = &vc.NetworkConfig{
-		NetworkID: "/proc/123456789/ns/net",
+		NetNSPath: "/proc/123456789/ns/net",
 	}
 	err = SetupNetworkNamespace(config)
 	assert.Error(err)
@@ -126,7 +131,7 @@ func TestSetupNetworkNamespace(t *testing.T) {
 	n, err := testutils.NewNS()
 	assert.NoError(err)
 	config = &vc.NetworkConfig{
-		NetworkID: n.Path(),
+		NetNSPath: n.Path(),
 	}
 	err = SetupNetworkNamespace(config)
 	assert.NoError(err)
@@ -136,16 +141,16 @@ func TestSetupNetworkNamespace(t *testing.T) {
 	config = &vc.NetworkConfig{}
 	err = SetupNetworkNamespace(config)
 	assert.NoError(err)
-	n, err = ns.GetNS(config.NetworkID)
+	n, err = ns.GetNS(config.NetNSPath)
 	assert.NoError(err)
 	assert.NotNil(n)
-	assert.True(config.NetworkCreated)
+	assert.True(config.NetNsCreated)
 	n.Close()
-	unix.Unmount(config.NetworkID, unix.MNT_DETACH)
-	os.RemoveAll(config.NetworkID)
+	unix.Unmount(config.NetNSPath, unix.MNT_DETACH)
+	os.RemoveAll(config.NetNSPath)
 
 	// Config with DisableNewNetNs
-	config = &vc.NetworkConfig{DisableNewNetwork: true}
+	config = &vc.NetworkConfig{DisableNewNetNs: true}
 	err = SetupNetworkNamespace(config)
 	assert.NoError(err)
 }

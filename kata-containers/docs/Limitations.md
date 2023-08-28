@@ -46,7 +46,7 @@ The following link shows the latest list of limitations:
 # Contributing
 
 If you would like to work on resolving a limitation, please refer to the
-[contributors guide](https://github.com/kata-containers/community/blob/main/CONTRIBUTING.md).
+[contributors guide](https://github.com/kata-containers/community/blob/master/CONTRIBUTING.md).
 If you wish to raise an issue for a new limitation, either
 [raise an issue directly on the runtime](https://github.com/kata-containers/kata-containers/issues/new)
 or see the
@@ -56,13 +56,6 @@ for advice on which repository to raise the issue against.
 # Pending items
 
 This section lists items that might be possible to fix.
-
-## OCI CLI commands
-
-### Docker and Podman support
-Currently Kata Containers does not support Docker or Podman.
-
-See issue https://github.com/kata-containers/kata-containers/issues/722 for more information.
 
 ## Runtime commands
 
@@ -93,6 +86,21 @@ All other configurations are supported and are working properly.
 
 ## Networking
 
+### Docker swarm and compose support
+
+The newest version of Docker supported is specified by the
+`externals.docker.version` variable in the
+[versions database](https://github.com/kata-containers/runtime/blob/master/versions.yaml).
+
+Basic Docker swarm support works. However, if you want to use custom networks
+with Docker's swarm, an older version of Docker is required. This is specified
+by the `externals.docker.meta.swarm-version` variable in the
+[versions database](https://github.com/kata-containers/runtime/blob/master/versions.yaml).
+
+See issue https://github.com/kata-containers/runtime/issues/175 for more information.
+
+Docker compose normally uses custom networks, so also has the same limitations.
+
 ## Resource management
 
 Due to the way VMs differ in their CPU and memory allocation, and sharing
@@ -104,11 +112,81 @@ See issue https://github.com/clearcontainers/runtime/issues/341 and [the constra
 For CPUs resource management see
 [CPU constraints](design/vcpu-handling.md).
 
+### docker run and shared memory
+
+The runtime does not implement the `docker run --shm-size` command to
+set the size of the `/dev/shm tmpfs` within the container. It is possible to pass this configuration value into the VM container so the appropriate mount command happens at launch time.
+
+See issue https://github.com/kata-containers/kata-containers/issues/21 for more information.
+
+### docker run and sysctl
+
+The `docker run --sysctl` feature is not implemented. At the runtime
+level, this equates to the `linux.sysctl` OCI configuration. Docker
+allows configuring the sysctl settings that support namespacing. From a security and isolation point of view, it might make sense to set them in the VM, which isolates sysctl settings. Also, given that each Kata Container has its own kernel, we can support setting of sysctl settings that are not namespaced. In some cases, we might need to support configuring some of the settings on both the host side Kata Container namespace and the Kata Containers kernel.
+
+See issue https://github.com/kata-containers/runtime/issues/185 for more information.
+
+## Docker daemon features
+
+Some features enabled or implemented via the
+[`dockerd` daemon](https://docs.docker.com/config/daemon/) configuration are not yet
+implemented.
+
+### SELinux support
+
+The `dockerd` configuration option `"selinux-enabled": true` is not presently implemented
+in Kata Containers. Enabling this option causes an OCI runtime error.
+
+See issue https://github.com/kata-containers/runtime/issues/784 for more information.
+
+The consequence of this is that the [Docker --security-opt is only partially supported](#docker---security-opt-option-partially-supported).
+
+Kubernetes [SELinux labels](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#assign-selinux-labels-to-a-container) will also not be applied.
+
 # Architectural limitations
 
 This section lists items that might not be fixed due to fundamental
 architectural differences between "soft containers" (i.e. traditional Linux*
 containers) and those based on VMs.
+
+## Networking limitations
+
+### Support for joining an existing VM network
+
+Docker supports the ability for containers to join another containers
+namespace with the `docker run --net=containers` syntax. This allows
+multiple containers to share a common network namespace and the network
+interfaces placed in the network namespace.  Kata Containers does not
+support network namespace sharing. If a Kata Container is setup to
+share the network namespace of a `runc` container, the runtime
+effectively takes over all the network interfaces assigned to the
+namespace and binds them to the VM. Consequently, the `runc` container loses
+its network connectivity.
+
+### docker --net=host
+
+Docker host network support (`docker --net=host run`) is not supported.
+It is not possible to directly access the host networking configuration
+from within the VM.
+
+The `--net=host` option can still be used with `runc` containers and
+inter-mixed with running Kata Containers, thus enabling use of `--net=host`
+when necessary.
+
+It should be noted, currently passing the `--net=host` option into a
+Kata Container may result in the Kata Container networking setup
+modifying, re-configuring and therefore possibly breaking the host
+networking setup. Do not use `--net=host` with Kata Containers.
+
+### docker run --link
+
+The runtime does not support the `docker run --link` command. This
+command is now deprecated by docker and we have no intention of adding support.
+Equivalent functionality can be achieved with the newer docker networking commands.
+
+See more documentation at
+[docs.docker.com](https://docs.docker.com/engine/userguide/networking/default_network/dockerlinks/).
 
 ## Storage limitations
 
@@ -120,11 +198,15 @@ moment.
 See [this issue](https://github.com/kata-containers/runtime/issues/2812) for more details.
 [Another issue](https://github.com/kata-containers/kata-containers/issues/1728) focuses on the case of `emptyDir`.
 
+
 ## Host resource sharing
 
-### Privileged containers
+### docker run --privileged
 
 Privileged support in Kata is essentially different from `runc` containers.
+Kata does support `docker run --privileged` command, but in this case full access
+to the guest VM is provided in addition to some host access.
+
 The container runs with elevated capabilities within the guest and is granted
 access to guest devices instead of the host devices.
 This is also true with using `securityContext privileged=true` with Kubernetes.
@@ -134,6 +216,17 @@ The container may also be granted full access to a subset of host devices
 
 See [Privileged Kata Containers](how-to/privileged.md) for how to configure some of this behavior.
 
+# Miscellaneous
+
+This section lists limitations where the possible solutions are uncertain.
+
+## Docker --security-opt option partially supported
+
+The `--security-opt=` option used by Docker is partially supported.
+We only support `--security-opt=no-new-privileges` and `--security-opt seccomp=/path/to/seccomp/profile.json`
+option as of today.
+
+Note: The `--security-opt apparmor=your_profile` is not yet supported. See https://github.com/kata-containers/runtime/issues/707.
 # Appendices
 
 ## The constraints challenge

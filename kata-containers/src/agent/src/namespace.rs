@@ -13,7 +13,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use tracing::instrument;
 
-use crate::mount::{baremount, FLAGS};
+use crate::mount::{BareMount, FLAGS};
 use slog::Logger;
 
 const PERSISTENT_NS_DIR: &str = "/var/run/sandbox-ns";
@@ -23,7 +23,12 @@ pub const NSTYPEPID: &str = "pid";
 
 #[instrument]
 pub fn get_current_thread_ns_path(ns_type: &str) -> String {
-    format!("/proc/{}/task/{}/ns/{}", getpid(), gettid(), ns_type)
+    format!(
+        "/proc/{}/task/{}/ns/{}",
+        getpid().to_string(),
+        gettid().to_string(),
+        ns_type
+    )
 }
 
 #[derive(Debug)]
@@ -95,14 +100,11 @@ impl Namespace {
         self.path = new_ns_path.clone().into_os_string().into_string().unwrap();
         let hostname = self.hostname.clone();
 
-        let new_thread = std::thread::spawn(move || {
+        let new_thread = tokio::spawn(async move {
             if let Err(err) = || -> Result<()> {
                 let origin_ns_path = get_current_thread_ns_path(ns_type.get());
 
-                let source = Path::new(&origin_ns_path);
-                let destination = new_ns_path.as_path();
-
-                File::open(&source)?;
+                File::open(Path::new(&origin_ns_path))?;
 
                 // Create a new netns on the current thread.
                 let cf = ns_type.get_flags();
@@ -113,6 +115,8 @@ impl Namespace {
                     nix::unistd::sethostname(hostname.unwrap())?;
                 }
                 // Bind mount the new namespace from the current thread onto the mount point to persist it.
+                let source: &str = origin_ns_path.as_str();
+                let destination: &str = new_ns_path.as_path().to_str().unwrap_or("none");
 
                 let mut flags = MsFlags::empty();
 
@@ -125,9 +129,10 @@ impl Namespace {
                     }
                 };
 
-                baremount(source, destination, "none", flags, "", &logger).map_err(|e| {
+                let bare_mount = BareMount::new(source, destination, "none", flags, "", &logger);
+                bare_mount.mount().map_err(|e| {
                     anyhow!(
-                        "Failed to mount {:?} to {:?} with err:{:?}",
+                        "Failed to mount {} to {} with err:{:?}",
                         source,
                         destination,
                         e
@@ -143,7 +148,7 @@ impl Namespace {
         });
 
         new_thread
-            .join()
+            .await
             .map_err(|e| anyhow!("Failed to join thread {:?}!", e))??;
 
         Ok(self)
@@ -245,127 +250,5 @@ mod tests {
         let pid = NamespaceType::Pid;
         assert_eq!("pid", pid.get());
         assert_eq!(CloneFlags::CLONE_NEWPID, pid.get_flags());
-    }
-
-    #[test]
-    fn test_new() {
-        // Create dummy logger and temp folder.
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        let ns_ipc = Namespace::new(&logger);
-        assert_eq!(NamespaceType::Ipc, ns_ipc.ns_type);
-    }
-
-    #[test]
-    fn test_get_ipc() {
-        // Create dummy logger and temp folder.
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        let ns_ipc = Namespace::new(&logger).get_ipc();
-        assert_eq!(NamespaceType::Ipc, ns_ipc.ns_type);
-    }
-
-    #[test]
-    fn test_get_uts_with_hostname() {
-        let hostname = String::from("a.test.com");
-        // Create dummy logger and temp folder.
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        let ns_uts = Namespace::new(&logger).get_uts(hostname.as_str());
-        assert_eq!(NamespaceType::Uts, ns_uts.ns_type);
-        assert!(ns_uts.hostname.is_some());
-    }
-
-    #[test]
-    fn test_get_uts() {
-        let hostname = String::from("");
-        // Create dummy logger and temp folder.
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        let ns_uts = Namespace::new(&logger).get_uts(hostname.as_str());
-        assert_eq!(NamespaceType::Uts, ns_uts.ns_type);
-        assert!(ns_uts.hostname.is_none());
-    }
-
-    #[test]
-    fn test_get_pid() {
-        // Create dummy logger and temp folder.
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        let ns_pid = Namespace::new(&logger).get_pid();
-        assert_eq!(NamespaceType::Pid, ns_pid.ns_type);
-    }
-
-    #[test]
-    fn test_set_root_dir() {
-        // Create dummy logger and temp folder.
-        let logger = slog::Logger::root(slog::Discard, o!());
-        let tmpdir = Builder::new().prefix("pid").tempdir().unwrap();
-
-        let ns_root = Namespace::new(&logger).set_root_dir(tmpdir.path().to_str().unwrap());
-        assert_eq!(NamespaceType::Ipc, ns_root.ns_type);
-        assert_eq!(ns_root.persistent_ns_dir, tmpdir.path().to_str().unwrap());
-    }
-
-    #[test]
-    fn test_namespace_type_get() {
-        #[derive(Debug)]
-        struct TestData<'a> {
-            ns_type: NamespaceType,
-            str: &'a str,
-        }
-
-        let tests = &[
-            TestData {
-                ns_type: NamespaceType::Ipc,
-                str: "ipc",
-            },
-            TestData {
-                ns_type: NamespaceType::Uts,
-                str: "uts",
-            },
-            TestData {
-                ns_type: NamespaceType::Pid,
-                str: "pid",
-            },
-        ];
-
-        // Run the tests
-        for (i, d) in tests.iter().enumerate() {
-            // Create a string containing details of the test
-            let msg = format!("test[{}]: {:?}", i, d);
-            assert_eq!(d.str, d.ns_type.get(), "{}", msg)
-        }
-    }
-
-    #[test]
-    fn test_namespace_type_get_flags() {
-        #[derive(Debug)]
-        struct TestData {
-            ns_type: NamespaceType,
-            ns_flag: CloneFlags,
-        }
-
-        let tests = &[
-            TestData {
-                ns_type: NamespaceType::Ipc,
-                ns_flag: CloneFlags::CLONE_NEWIPC,
-            },
-            TestData {
-                ns_type: NamespaceType::Uts,
-                ns_flag: CloneFlags::CLONE_NEWUTS,
-            },
-            TestData {
-                ns_type: NamespaceType::Pid,
-                ns_flag: CloneFlags::CLONE_NEWPID,
-            },
-        ];
-
-        // Run the tests
-        for (i, d) in tests.iter().enumerate() {
-            // Create a string containing details of the test
-            let msg = format!("test[{}]: {:?}", i, d);
-            assert_eq!(d.ns_flag, d.ns_type.get_flags(), "{}", msg)
-        }
     }
 }

@@ -55,10 +55,6 @@ const (
 	// FirmwarePath is a sandbox annotation for passing a per container path pointing at the guest firmware that will run the container VM.
 	FirmwarePath = kataAnnotHypervisorPrefix + "firmware"
 
-	// FirmwareVolumePath is a sandbox annotation for passing a per container path pointing at the guest firmware volume
-	// that will be passed to the container VM.
-	FirmwareVolumePath = kataAnnotHypervisorPrefix + "firmware_volume"
-
 	// KernelHash is a sandbox annotation for passing a container kernel image SHA-512 hash value.
 	KernelHash = kataAnnotHypervisorPrefix + "kernel_hash"
 
@@ -79,9 +75,6 @@ const (
 
 	// FirmwareHash is an sandbox annotation for passing a container guest firmware SHA-512 hash value.
 	FirmwareHash = kataAnnotHypervisorPrefix + "firmware_hash"
-
-	// FirmwareVolumeHash is an sandbox annotation for passing a container guest firmware volume SHA-512 hash value.
-	FirmwareVolumeHash = kataAnnotHypervisorPrefix + "firmware_volume_hash"
 
 	// AssetHashType is the hash type used for assets verification
 	AssetHashType = kataAnnotationsPrefix + "asset_hash_type"
@@ -130,9 +123,6 @@ const (
 	// entropy (/dev/random, /dev/urandom or real hardware RNG device)
 	EntropySource = kataAnnotHypervisorPrefix + "entropy_source"
 
-	// UseLegacySerial sets legacy serial device for guest console if available and implemented for architecture
-	UseLegacySerial = kataAnnotHypervisorPrefix + "use_legacy_serial"
-
 	//
 	//	CPU Annotations
 	//
@@ -161,6 +151,10 @@ const (
 
 	// MemPrealloc is a sandbox annotation that specifies the memory space used for nvdimm device by the hypervisor.
 	MemPrealloc = kataAnnotHypervisorPrefix + "enable_mem_prealloc"
+
+	// EnableSwap is a sandbox annotation to enable swap of vm memory.
+	// The behaviour is undefined if mem_prealloc is also set to true
+	EnableSwap = kataAnnotHypervisorPrefix + "enable_swap"
 
 	// HugePages is a sandbox annotation to specify if the memory should be pre-allocated from huge pages
 	HugePages = kataAnnotHypervisorPrefix + "enable_hugepages"
@@ -229,9 +223,6 @@ const (
 
 	// EnableGuestSwap is a sandbox annotation to enable swap in the guest.
 	EnableGuestSwap = kataAnnotHypervisorPrefix + "enable_guest_swap"
-
-	// EnableRootlessHypervisor is a sandbox annotation to enable rootless hypervisor (only supported in QEMU currently).
-	EnableRootlessHypervisor = kataAnnotHypervisorPrefix + "rootless"
 )
 
 // Runtime related annotations
@@ -256,10 +247,6 @@ const (
 
 	// DisableNewNetNs is a sandbox annotation that determines if create a netns for hypervisor process.
 	DisableNewNetNs = kataAnnotRuntimePrefix + "disable_new_netns"
-
-	// VfioMode is a sandbox annotation to specify how attached VFIO devices should be treated
-	// Overrides the runtime.vfio_mode parameter in the global configuration.toml
-	VfioMode = kataAnnotRuntimePrefix + "vfio_mode"
 )
 
 // Agent related annotations
@@ -281,6 +268,12 @@ const (
 
 	// AgentTrace is a sandbox annotation to enable tracing for the agent.
 	AgentTrace = kataAnnotAgentPrefix + "enable_tracing"
+
+	// AgentTraceMode is a sandbox annotation to specify the trace mode for the agent.
+	AgentTraceMode = kataAnnotAgentPrefix + "trace_mode"
+
+	// AgentTraceMode is a sandbox annotation to specify the trace type for the agent.
+	AgentTraceType = kataAnnotAgentPrefix + "trace_type"
 
 	// AgentContainerPipeSize is an annotation to specify the size of the pipes created for containers
 	AgentContainerPipeSize       = kataAnnotAgentPrefix + ContainerPipeSizeOption

@@ -1,6 +1,5 @@
 #
 # Copyright (c) 2018-2019 Intel Corporation
-# Copyright (c) 2021 Adobe Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -9,18 +8,19 @@ SKIP_GO_VERSION_CHECK=
 include golang.mk
 
 #Get ARCH.
-ifeq ($(ARCH),)
-    ifneq (,$(golang_version_raw))
-        override ARCH = $(shell go env GOARCH)
-    else
-        override ARCH = $(shell uname -m)
+ifneq (,$(golang_version_raw))
+    GOARCH=$(shell go env GOARCH)
+    ifeq ($(ARCH),)
+        ARCH = $(GOARCH)
     endif
-endif
-ifeq ($(ARCH),x86_64)
-    override ARCH = amd64
-endif
-ifeq ($(ARCH),aarch64)
-    override ARCH = arm64
+else
+    ARCH = $(shell uname -m)
+    ifeq ($(ARCH),x86_64)
+        ARCH = amd64
+    endif
+    ifeq ($(ARCH),aarch64)
+        ARCH = arm64
+    endif
 endif
 
 ARCH_DIR = arch
@@ -29,15 +29,8 @@ ARCH_FILE = $(ARCH_DIR)/$(ARCH)$(ARCH_FILE_SUFFIX)
 ARCH_FILES = $(wildcard arch/*$(ARCH_FILE_SUFFIX))
 ALL_ARCHES = $(patsubst $(ARCH_DIR)/%$(ARCH_FILE_SUFFIX),%,$(ARCH_FILES))
 
-# Build as safely as possible
-export CGO_CPPFLAGS = -D_FORTIFY_SOURCE=2 -fstack-protector
-
-ifeq (,$(realpath $(ARCH_FILE)))
-    $(error "ERROR: invalid architecture: '$(ARCH)'")
-else
-    # Load architecture-dependent settings
-    include $(ARCH_FILE)
-endif
+# Load architecture-dependent settings
+include $(ARCH_FILE)
 
 PROJECT_TYPE = kata
 PROJECT_NAME = Kata Containers
@@ -58,9 +51,13 @@ PROJECT_DIR = $(PROJECT_TAG)
 IMAGENAME = $(PROJECT_TAG).img
 
 TARGET = $(BIN_PREFIX)-runtime
-RUNTIME_OUTPUT = $(CURDIR)/$(TARGET)
-RUNTIME_DIR = $(CLI_DIR)/$(TARGET)
+TARGET_OUTPUT = $(CURDIR)/$(TARGET)
 BINLIST += $(TARGET)
+
+NETMON_DIR = netmon
+NETMON_TARGET = $(PROJECT_TYPE)-netmon
+NETMON_TARGET_OUTPUT = $(CURDIR)/$(NETMON_TARGET)
+BINLIBEXECLIST += $(NETMON_TARGET)
 
 DESTDIR ?= /
 
@@ -111,7 +108,6 @@ KERNELDIR := $(PKGDATADIR)
 
 IMAGEPATH := $(PKGDATADIR)/$(IMAGENAME)
 FIRMWAREPATH :=
-FIRMWAREVOLUMEPATH :=
 
 # Name of default configuration file the runtime will use.
 CONFIG_FILE = configuration.toml
@@ -145,6 +141,9 @@ ACRNVALIDHYPERVISORPATHS := [\"$(ACRNPATH)\"]
 ACRNCTLPATH := $(ACRNBINDIR)/$(ACRNCTLCMD)
 ACRNVALIDCTLPATHS := [\"$(ACRNCTLPATH)\"]
 
+NETMONCMD := $(BIN_PREFIX)-netmon
+NETMONPATH := $(PKGLIBEXECDIR)/$(NETMONCMD)
+
 # Default number of vCPUs
 DEFVCPUS := 1
 # Default maximum number of vCPUs
@@ -158,34 +157,20 @@ DEFMEMSZ := 2048
 # - vm template memory
 # - hugepage memory
 DEFMEMSLOTS := 10
-# Default maximum memory in MiB
-DEFMAXMEMSZ := 0
 #Default number of bridges
 DEFBRIDGES := 1
-DEFENABLEANNOTATIONS := [\"enable_iommu\"]
+DEFENABLEANNOTATIONS := []
 DEFDISABLEGUESTSECCOMP := true
-DEFDISABLEGUESTEMPTYDIR := false
 #Default experimental features enabled
 DEFAULTEXPFEATURES := []
-
-DEFDISABLESELINUX := false
-#Default SeccomSandbox param
-#The same default policy is used by libvirt
-#More explanation on https://lists.gnu.org/archive/html/qemu-devel/2017-02/msg03348.html
-# Note: "elevateprivileges=deny" doesn't work with daemonize option, so it's removed from the seccomp sandbox
-DEFSECCOMPSANDBOXPARAM := on,obsolete=deny,spawn=deny,resourcecontrol=deny
 
 #Default entropy source
 DEFENTROPYSOURCE := /dev/urandom
 DEFVALIDENTROPYSOURCES := [\"/dev/urandom\",\"/dev/random\",\"\"]
 
 DEFDISABLEBLOCK := false
-DEFSHAREDFS_CLH_VIRTIOFS := virtio-fs
 DEFSHAREDFS_QEMU_VIRTIOFS := virtio-fs
-DEFVIRTIOFSDAEMON := $(LIBEXECDIR)/virtiofsd
-ifeq ($(ARCH),ppc64le)
 DEFVIRTIOFSDAEMON := $(LIBEXECDIR)/kata-qemu/virtiofsd
-endif
 DEFVALIDVIRTIOFSDAEMONPATHS := [\"$(DEFVIRTIOFSDAEMON)\"]
 # Default DAX mapping cache size in MiB
 #if value is 0, DAX is not enabled
@@ -196,7 +181,7 @@ DEFVIRTIOFSCACHE ?= auto
 #
 # see `virtiofsd -h` for possible options.
 # Make sure you quote args.
-DEFVIRTIOFSEXTRAARGS ?= [\"--thread-pool-size=1\", \"-o\", \"announce_submounts\"]
+DEFVIRTIOFSEXTRAARGS ?= [\"--thread-pool-size=1\"]
 DEFENABLEIOTHREADS := false
 DEFENABLEVHOSTUSERSTORE := false
 DEFVHOSTUSERSTOREPATH := $(PKGRUNDIR)/vhost-user
@@ -204,18 +189,18 @@ DEFVALIDVHOSTUSERSTOREPATHS := [\"$(DEFVHOSTUSERSTOREPATH)\"]
 DEFFILEMEMBACKEND := ""
 DEFVALIDFILEMEMBACKENDS := [\"$(DEFFILEMEMBACKEND)\"]
 DEFMSIZE9P := 8192
-DEFVFIOMODE := guest-kernel
 
 # Default cgroup model
 DEFSANDBOXCGROUPONLY ?= false
 
-DEFSTATICRESOURCEMGMT ?= false
-
 DEFBINDMOUNTS := []
+
+# Features
+FEATURE_SELINUX ?= check
 
 SED = sed
 
-CLI_DIR = cmd
+CLI_DIR = cli
 SHIMV2 = containerd-shim-kata-v2
 SHIMV2_OUTPUT = $(CURDIR)/$(SHIMV2)
 SHIMV2_DIR = $(CLI_DIR)/$(SHIMV2)
@@ -240,7 +225,7 @@ ifneq (,$(QEMUCMD))
     KNOWN_HYPERVISORS += $(HYPERVISOR_QEMU)
 
     CONFIG_FILE_QEMU = configuration-qemu.toml
-    CONFIG_QEMU = config/$(CONFIG_FILE_QEMU)
+    CONFIG_QEMU = $(CLI_DIR)/config/$(CONFIG_FILE_QEMU)
     CONFIG_QEMU_IN = $(CONFIG_QEMU).in
 
     CONFIG_PATH_QEMU = $(abspath $(CONFDIR)/$(CONFIG_FILE_QEMU))
@@ -263,7 +248,7 @@ ifneq (,$(CLHCMD))
     KNOWN_HYPERVISORS += $(HYPERVISOR_CLH)
 
     CONFIG_FILE_CLH = configuration-clh.toml
-    CONFIG_CLH = config/$(CONFIG_FILE_CLH)
+    CONFIG_CLH = $(CLI_DIR)/config/$(CONFIG_FILE_CLH)
     CONFIG_CLH_IN = $(CONFIG_CLH).in
 
     CONFIG_PATH_CLH = $(abspath $(CONFDIR)/$(CONFIG_FILE_CLH))
@@ -286,7 +271,7 @@ ifneq (,$(FCCMD))
     KNOWN_HYPERVISORS += $(HYPERVISOR_FC)
 
     CONFIG_FILE_FC = configuration-fc.toml
-    CONFIG_FC = config/$(CONFIG_FILE_FC)
+    CONFIG_FC = $(CLI_DIR)/config/$(CONFIG_FILE_FC)
     CONFIG_FC_IN = $(CONFIG_FC).in
 
     CONFIG_PATH_FC = $(abspath $(CONFDIR)/$(CONFIG_FILE_FC))
@@ -300,7 +285,6 @@ ifneq (,$(FCCMD))
     # firecracker-specific options (all should be suffixed by "_FC")
     DEFBLOCKSTORAGEDRIVER_FC := virtio-mmio
     DEFNETWORKMODEL_FC := tcfilter
-    DEFSTATICRESOURCEMGMT_FC = true
     KERNELTYPE_FC = uncompressed
     KERNEL_NAME_FC = $(call MAKE_KERNEL_NAME,$(KERNELTYPE_FC))
     KERNELPATH_FC = $(KERNELDIR)/$(KERNEL_NAME_FC)
@@ -310,7 +294,7 @@ ifneq (,$(ACRNCMD))
     KNOWN_HYPERVISORS += $(HYPERVISOR_ACRN)
 
     CONFIG_FILE_ACRN = configuration-acrn.toml
-    CONFIG_ACRN = config/$(CONFIG_FILE_ACRN)
+    CONFIG_ACRN = $(CLI_DIR)/config/$(CONFIG_FILE_ACRN)
     CONFIG_ACRN_IN = $(CONFIG_ACRN).in
 
     CONFIG_PATH_ACRN = $(abspath $(CONFDIR)/$(CONFIG_FILE_ACRN))
@@ -383,6 +367,7 @@ USER_VARS += CONFIG_PATH
 USER_VARS += CONFIG_QEMU_IN
 USER_VARS += DESTDIR
 USER_VARS += DEFAULT_HYPERVISOR
+USER_VARS += DEFENABLEMSWAP
 USER_VARS += ACRNCMD
 USER_VARS += ACRNCTLCMD
 USER_VARS += ACRNPATH
@@ -412,7 +397,6 @@ USER_VARS += KERNELPATH_CLH
 USER_VARS += KERNELPATH_FC
 USER_VARS += KERNELVIRTIOFSPATH
 USER_VARS += FIRMWAREPATH
-USER_VARS += FIRMWAREVOLUMEPATH
 USER_VARS += MACHINEACCELERATORS
 USER_VARS += CPUFEATURES
 USER_VARS += DEFMACHINETYPE_CLH
@@ -430,6 +414,7 @@ USER_VARS += PROJECT_PREFIX
 USER_VARS += PROJECT_TAG
 USER_VARS += PROJECT_TYPE
 USER_VARS += PROJECT_URL
+USER_VARS += NETMONPATH
 USER_VARS += QEMUBINDIR
 USER_VARS += QEMUCMD
 USER_VARS += QEMUPATH
@@ -444,21 +429,17 @@ USER_VARS += DEFMAXVCPUS
 USER_VARS += DEFMAXVCPUS_ACRN
 USER_VARS += DEFMEMSZ
 USER_VARS += DEFMEMSLOTS
-USER_VARS += DEFMAXMEMSZ
 USER_VARS += DEFBRIDGES
 USER_VARS += DEFNETWORKMODEL_ACRN
 USER_VARS += DEFNETWORKMODEL_CLH
 USER_VARS += DEFNETWORKMODEL_FC
 USER_VARS += DEFNETWORKMODEL_QEMU
-USER_VARS += DEFDISABLEGUESTEMPTYDIR
 USER_VARS += DEFDISABLEGUESTSECCOMP
-USER_VARS += DEFDISABLESELINUX
 USER_VARS += DEFAULTEXPFEATURES
 USER_VARS += DEFDISABLEBLOCK
 USER_VARS += DEFBLOCKSTORAGEDRIVER_ACRN
 USER_VARS += DEFBLOCKSTORAGEDRIVER_FC
 USER_VARS += DEFBLOCKSTORAGEDRIVER_QEMU
-USER_VARS += DEFSHAREDFS_CLH_VIRTIOFS
 USER_VARS += DEFSHAREDFS_QEMU_VIRTIOFS
 USER_VARS += DEFVIRTIOFSDAEMON
 USER_VARS += DEFVALIDVIRTIOFSDAEMONPATHS
@@ -467,7 +448,6 @@ USER_VARS += DEFVIRTIOFSCACHE
 USER_VARS += DEFVIRTIOFSEXTRAARGS
 USER_VARS += DEFENABLEANNOTATIONS
 USER_VARS += DEFENABLEIOTHREADS
-USER_VARS += DEFSECCOMPSANDBOXPARAM
 USER_VARS += DEFENABLEVHOSTUSERSTORE
 USER_VARS += DEFVHOSTUSERSTOREPATH
 USER_VARS += DEFVALIDVHOSTUSERSTOREPATHS
@@ -477,10 +457,8 @@ USER_VARS += DEFMSIZE9P
 USER_VARS += DEFENTROPYSOURCE
 USER_VARS += DEFVALIDENTROPYSOURCES
 USER_VARS += DEFSANDBOXCGROUPONLY
-USER_VARS += DEFSTATICRESOURCEMGMT
-USER_VARS += DEFSTATICRESOURCEMGMT_FC
 USER_VARS += DEFBINDMOUNTS
-USER_VARS += DEFVFIOMODE
+USER_VARS += FEATURE_SELINUX
 USER_VARS += BUILDFLAGS
 
 
@@ -495,16 +473,27 @@ QUIET_TEST     = $(Q:@=@echo    '     TEST     '$@;)
 
 BUILDTAGS :=
 
+ifneq ($(FEATURE_SELINUX),no)
+    SELINUXTAG := $(shell ./hack/selinux_tag.sh)
+
+    ifneq ($(SELINUXTAG),)
+        override FEATURE_SELINUX = yes
+        BUILDTAGS += --tags "$(SELINUXTAG)"
+    else
+        ifeq ($(FEATURE_SELINUX),yes)
+            $(error "ERROR: SELinux support requested, but libselinux is not available")
+        endif
+
+        override FEATURE_SELINUX = no
+    endif
+endif
+
 # go build common flags
 BUILDFLAGS := -buildmode=pie -mod=vendor ${BUILDTAGS}
 
 # whether stipping the binary
 ifeq ($(STRIP),yes)
-       KATA_LDFLAGS = -w -s
-endif
-
-ifeq ($(ARCH),s390x)
-    KATA_LDFLAGS += -extldflags=-Wl,--s390-pgste
+       KATA_LDFLAGS := -ldflags "-w -s"
 endif
 
 # Return non-empty string if specified directory exists
@@ -517,7 +506,7 @@ define SHOW_ARCH
   $(shell printf "\\t%s%s\\\n" "$(1)" $(if $(filter $(ARCH),$(1))," (default)",""))
 endef
 
-all: runtime containerd-shim-v2 monitor
+all: runtime containerd-shim-v2 netmon monitor
 
 # Targets that depend on .git-commit can use $(shell cat .git-commit) to get a
 # git revision string.  They will only be rebuilt if the revision string
@@ -533,10 +522,15 @@ containerd-shim-v2: $(SHIMV2_OUTPUT)
 
 monitor: $(MONITOR_OUTPUT)
 
-runtime: $(RUNTIME_OUTPUT) $(CONFIGS)
+netmon: $(NETMON_TARGET_OUTPUT)
+
+$(NETMON_TARGET_OUTPUT): $(SOURCES) VERSION
+	$(QUIET_BUILD)(cd $(NETMON_DIR) && go build $(BUILDFLAGS) -o $@ -ldflags "-X main.version=$(VERSION)" $(KATA_LDFLAGS))
+
+runtime: $(TARGET_OUTPUT) $(CONFIGS)
 .DEFAULT: default
 
-build: all
+build: default
 
 #Install an executable file
 # params:
@@ -564,25 +558,28 @@ define MAKE_KERNEL_VIRTIOFS_NAME
 $(if $(findstring uncompressed,$1),vmlinux-virtiofs.container,vmlinuz-virtiofs.container)
 endef
 
+GENERATED_CONFIG = $(abspath $(CLI_DIR)/config-generated.go)
+
+GENERATED_FILES += $(GENERATED_CONFIG)
 GENERATED_FILES += pkg/katautils/config-settings.go
 
-$(RUNTIME_OUTPUT): $(SOURCES) $(GENERATED_FILES) $(MAKEFILE_LIST) | show-summary
-	$(QUIET_BUILD)(cd $(RUNTIME_DIR) && go build -ldflags "$(KATA_LDFLAGS)" $(BUILDFLAGS) -o $@ .)
+$(TARGET_OUTPUT): $(SOURCES) $(GENERATED_FILES) $(MAKEFILE_LIST) | show-summary
+	$(QUIET_BUILD)(cd $(CLI_DIR) && go build $(KATA_LDFLAGS) $(BUILDFLAGS) -o $@ .)
 
 $(SHIMV2_OUTPUT): $(SOURCES) $(GENERATED_FILES) $(MAKEFILE_LIST)
-	$(QUIET_BUILD)(cd $(SHIMV2_DIR)/ && go build -ldflags "$(KATA_LDFLAGS)" $(BUILDFLAGS) -o $@ .)
+	$(QUIET_BUILD)(cd $(SHIMV2_DIR)/ && ln -fs $(GENERATED_CONFIG))
+	$(QUIET_BUILD)(cd $(SHIMV2_DIR)/ && go build $(KATA_LDFLAGS) $(BUILDFLAGS) -o $@ .)
 
 $(MONITOR_OUTPUT): $(SOURCES) $(GENERATED_FILES) $(MAKEFILE_LIST) .git-commit
-	$(QUIET_BUILD)(cd $(MONITOR_DIR)/ && go build \
-		--ldflags "-X main.GitCommit=$(shell cat .git-commit)" $(BUILDFLAGS) -o $@ .)
+	$(QUIET_BUILD)(cd $(MONITOR_DIR)/ && CGO_ENABLED=0 go build \
+		--ldflags "-X main.GitCommit=$(shell cat .git-commit)" $(BUILDFLAGS) -buildmode=exe -o $@ .)
 
 .PHONY: \
 	check \
+	check-go-static \
 	coverage \
 	default \
 	install \
-	lint \
-	pre-commit \
 	show-header \
 	show-summary \
 	show-variables \
@@ -601,48 +598,36 @@ $(GENERATED_FILES): %: %.in $(MAKEFILE_LIST) VERSION .git-commit
 
 generate-config: $(CONFIGS)
 
-test: hook go-test
+check: check-go-static
 
-hook:
-	make -C pkg/katautils/mockhook
+test: install-hook go-test
+
+install-hook:
+	make -C virtcontainers hook
+ifeq ($(shell id -u), 0)
+	echo "installing mock hook"
+	make -C virtcontainers install
+endif
 
 go-test: $(GENERATED_FILES)
-	go clean -testcache
-	$(QUIET_TEST)./go-test.sh
+	go test -v -mod=vendor ./...
 
-fast-test: $(GENERATED_FILES)
-	go clean -testcache
-	for s in $$(go list ./...); do if ! go test -failfast -v -mod=vendor -p 1 $$s; then break; fi; done
-
-GOLANGCI_LINT_FILE := ../../../tests/.ci/.golangci.yml
-GOLANGCI_LINT_NAME = golangci-lint
-GOLANGCI_LINT_CMD := $(shell command -v $(GOLANGCI_LINT_NAME) 2>/dev/null)
-lint: all
-	if [ -z $(GOLANGCI_LINT_CMD) ] ; \
-	then \
-		echo "ERROR: command $(GOLANGCI_LINT_NAME) not found. Please install it first." >&2; exit 1; \
-	fi
-
-	if [ -f $(GOLANGCI_LINT_FILE) ] ; \
-	then \
-		echo "running $(GOLANGCI_LINT_NAME)..."; \
-		$(GOLANGCI_LINT_NAME) run -c $(GOLANGCI_LINT_FILE) ; \
-	else \
-		echo "ERROR: file $(GOLANGCI_LINT_FILE) not found. You should clone https://github.com/kata-containers/tests to run $(GOLANGCI_LINT_NAME) locally." >&2; exit 1; \
-	fi;
-
-pre-commit: lint fast-test
+check-go-static:
+	$(QUIET_CHECK)../../ci/go-no-os-exit.sh ./cli
+	$(QUIET_CHECK)../../ci/go-no-os-exit.sh ./virtcontainers
 
 coverage:
 	go test -v -mod=vendor -covermode=atomic -coverprofile=coverage.txt ./...
 	go tool cover -html=coverage.txt -o coverage.html
 
-install: all install-runtime install-containerd-shim-v2 install-monitor
+install: default install-runtime install-containerd-shim-v2 install-monitor install-netmon
 
 install-bin: $(BINLIST)
 	$(QUIET_INST)$(foreach f,$(BINLIST),$(call INSTALL_EXEC,$f,$(BINDIR)))
 
 install-runtime: runtime install-scripts install-completions install-configs install-bin
+
+install-netmon: install-bin-libexec
 
 install-containerd-shim-v2: $(SHIMV2)
 	$(QUIET_INST)$(call INSTALL_EXEC,$<,$(BINDIR))
@@ -675,8 +660,10 @@ clean:
 	$(QUIET_CLEAN)rm -f \
 		$(CONFIGS) \
 		$(GENERATED_FILES) \
+		$(NETMON_TARGET) \
 		$(MONITOR) \
 		$(SHIMV2) \
+		$(SHIMV2_DIR)/$(notdir $(GENERATED_CONFIG)) \
 		$(TARGET) \
 		.git-commit .git-commit.tmp
 
@@ -691,9 +678,6 @@ show-usage: show-header
 	@printf "\n"
 	@printf "\tbuild                      : standard build (build everything).\n"
 	@printf "\ttest                       : run tests.\n"
-	@printf "\tpre-commit                 : run $(GOLANGCI_LINT_NAME) and tests locally.\n"
-	@printf "\tlint                       : run $(GOLANGCI_LINT_NAME).\n"
-	@printf "\tfast-test                  : run tests with failfast option.\n"
 	@printf "\tcheck                      : run code checks.\n"
 	@printf "\tclean                      : remove built files.\n"
 	@printf "\tcontainerd-shim-v2         : only build containerd shim v2.\n"
@@ -702,7 +686,9 @@ show-usage: show-header
 	@printf "\tgenerate-config            : create configuration file.\n"
 	@printf "\tinstall                    : install everything.\n"
 	@printf "\tinstall-containerd-shim-v2 : only install containerd shim v2 files.\n"
+	@printf "\tinstall-netmon             : only install netmon files.\n"
 	@printf "\tinstall-runtime            : only install runtime files.\n"
+	@printf "\tnetmon                     : only build netmon.\n"
 	@printf "\truntime                    : only build runtime.\n"
 	@printf "\tshow-arches                : show supported architectures (ARCH variable values).\n"
 	@printf "\tshow-summary               : show install locations.\n"
@@ -751,6 +737,9 @@ endif
 	@printf "\tDefault: $(DEFAULT_HYPERVISOR)\n"
 	@printf "\tKnown: $(sort $(HYPERVISORS))\n"
 	@printf "\tAvailable for this architecture: $(sort $(KNOWN_HYPERVISORS))\n"
+	@printf "\n"
+	@printf "• Features:\n"
+	@printf "\tSELinux (FEATURE_SELINUX): $(FEATURE_SELINUX)\n"
 	@printf "\n"
 	@printf "• Summary:\n"
 	@printf "\n"

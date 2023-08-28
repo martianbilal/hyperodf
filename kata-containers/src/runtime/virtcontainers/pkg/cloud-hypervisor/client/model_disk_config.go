@@ -24,8 +24,8 @@ type DiskConfig struct {
 	QueueSize         *int32             `json:"queue_size,omitempty"`
 	VhostUser         *bool              `json:"vhost_user,omitempty"`
 	VhostSocket       *string            `json:"vhost_socket,omitempty"`
+	PollQueue         *bool              `json:"poll_queue,omitempty"`
 	RateLimiterConfig *RateLimiterConfig `json:"rate_limiter_config,omitempty"`
-	PciSegment        *int32             `json:"pci_segment,omitempty"`
 	Id                *string            `json:"id,omitempty"`
 }
 
@@ -48,6 +48,8 @@ func NewDiskConfig(path string) *DiskConfig {
 	this.QueueSize = &queueSize
 	var vhostUser bool = false
 	this.VhostUser = &vhostUser
+	var pollQueue bool = true
+	this.PollQueue = &pollQueue
 	return &this
 }
 
@@ -68,6 +70,8 @@ func NewDiskConfigWithDefaults() *DiskConfig {
 	this.QueueSize = &queueSize
 	var vhostUser bool = false
 	this.VhostUser = &vhostUser
+	var pollQueue bool = true
+	this.PollQueue = &pollQueue
 	return &this
 }
 
@@ -319,6 +323,38 @@ func (o *DiskConfig) SetVhostSocket(v string) {
 	o.VhostSocket = &v
 }
 
+// GetPollQueue returns the PollQueue field value if set, zero value otherwise.
+func (o *DiskConfig) GetPollQueue() bool {
+	if o == nil || o.PollQueue == nil {
+		var ret bool
+		return ret
+	}
+	return *o.PollQueue
+}
+
+// GetPollQueueOk returns a tuple with the PollQueue field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *DiskConfig) GetPollQueueOk() (*bool, bool) {
+	if o == nil || o.PollQueue == nil {
+		return nil, false
+	}
+	return o.PollQueue, true
+}
+
+// HasPollQueue returns a boolean if a field has been set.
+func (o *DiskConfig) HasPollQueue() bool {
+	if o != nil && o.PollQueue != nil {
+		return true
+	}
+
+	return false
+}
+
+// SetPollQueue gets a reference to the given bool and assigns it to the PollQueue field.
+func (o *DiskConfig) SetPollQueue(v bool) {
+	o.PollQueue = &v
+}
+
 // GetRateLimiterConfig returns the RateLimiterConfig field value if set, zero value otherwise.
 func (o *DiskConfig) GetRateLimiterConfig() RateLimiterConfig {
 	if o == nil || o.RateLimiterConfig == nil {
@@ -349,38 +385,6 @@ func (o *DiskConfig) HasRateLimiterConfig() bool {
 // SetRateLimiterConfig gets a reference to the given RateLimiterConfig and assigns it to the RateLimiterConfig field.
 func (o *DiskConfig) SetRateLimiterConfig(v RateLimiterConfig) {
 	o.RateLimiterConfig = &v
-}
-
-// GetPciSegment returns the PciSegment field value if set, zero value otherwise.
-func (o *DiskConfig) GetPciSegment() int32 {
-	if o == nil || o.PciSegment == nil {
-		var ret int32
-		return ret
-	}
-	return *o.PciSegment
-}
-
-// GetPciSegmentOk returns a tuple with the PciSegment field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *DiskConfig) GetPciSegmentOk() (*int32, bool) {
-	if o == nil || o.PciSegment == nil {
-		return nil, false
-	}
-	return o.PciSegment, true
-}
-
-// HasPciSegment returns a boolean if a field has been set.
-func (o *DiskConfig) HasPciSegment() bool {
-	if o != nil && o.PciSegment != nil {
-		return true
-	}
-
-	return false
-}
-
-// SetPciSegment gets a reference to the given int32 and assigns it to the PciSegment field.
-func (o *DiskConfig) SetPciSegment(v int32) {
-	o.PciSegment = &v
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
@@ -441,11 +445,11 @@ func (o DiskConfig) MarshalJSON() ([]byte, error) {
 	if o.VhostSocket != nil {
 		toSerialize["vhost_socket"] = o.VhostSocket
 	}
+	if o.PollQueue != nil {
+		toSerialize["poll_queue"] = o.PollQueue
+	}
 	if o.RateLimiterConfig != nil {
 		toSerialize["rate_limiter_config"] = o.RateLimiterConfig
-	}
-	if o.PciSegment != nil {
-		toSerialize["pci_segment"] = o.PciSegment
 	}
 	if o.Id != nil {
 		toSerialize["id"] = o.Id

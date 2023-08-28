@@ -8,26 +8,18 @@ COMPONENTS =
 
 COMPONENTS += agent
 COMPONENTS += runtime
+COMPONENTS += trace-forwarder
 
 # List of available tools
 TOOLS =
 
 TOOLS += agent-ctl
-TOOLS += trace-forwarder
-TOOLS += runk
-TOOLS += log-parser
 
 STANDARD_TARGETS = build check clean install test vendor
 
-default: all
-
-all: logging-crate-tests build
-
-logging-crate-tests:
-	make -C src/libs/logging
-
 include utils.mk
-include ./tools/packaging/kata-deploy/local-build/Makefile
+
+all: build
 
 # Create the rules
 $(eval $(call create_all_rules,$(COMPONENTS),$(TOOLS),$(STANDARD_TARGETS)))
@@ -41,16 +33,10 @@ generate-protocols:
 static-checks: build
 	bash ci/static-checks.sh
 
-docs-url-alive-check:
-	bash ci/docs-url-alive-check.sh
+binary-tarball:
+	make -f ./tools/packaging/kata-deploy/local-build/Makefile
 
-.PHONY: \
-	all \
-	binary-tarball \
-	default \
-	install-binary-tarball \
-	logging-crate-tests \
-	static-checks \
-	docs-url-alive-check
+install-binary-tarball:
+	make -f ./tools/packaging/kata-deploy/local-build/Makefile install
 
-
+.PHONY: all default static-checks binary-tarball install-binary-tarball

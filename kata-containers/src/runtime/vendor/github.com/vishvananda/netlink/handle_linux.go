@@ -15,26 +15,10 @@ var pkgHandle = &Handle{}
 // Handle is an handle for the netlink requests on a
 // specific network namespace. All the requests on the
 // same netlink family share the same netlink socket,
-// which gets released when the handle is Close'd.
+// which gets released when the handle is deleted.
 type Handle struct {
 	sockets      map[int]*nl.SocketHandle
 	lookupByDump bool
-}
-
-// SetSocketTimeout configures timeout for default netlink sockets
-func SetSocketTimeout(to time.Duration) error {
-	if to < time.Microsecond {
-		return fmt.Errorf("invalid timeout, minimul value is %s", time.Microsecond)
-	}
-
-	nl.SocketTimeoutTv = unix.NsecToTimeval(to.Nanoseconds())
-	return nil
-}
-
-// GetSocketTimeout returns the timeout value used by default netlink sockets
-func GetSocketTimeout() time.Duration {
-	nsec := unix.TimevalToNsec(nl.SocketTimeoutTv)
-	return time.Duration(nsec) * time.Nanosecond
 }
 
 // SupportsNetlinkFamily reports whether the passed netlink family is supported by this Handle
@@ -136,20 +120,12 @@ func newHandle(newNs, curNs netns.NsHandle, nlFamilies ...int) (*Handle, error) 
 	return h, nil
 }
 
-// Close releases the resources allocated to this handle
-func (h *Handle) Close() {
+// Delete releases the resources allocated to this handle
+func (h *Handle) Delete() {
 	for _, sh := range h.sockets {
 		sh.Close()
 	}
 	h.sockets = nil
-}
-
-// Delete releases the resources allocated to this handle
-//
-// Deprecated: use Close instead which is in line with typical resource release
-// patterns for files and other resources.
-func (h *Handle) Delete() {
-	h.Close()
 }
 
 func (h *Handle) newNetlinkRequest(proto, flags int) *nl.NetlinkRequest {

@@ -18,17 +18,13 @@ Method | HTTP request | Description
 [**VmAddFsPut**](DefaultApi.md#VmAddFsPut) | **Put** /vm.add-fs | Add a new virtio-fs device to the VM
 [**VmAddNetPut**](DefaultApi.md#VmAddNetPut) | **Put** /vm.add-net | Add a new network device to the VM
 [**VmAddPmemPut**](DefaultApi.md#VmAddPmemPut) | **Put** /vm.add-pmem | Add a new pmem device to the VM
-[**VmAddVdpaPut**](DefaultApi.md#VmAddVdpaPut) | **Put** /vm.add-vdpa | Add a new vDPA device to the VM
 [**VmAddVsockPut**](DefaultApi.md#VmAddVsockPut) | **Put** /vm.add-vsock | Add a new vsock device to the VM
-[**VmCoredumpPut**](DefaultApi.md#VmCoredumpPut) | **Put** /vm.coredump | Takes a VM coredump.
 [**VmCountersGet**](DefaultApi.md#VmCountersGet) | **Get** /vm.counters | Get counters from the VM
 [**VmInfoGet**](DefaultApi.md#VmInfoGet) | **Get** /vm.info | Returns general information about the cloud-hypervisor Virtual Machine (VM) instance.
-[**VmReceiveMigrationPut**](DefaultApi.md#VmReceiveMigrationPut) | **Put** /vm.receive-migration | Receive a VM migration from URL
 [**VmRemoveDevicePut**](DefaultApi.md#VmRemoveDevicePut) | **Put** /vm.remove-device | Remove a device from the VM
 [**VmResizePut**](DefaultApi.md#VmResizePut) | **Put** /vm.resize | Resize the VM
 [**VmResizeZonePut**](DefaultApi.md#VmResizeZonePut) | **Put** /vm.resize-zone | Resize a memory zone
 [**VmRestorePut**](DefaultApi.md#VmRestorePut) | **Put** /vm.restore | Restore a VM from a snapshot.
-[**VmSendMigrationPut**](DefaultApi.md#VmSendMigrationPut) | **Put** /vm.send-migration | Send a VM migration to URL
 [**VmSnapshotPut**](DefaultApi.md#VmSnapshotPut) | **Put** /vm.snapshot | Returns a VM snapshot.
 [**VmmPingGet**](DefaultApi.md#VmmPingGet) | **Get** /vmm.ping | Ping the VMM to check for API server availability
 
@@ -110,7 +106,7 @@ import (
 )
 
 func main() {
-    vmConfig := *openapiclient.NewVmConfig(*openapiclient.NewPayloadConfig()) // VmConfig | The VM configuration
+    vmConfig := *openapiclient.NewVmConfig(*openapiclient.NewKernelConfig("Path_example")) // VmConfig | The VM configuration
 
     configuration := openapiclient.NewConfiguration()
     api_client := openapiclient.NewAPIClient(configuration)
@@ -699,7 +695,7 @@ import (
 )
 
 func main() {
-    fsConfig := *openapiclient.NewFsConfig("Tag_example", "Socket_example", int32(123), int32(123)) // FsConfig | The details of the new virtio-fs
+    fsConfig := *openapiclient.NewFsConfig("Tag_example", "Socket_example", int32(123), int32(123), false, int64(123)) // FsConfig | The details of the new virtio-fs
 
     configuration := openapiclient.NewConfiguration()
     api_client := openapiclient.NewAPIClient(configuration)
@@ -872,70 +868,6 @@ No authorization required
 [[Back to README]](../README.md)
 
 
-## VmAddVdpaPut
-
-> PciDeviceInfo VmAddVdpaPut(ctx).VdpaConfig(vdpaConfig).Execute()
-
-Add a new vDPA device to the VM
-
-### Example
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "os"
-    openapiclient "./openapi"
-)
-
-func main() {
-    vdpaConfig := *openapiclient.NewVdpaConfig("Path_example", int32(123)) // VdpaConfig | The details of the new vDPA device
-
-    configuration := openapiclient.NewConfiguration()
-    api_client := openapiclient.NewAPIClient(configuration)
-    resp, r, err := api_client.DefaultApi.VmAddVdpaPut(context.Background()).VdpaConfig(vdpaConfig).Execute()
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Error when calling `DefaultApi.VmAddVdpaPut``: %v\n", err)
-        fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-    }
-    // response from `VmAddVdpaPut`: PciDeviceInfo
-    fmt.Fprintf(os.Stdout, "Response from `DefaultApi.VmAddVdpaPut`: %v\n", resp)
-}
-```
-
-### Path Parameters
-
-
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiVmAddVdpaPutRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **vdpaConfig** | [**VdpaConfig**](VdpaConfig.md) | The details of the new vDPA device | 
-
-### Return type
-
-[**PciDeviceInfo**](PciDeviceInfo.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: application/json
-- **Accept**: application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
-
-
 ## VmAddVsockPut
 
 > PciDeviceInfo VmAddVsockPut(ctx).VsockConfig(vsockConfig).Execute()
@@ -994,68 +926,6 @@ No authorization required
 
 - **Content-Type**: application/json
 - **Accept**: application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
-
-
-## VmCoredumpPut
-
-> VmCoredumpPut(ctx).VmCoredumpData(vmCoredumpData).Execute()
-
-Takes a VM coredump.
-
-### Example
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "os"
-    openapiclient "./openapi"
-)
-
-func main() {
-    vmCoredumpData := *openapiclient.NewVmCoredumpData() // VmCoredumpData | The coredump configuration
-
-    configuration := openapiclient.NewConfiguration()
-    api_client := openapiclient.NewAPIClient(configuration)
-    resp, r, err := api_client.DefaultApi.VmCoredumpPut(context.Background()).VmCoredumpData(vmCoredumpData).Execute()
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Error when calling `DefaultApi.VmCoredumpPut``: %v\n", err)
-        fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-    }
-}
-```
-
-### Path Parameters
-
-
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiVmCoredumpPutRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **vmCoredumpData** | [**VmCoredumpData**](VmCoredumpData.md) | The coredump configuration | 
-
-### Return type
-
- (empty response body)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: application/json
-- **Accept**: Not defined
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
 [[Back to Model list]](../README.md#documentation-for-models)
@@ -1174,68 +1044,6 @@ No authorization required
 
 - **Content-Type**: Not defined
 - **Accept**: application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
-
-
-## VmReceiveMigrationPut
-
-> VmReceiveMigrationPut(ctx).ReceiveMigrationData(receiveMigrationData).Execute()
-
-Receive a VM migration from URL
-
-### Example
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "os"
-    openapiclient "./openapi"
-)
-
-func main() {
-    receiveMigrationData := *openapiclient.NewReceiveMigrationData("ReceiverUrl_example") // ReceiveMigrationData | The URL for the reception of migration state
-
-    configuration := openapiclient.NewConfiguration()
-    api_client := openapiclient.NewAPIClient(configuration)
-    resp, r, err := api_client.DefaultApi.VmReceiveMigrationPut(context.Background()).ReceiveMigrationData(receiveMigrationData).Execute()
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Error when calling `DefaultApi.VmReceiveMigrationPut``: %v\n", err)
-        fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-    }
-}
-```
-
-### Path Parameters
-
-
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiVmReceiveMigrationPutRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **receiveMigrationData** | [**ReceiveMigrationData**](ReceiveMigrationData.md) | The URL for the reception of migration state | 
-
-### Return type
-
- (empty response body)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: application/json
-- **Accept**: Not defined
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
 [[Back to Model list]](../README.md#documentation-for-models)
@@ -1471,68 +1279,6 @@ Other parameters are passed through a pointer to a apiVmRestorePutRequest struct
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **restoreConfig** | [**RestoreConfig**](RestoreConfig.md) | The restore configuration | 
-
-### Return type
-
- (empty response body)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: application/json
-- **Accept**: Not defined
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
-
-
-## VmSendMigrationPut
-
-> VmSendMigrationPut(ctx).SendMigrationData(sendMigrationData).Execute()
-
-Send a VM migration to URL
-
-### Example
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "os"
-    openapiclient "./openapi"
-)
-
-func main() {
-    sendMigrationData := *openapiclient.NewSendMigrationData("DestinationUrl_example") // SendMigrationData | The URL for sending the migration state
-
-    configuration := openapiclient.NewConfiguration()
-    api_client := openapiclient.NewAPIClient(configuration)
-    resp, r, err := api_client.DefaultApi.VmSendMigrationPut(context.Background()).SendMigrationData(sendMigrationData).Execute()
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Error when calling `DefaultApi.VmSendMigrationPut``: %v\n", err)
-        fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-    }
-}
-```
-
-### Path Parameters
-
-
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiVmSendMigrationPutRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **sendMigrationData** | [**SendMigrationData**](SendMigrationData.md) | The URL for sending the migration state | 
 
 ### Return type
 

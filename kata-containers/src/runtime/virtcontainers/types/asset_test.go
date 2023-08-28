@@ -7,6 +7,7 @@ package types
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -21,7 +22,7 @@ var assetContentWrongHash = "92549f8d2018a95a294d28a65e795ed7d1a9d150009a28cea10
 func TestAssetWrongHashType(t *testing.T) {
 	assert := assert.New(t)
 
-	tmpfile, err := os.CreateTemp("", "virtcontainers-test-")
+	tmpfile, err := ioutil.TempFile("", "virtcontainers-test-")
 	assert.Nil(err)
 
 	defer func() {
@@ -44,7 +45,7 @@ func TestAssetWrongHashType(t *testing.T) {
 func TestAssetHash(t *testing.T) {
 	assert := assert.New(t)
 
-	tmpfile, err := os.CreateTemp("", "virtcontainers-test-")
+	tmpfile, err := ioutil.TempFile("", "virtcontainers-test-")
 	assert.Nil(err)
 
 	defer func() {
@@ -89,7 +90,7 @@ func testValid(t *testing.T, a *Asset, msg string) {
 func TestAssetNew(t *testing.T) {
 	assert := assert.New(t)
 
-	tmpfile, err := os.CreateTemp("", "virtcontainers-test-")
+	tmpfile, err := ioutil.TempFile("", "virtcontainers-test-")
 	assert.Nil(err)
 
 	defer func() {
@@ -118,7 +119,6 @@ func TestAssetNew(t *testing.T) {
 		{annotations.HypervisorCtlPath, annotations.HypervisorCtlHash, HypervisorCtlAsset, assetContentHash, false, false},
 		{annotations.JailerPath, annotations.JailerHash, JailerAsset, assetContentHash, false, false},
 		{annotations.FirmwarePath, annotations.FirmwareHash, FirmwareAsset, assetContentHash, false, false},
-		{annotations.FirmwareVolumePath, annotations.FirmwareVolumeHash, FirmwareVolumeAsset, assetContentHash, false, false},
 
 		// Failure with incorrect hash
 		{annotations.KernelPath, annotations.KernelHash, KernelAsset, assetContentWrongHash, true, false},
@@ -128,7 +128,6 @@ func TestAssetNew(t *testing.T) {
 		{annotations.HypervisorCtlPath, annotations.HypervisorCtlHash, HypervisorCtlAsset, assetContentWrongHash, true, false},
 		{annotations.JailerPath, annotations.JailerHash, JailerAsset, assetContentWrongHash, true, false},
 		{annotations.FirmwarePath, annotations.FirmwareHash, FirmwareAsset, assetContentWrongHash, true, false},
-		{annotations.FirmwareVolumePath, annotations.FirmwareVolumeHash, FirmwareVolumeAsset, assetContentWrongHash, true, false},
 
 		// Other failures
 		{annotations.KernelPath, annotations.KernelHash, ImageAsset, assetContentHash, false, true},

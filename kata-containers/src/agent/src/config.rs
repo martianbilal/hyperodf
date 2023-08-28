@@ -2,13 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use crate::rpc;
+use crate::tracer;
 use anyhow::{bail, ensure, Context, Result};
-use serde::Deserialize;
-use std::collections::HashSet;
 use std::env;
 use std::fs;
-use std::str::FromStr;
 use std::time;
 use tracing::instrument;
 
@@ -22,7 +19,6 @@ const DEBUG_CONSOLE_VPORT_OPTION: &str = "agent.debug_console_vport";
 const LOG_VPORT_OPTION: &str = "agent.log_vport";
 const CONTAINER_PIPE_SIZE_OPTION: &str = "agent.container_pipe_size";
 const UNIFIED_CGROUP_HIERARCHY_OPTION: &str = "agent.unified_cgroup_hierarchy";
-const CONFIG_FILE: &str = "agent.config_file";
 
 const DEFAULT_LOG_LEVEL: slog::Level = slog::Level::Info;
 const DEFAULT_HOTPLUG_TIMEOUT: time::Duration = time::Duration::from_secs(3);
@@ -33,7 +29,7 @@ const VSOCK_PORT: u16 = 1024;
 // Environment variables used for development and testing
 const SERVER_ADDR_ENV_VAR: &str = "KATA_AGENT_SERVER_ADDR";
 const LOG_LEVEL_ENV_VAR: &str = "KATA_AGENT_LOG_LEVEL";
-const TRACING_ENV_VAR: &str = "KATA_AGENT_TRACING";
+const TRACE_TYPE_ENV_VAR: &str = "KATA_AGENT_TRACE_TYPE";
 
 const ERR_INVALID_LOG_LEVEL: &str = "invalid log level";
 const ERR_INVALID_LOG_LEVEL_PARAM: &str = "invalid log level parameter";
@@ -51,17 +47,6 @@ const ERR_INVALID_CONTAINER_PIPE_SIZE_PARAM: &str = "unable to parse container p
 const ERR_INVALID_CONTAINER_PIPE_SIZE_KEY: &str = "invalid container pipe size key name";
 const ERR_INVALID_CONTAINER_PIPE_NEGATIVE: &str = "container pipe size should not be negative";
 
-#[derive(Debug, Default, Deserialize)]
-pub struct EndpointsConfig {
-    pub allowed: Vec<String>,
-}
-
-#[derive(Debug, Default)]
-pub struct AgentEndpoints {
-    pub allowed: HashSet<String>,
-    pub all_allowed: bool,
-}
-
 #[derive(Debug)]
 pub struct AgentConfig {
     pub debug_console: bool,
@@ -73,38 +58,7 @@ pub struct AgentConfig {
     pub container_pipe_size: i32,
     pub server_addr: String,
     pub unified_cgroup_hierarchy: bool,
-    pub tracing: bool,
-    pub endpoints: AgentEndpoints,
-    pub supports_seccomp: bool,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AgentConfigBuilder {
-    pub debug_console: Option<bool>,
-    pub dev_mode: Option<bool>,
-    pub log_level: Option<String>,
-    pub hotplug_timeout: Option<time::Duration>,
-    pub debug_console_vport: Option<i32>,
-    pub log_vport: Option<i32>,
-    pub container_pipe_size: Option<i32>,
-    pub server_addr: Option<String>,
-    pub unified_cgroup_hierarchy: Option<bool>,
-    pub tracing: Option<bool>,
-    pub endpoints: Option<EndpointsConfig>,
-}
-
-macro_rules! config_override {
-    ($builder:ident, $config:ident, $field:ident) => {
-        if let Some(v) = $builder.$field {
-            $config.$field = v;
-        }
-    };
-
-    ($builder:ident, $config:ident, $field:ident, $func: ident) => {
-        if let Some(v) = $builder.$field {
-            $config.$field = $func(&v)?;
-        }
-    };
+    pub tracing: tracer::TraceType,
 }
 
 // parse_cmdline_param parse commandline parameters.
@@ -137,8 +91,8 @@ macro_rules! parse_cmdline_param {
     };
 }
 
-impl Default for AgentConfig {
-    fn default() -> Self {
+impl AgentConfig {
+    pub fn new() -> AgentConfig {
         AgentConfig {
             debug_console: false,
             dev_mode: false,
@@ -149,94 +103,34 @@ impl Default for AgentConfig {
             container_pipe_size: DEFAULT_CONTAINER_PIPE_SIZE,
             server_addr: format!("{}:{}", VSOCK_ADDR, VSOCK_PORT),
             unified_cgroup_hierarchy: false,
-            tracing: false,
-            endpoints: Default::default(),
-            supports_seccomp: rpc::have_seccomp(),
+            tracing: tracer::TraceType::Disabled,
         }
     }
-}
 
-impl FromStr for AgentConfig {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let agent_config_builder: AgentConfigBuilder =
-            toml::from_str(s).map_err(anyhow::Error::new)?;
-        let mut agent_config: AgentConfig = Default::default();
-
-        // Overwrite default values with the configuration files ones.
-        config_override!(agent_config_builder, agent_config, debug_console);
-        config_override!(agent_config_builder, agent_config, dev_mode);
-        config_override!(
-            agent_config_builder,
-            agent_config,
-            log_level,
-            logrus_to_slog_level
-        );
-        config_override!(agent_config_builder, agent_config, hotplug_timeout);
-        config_override!(agent_config_builder, agent_config, debug_console_vport);
-        config_override!(agent_config_builder, agent_config, log_vport);
-        config_override!(agent_config_builder, agent_config, container_pipe_size);
-        config_override!(agent_config_builder, agent_config, server_addr);
-        config_override!(agent_config_builder, agent_config, unified_cgroup_hierarchy);
-        config_override!(agent_config_builder, agent_config, tracing);
-
-        // Populate the allowed endpoints hash set, if we got any from the config file.
-        if let Some(endpoints) = agent_config_builder.endpoints {
-            for ep in endpoints.allowed {
-                agent_config.endpoints.allowed.insert(ep);
-            }
-        }
-
-        Ok(agent_config)
-    }
-}
-
-impl AgentConfig {
     #[instrument]
-    pub fn from_cmdline(file: &str, args: Vec<String>) -> Result<AgentConfig> {
-        // If config file specified in the args, generate our config from it
-        let config_position = args.iter().position(|a| a == "--config" || a == "-c");
-        if let Some(config_position) = config_position {
-            if let Some(config_file) = args.get(config_position + 1) {
-                return AgentConfig::from_config_file(config_file);
-            } else {
-                panic!("The config argument wasn't formed properly: {:?}", args);
-            }
-        }
-
-        let mut config: AgentConfig = Default::default();
+    pub fn parse_cmdline(&mut self, file: &str) -> Result<()> {
         let cmdline = fs::read_to_string(file)?;
         let params: Vec<&str> = cmdline.split_ascii_whitespace().collect();
         for param in params.iter() {
-            // If we get a configuration file path from the command line, we
-            // generate our config from it.
-            // The agent will fail to start if the configuration file is not present,
-            // or if it can't be parsed properly.
-            if param.starts_with(format!("{}=", CONFIG_FILE).as_str()) {
-                let config_file = get_string_value(param)?;
-                return AgentConfig::from_config_file(&config_file);
-            }
-
             // parse cmdline flags
-            parse_cmdline_param!(param, DEBUG_CONSOLE_FLAG, config.debug_console);
-            parse_cmdline_param!(param, DEV_MODE_FLAG, config.dev_mode);
+            parse_cmdline_param!(param, DEBUG_CONSOLE_FLAG, self.debug_console);
+            parse_cmdline_param!(param, DEV_MODE_FLAG, self.dev_mode);
 
             // Support "bare" tracing option for backwards compatibility with
             // Kata 1.x.
             if param == &TRACE_MODE_OPTION {
-                config.tracing = true;
+                self.tracing = tracer::TraceType::Isolated;
                 continue;
             }
 
-            parse_cmdline_param!(param, TRACE_MODE_OPTION, config.tracing, get_bool_value);
+            parse_cmdline_param!(param, TRACE_MODE_OPTION, self.tracing, get_trace_type);
 
             // parse cmdline options
-            parse_cmdline_param!(param, LOG_LEVEL_OPTION, config.log_level, get_log_level);
+            parse_cmdline_param!(param, LOG_LEVEL_OPTION, self.log_level, get_log_level);
             parse_cmdline_param!(
                 param,
                 SERVER_ADDR_OPTION,
-                config.server_addr,
+                self.server_addr,
                 get_string_value
             );
 
@@ -244,7 +138,7 @@ impl AgentConfig {
             parse_cmdline_param!(
                 param,
                 HOTPLUG_TIMOUT_OPTION,
-                config.hotplug_timeout,
+                self.hotplug_timeout,
                 get_hotplug_timeout,
                 |hotplug_timeout: time::Duration| hotplug_timeout.as_secs() > 0
             );
@@ -253,14 +147,14 @@ impl AgentConfig {
             parse_cmdline_param!(
                 param,
                 DEBUG_CONSOLE_VPORT_OPTION,
-                config.debug_console_vport,
+                self.debug_console_vport,
                 get_vsock_port,
                 |port| port > 0
             );
             parse_cmdline_param!(
                 param,
                 LOG_VPORT_OPTION,
-                config.log_vport,
+                self.log_vport,
                 get_vsock_port,
                 |port| port > 0
             );
@@ -268,47 +162,34 @@ impl AgentConfig {
             parse_cmdline_param!(
                 param,
                 CONTAINER_PIPE_SIZE_OPTION,
-                config.container_pipe_size,
+                self.container_pipe_size,
                 get_container_pipe_size
             );
             parse_cmdline_param!(
                 param,
                 UNIFIED_CGROUP_HIERARCHY_OPTION,
-                config.unified_cgroup_hierarchy,
+                self.unified_cgroup_hierarchy,
                 get_bool_value
             );
         }
 
         if let Ok(addr) = env::var(SERVER_ADDR_ENV_VAR) {
-            config.server_addr = addr;
+            self.server_addr = addr;
         }
 
         if let Ok(addr) = env::var(LOG_LEVEL_ENV_VAR) {
             if let Ok(level) = logrus_to_slog_level(&addr) {
-                config.log_level = level;
+                self.log_level = level;
             }
         }
 
-        if let Ok(value) = env::var(TRACING_ENV_VAR) {
-            let name_value = format!("{}={}", TRACING_ENV_VAR, value);
-
-            config.tracing = get_bool_value(&name_value)?;
+        if let Ok(value) = env::var(TRACE_TYPE_ENV_VAR) {
+            if let Ok(result) = value.parse::<tracer::TraceType>() {
+                self.tracing = result;
+            }
         }
 
-        // We did not get a configuration file: allow all endpoints.
-        config.endpoints.all_allowed = true;
-
-        Ok(config)
-    }
-
-    #[instrument]
-    pub fn from_config_file(file: &str) -> Result<AgentConfig> {
-        let config = fs::read_to_string(file)?;
-        AgentConfig::from_str(&config)
-    }
-
-    pub fn is_allowed_endpoint(&self, ep: &str) -> bool {
-        self.endpoints.all_allowed || self.endpoints.allowed.contains(ep)
+        Ok(())
     }
 }
 
@@ -353,6 +234,25 @@ fn get_log_level(param: &str) -> Result<slog::Level> {
     ensure!(fields[0] == LOG_LEVEL_OPTION, ERR_INVALID_LOG_LEVEL_KEY);
 
     logrus_to_slog_level(fields[1])
+}
+
+#[instrument]
+fn get_trace_type(param: &str) -> Result<tracer::TraceType> {
+    ensure!(!param.is_empty(), "invalid trace type parameter");
+
+    let fields: Vec<&str> = param.split('=').collect();
+    ensure!(
+        fields[0] == TRACE_MODE_OPTION,
+        "invalid trace type key name"
+    );
+
+    if fields.len() == 1 {
+        return Ok(tracer::TraceType::Isolated);
+    }
+
+    let result = fields[1].parse::<tracer::TraceType>()?;
+
+    Ok(result)
 }
 
 #[instrument]
@@ -432,8 +332,6 @@ fn get_container_pipe_size(param: &str) -> Result<i32> {
 
 #[cfg(test)]
 mod tests {
-    use crate::assert_result;
-
     use super::*;
     use anyhow::anyhow;
     use std::fs::File;
@@ -441,9 +339,39 @@ mod tests {
     use std::time;
     use tempfile::tempdir;
 
+    const ERR_INVALID_TRACE_TYPE_PARAM: &str = "invalid trace type parameter";
+    const ERR_INVALID_TRACE_TYPE: &str = "invalid trace type";
+    const ERR_INVALID_TRACE_TYPE_KEY: &str = "invalid trace type key name";
+
+    // Parameters:
+    //
+    // 1: expected Result
+    // 2: actual Result
+    // 3: string used to identify the test on error
+    macro_rules! assert_result {
+        ($expected_result:expr, $actual_result:expr, $msg:expr) => {
+            if $expected_result.is_ok() {
+                let expected_level = $expected_result.as_ref().unwrap();
+                let actual_level = $actual_result.unwrap();
+                assert!(*expected_level == actual_level, "{}", $msg);
+            } else {
+                let expected_error = $expected_result.as_ref().unwrap_err();
+                let expected_error_msg = format!("{:?}", expected_error);
+
+                if let Err(actual_error) = $actual_result {
+                    let actual_error_msg = format!("{:?}", actual_error);
+
+                    assert!(expected_error_msg == actual_error_msg, "{}", $msg);
+                } else {
+                    assert!(expected_error_msg == "expected error, got OK", "{}", $msg);
+                }
+            }
+        };
+    }
+
     #[test]
     fn test_new() {
-        let config: AgentConfig = Default::default();
+        let config = AgentConfig::new();
         assert!(!config.debug_console);
         assert!(!config.dev_mode);
         assert_eq!(config.log_level, DEFAULT_LOG_LEVEL);
@@ -451,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_cmdline() {
+    fn test_parse_cmdline() {
         const TEST_SERVER_ADDR: &str = "vsock://-1:1024";
 
         #[derive(Debug)]
@@ -465,7 +393,7 @@ mod tests {
             container_pipe_size: i32,
             server_addr: &'a str,
             unified_cgroup_hierarchy: bool,
-            tracing: bool,
+            tracing: tracer::TraceType,
         }
 
         impl Default for TestData<'_> {
@@ -480,7 +408,7 @@ mod tests {
                     container_pipe_size: DEFAULT_CONTAINER_PIPE_SIZE,
                     server_addr: TEST_SERVER_ADDR,
                     unified_cgroup_hierarchy: false,
-                    tracing: false,
+                    tracing: tracer::TraceType::Disabled,
                 }
             }
         }
@@ -739,120 +667,63 @@ mod tests {
             },
             TestData {
                 contents: "trace",
-                tracing: false,
+                tracing: tracer::TraceType::Disabled,
                 ..Default::default()
             },
             TestData {
                 contents: ".trace",
-                tracing: false,
+                tracing: tracer::TraceType::Disabled,
                 ..Default::default()
             },
             TestData {
                 contents: "agent.tracer",
-                tracing: false,
+                tracing: tracer::TraceType::Disabled,
                 ..Default::default()
             },
             TestData {
                 contents: "agent.trac",
-                tracing: false,
+                tracing: tracer::TraceType::Disabled,
                 ..Default::default()
             },
             TestData {
                 contents: "agent.trace",
-                tracing: true,
+                tracing: tracer::TraceType::Isolated,
                 ..Default::default()
             },
             TestData {
-                contents: "agent.trace=true",
-                tracing: true,
+                contents: "agent.trace=isolated",
+                tracing: tracer::TraceType::Isolated,
                 ..Default::default()
             },
             TestData {
-                contents: "agent.trace=false",
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "agent.trace=0",
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "agent.trace=1",
-                tracing: true,
-                ..Default::default()
-            },
-            TestData {
-                contents: "agent.trace=a",
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "agent.trace=foo",
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "agent.trace=.",
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "agent.trace=,",
-                tracing: false,
+                contents: "agent.trace=disabled",
+                tracing: tracer::TraceType::Disabled,
                 ..Default::default()
             },
             TestData {
                 contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING="],
-                tracing: false,
+                env_vars: vec!["KATA_AGENT_TRACE_TYPE=isolated"],
+                tracing: tracer::TraceType::Isolated,
                 ..Default::default()
             },
             TestData {
                 contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING=''"],
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING=0"],
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING=."],
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING=,"],
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING=foo"],
-                tracing: false,
-                ..Default::default()
-            },
-            TestData {
-                contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING=1"],
-                tracing: true,
-                ..Default::default()
-            },
-            TestData {
-                contents: "",
-                env_vars: vec!["KATA_AGENT_TRACING=true"],
-                tracing: true,
+                env_vars: vec!["KATA_AGENT_TRACE_TYPE=disabled"],
+                tracing: tracer::TraceType::Disabled,
                 ..Default::default()
             },
         ];
 
         let dir = tempdir().expect("failed to create tmpdir");
+
+        // First, check a missing file is handled
+        let file_path = dir.path().join("enoent");
+
+        let filename = file_path.to_str().expect("failed to create filename");
+
+        let mut config = AgentConfig::new();
+        let result = config.parse_cmdline(&filename.to_owned());
+        assert!(result.is_err());
 
         // Now, test various combinations of file contents and environment
         // variables.
@@ -882,8 +753,22 @@ mod tests {
                 vars_to_unset.push(name);
             }
 
-            let config =
-                AgentConfig::from_cmdline(filename, vec![]).expect("Failed to parse command line");
+            let mut config = AgentConfig::new();
+            assert!(!config.debug_console, "{}", msg);
+            assert!(!config.dev_mode, "{}", msg);
+            assert!(!config.unified_cgroup_hierarchy, "{}", msg);
+            assert_eq!(
+                config.hotplug_timeout,
+                time::Duration::from_secs(3),
+                "{}",
+                msg
+            );
+            assert_eq!(config.container_pipe_size, 0, "{}", msg);
+            assert_eq!(config.server_addr, TEST_SERVER_ADDR, "{}", msg);
+            assert_eq!(config.tracing, tracer::TraceType::Disabled, "{}", msg);
+
+            let result = config.parse_cmdline(filename);
+            assert!(result.is_ok(), "{}", msg);
 
             assert_eq!(d.debug_console, config.debug_console, "{}", msg);
             assert_eq!(d.dev_mode, config.dev_mode, "{}", msg);
@@ -902,40 +787,6 @@ mod tests {
                 env::remove_var(v);
             }
         }
-    }
-
-    #[test]
-    fn test_from_cmdline_with_args_overwrites() {
-        let expected = AgentConfig {
-            dev_mode: true,
-            server_addr: "unix://@/tmp/foo.socket".to_string(),
-            ..Default::default()
-        };
-
-        let example_config_file_contents =
-            "dev_mode = true\nserver_addr = 'unix://@/tmp/foo.socket'";
-        let dir = tempdir().expect("failed to create tmpdir");
-        let file_path = dir.path().join("config.toml");
-        let filename = file_path.to_str().expect("failed to create filename");
-        let mut file = File::create(filename).unwrap_or_else(|_| panic!("failed to create file"));
-        file.write_all(example_config_file_contents.as_bytes())
-            .unwrap_or_else(|_| panic!("failed to write file contents"));
-
-        let config =
-            AgentConfig::from_cmdline("", vec!["--config".to_string(), filename.to_string()])
-                .expect("Failed to parse command line");
-
-        assert_eq!(expected.debug_console, config.debug_console);
-        assert_eq!(expected.dev_mode, config.dev_mode);
-        assert_eq!(
-            expected.unified_cgroup_hierarchy,
-            config.unified_cgroup_hierarchy,
-        );
-        assert_eq!(expected.log_level, config.log_level);
-        assert_eq!(expected.hotplug_timeout, config.hotplug_timeout);
-        assert_eq!(expected.container_pipe_size, config.container_pipe_size);
-        assert_eq!(expected.server_addr, config.server_addr);
-        assert_eq!(expected.tracing, config.tracing);
     }
 
     #[test]
@@ -1369,33 +1220,60 @@ Caused by:
     }
 
     #[test]
-    fn test_config_builder_from_string() {
-        let config = AgentConfig::from_str(
-            r#"
-               dev_mode = true
-               server_addr = 'vsock://8:2048'
+    fn test_get_trace_type() {
+        #[derive(Debug)]
+        struct TestData<'a> {
+            param: &'a str,
+            result: Result<tracer::TraceType>,
+        }
 
-               [endpoints]
-               allowed = ["CreateContainer", "StartContainer"]
-              "#,
-        )
-        .unwrap();
+        let tests = &[
+            TestData {
+                param: "",
+                result: Err(anyhow!(ERR_INVALID_TRACE_TYPE_PARAM)),
+            },
+            TestData {
+                param: "agent.tracer",
+                result: Err(anyhow!(ERR_INVALID_TRACE_TYPE_KEY)),
+            },
+            TestData {
+                param: "agent.trac",
+                result: Err(anyhow!(ERR_INVALID_TRACE_TYPE_KEY)),
+            },
+            TestData {
+                param: "agent.trace=",
+                result: Err(anyhow!(ERR_INVALID_TRACE_TYPE)),
+            },
+            TestData {
+                param: "agent.trace==",
+                result: Err(anyhow!(ERR_INVALID_TRACE_TYPE)),
+            },
+            TestData {
+                param: "agent.trace=foo",
+                result: Err(anyhow!(ERR_INVALID_TRACE_TYPE)),
+            },
+            TestData {
+                param: "agent.trace",
+                result: Ok(tracer::TraceType::Isolated),
+            },
+            TestData {
+                param: "agent.trace=isolated",
+                result: Ok(tracer::TraceType::Isolated),
+            },
+            TestData {
+                param: "agent.trace=disabled",
+                result: Ok(tracer::TraceType::Disabled),
+            },
+        ];
 
-        // Verify that the all_allowed flag is false
-        assert!(!config.endpoints.all_allowed);
+        for (i, d) in tests.iter().enumerate() {
+            let msg = format!("test[{}]: {:?}", i, d);
 
-        // Verify that the override worked
-        assert!(config.dev_mode);
-        assert_eq!(config.server_addr, "vsock://8:2048");
-        assert_eq!(
-            config.endpoints.allowed,
-            vec!["CreateContainer".to_string(), "StartContainer".to_string()]
-                .iter()
-                .cloned()
-                .collect()
-        );
+            let result = get_trace_type(d.param);
 
-        // Verify that the default values are valid
-        assert_eq!(config.hotplug_timeout, DEFAULT_HOTPLUG_TIMEOUT);
+            let msg = format!("{}: result: {:?}", msg, result);
+
+            assert_result!(d.result, result, msg);
+        }
     }
 }

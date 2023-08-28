@@ -15,9 +15,8 @@ import (
 	"testing"
 
 	ktu "github.com/kata-containers/kata-containers/src/runtime/pkg/katatestutils"
-	resCtrl "github.com/kata-containers/kata-containers/src/runtime/pkg/resourcecontrol"
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/fs"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/annotations"
+	vccgroups "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/cgroups"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/mock"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/rootless"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
@@ -49,7 +48,7 @@ func newEmptySpec() *specs.Spec {
 	return &specs.Spec{
 		Linux: &specs.Linux{
 			Resources:   &specs.LinuxResources{},
-			CgroupsPath: resCtrl.DefaultResourceControllerID,
+			CgroupsPath: vccgroups.DefaultCgroupPath,
 		},
 		Process: &specs.Process{
 			Capabilities: &specs.LinuxCapabilities{},
@@ -77,7 +76,7 @@ func newBasicTestCmd() types.Cmd {
 func newTestSandboxConfigNoop() SandboxConfig {
 	bundlePath := filepath.Join(testDir, testBundle)
 	containerAnnotations[annotations.BundlePathKey] = bundlePath
-	containerAnnotations[annotations.ContainerTypeKey] = "pod_sandbox"
+	// containerAnnotations["com.github.containers.virtcontainers.pkg.oci.container_type"] = "pod_sandbox"
 
 	emptySpec := newEmptySpec()
 
@@ -131,16 +130,8 @@ func newTestSandboxConfigKataAgent() SandboxConfig {
 }
 
 func TestCreateSandboxNoopAgentSuccessful(t *testing.T) {
-	assert := assert.New(t)
-	if tc.NotValid(ktu.NeedRoot()) {
-		t.Skip(testDisabledAsNonRoot)
-	}
 	defer cleanUp()
-
-	// Pre-create the directory path to avoid panic error. Without this change, ff the test is run as a non-root user,
-	// this test will fail because of permission denied error in chown syscall in the utils.MkdirAllWithInheritedOwner() method
-	err := os.MkdirAll(fs.MockRunStoragePath(), DirMode)
-	assert.NoError(err)
+	assert := assert.New(t)
 
 	config := newTestSandboxConfigNoop()
 
@@ -170,10 +161,10 @@ func TestCreateSandboxKataAgentSuccessful(t *testing.T) {
 
 	url, err := mock.GenerateKataMockHybridVSock()
 	assert.NoError(err)
-	defer mock.RemoveKataMockHybridVSock(url)
+	MockHybridVSockPath = url
 
 	hybridVSockTTRPCMock := mock.HybridVSockTTRPCMock{}
-	err = hybridVSockTTRPCMock.Start(url)
+	err = hybridVSockTTRPCMock.Start(fmt.Sprintf("mock://%s", url))
 	assert.NoError(err)
 	defer hybridVSockTTRPCMock.Stop()
 
@@ -190,9 +181,6 @@ func TestCreateSandboxKataAgentSuccessful(t *testing.T) {
 }
 
 func TestCreateSandboxFailing(t *testing.T) {
-	if tc.NotValid(ktu.NeedRoot()) {
-		t.Skip(testDisabledAsNonRoot)
-	}
 	defer cleanUp()
 	assert := assert.New(t)
 
@@ -252,9 +240,6 @@ func createAndStartSandbox(ctx context.Context, config SandboxConfig) (sandbox V
 }
 
 func TestReleaseSandbox(t *testing.T) {
-	if tc.NotValid(ktu.NeedRoot()) {
-		t.Skip(testDisabledAsNonRoot)
-	}
 	defer cleanUp()
 
 	config := newTestSandboxConfigNoop()
@@ -269,10 +254,6 @@ func TestReleaseSandbox(t *testing.T) {
 }
 
 func TestCleanupContainer(t *testing.T) {
-	if tc.NotValid(ktu.NeedRoot()) {
-		t.Skip(testDisabledAsNonRoot)
-	}
-
 	config := newTestSandboxConfigNoop()
 	assert := assert.New(t)
 

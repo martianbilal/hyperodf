@@ -28,9 +28,8 @@ package ethtool
 import (
 	"math"
 	"reflect"
+	"syscall"
 	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 type EthtoolCmd struct { /* ethtool.c: struct ethtool_cmd */
@@ -122,10 +121,10 @@ func (e *Ethtool) CmdGet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 		ifr_data: uintptr(unsafe.Pointer(ecmd)),
 	}
 
-	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
 		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
-		return 0, ep
+		return 0, syscall.Errno(ep)
 	}
 
 	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
@@ -150,10 +149,10 @@ func (e *Ethtool) CmdSet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 		ifr_data: uintptr(unsafe.Pointer(ecmd)),
 	}
 
-	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
 		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
-		return 0, unix.Errno(ep)
+		return 0, syscall.Errno(ep)
 	}
 
 	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
@@ -179,10 +178,10 @@ func (e *Ethtool) CmdGetMapped(intf string) (map[string]uint64, error) {
 		ifr_data: uintptr(unsafe.Pointer(&ecmd)),
 	}
 
-	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
 		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
-		return nil, ep
+		return nil, syscall.Errno(ep)
 	}
 
 	var result = make(map[string]uint64)

@@ -7,8 +7,8 @@ package virtcontainers
 
 import (
 	"context"
+	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
@@ -18,7 +18,9 @@ import (
 func TestNewVM(t *testing.T) {
 	assert := assert.New(t)
 
-	testDir := t.TempDir()
+	testDir, err := ioutil.TempDir("", "vmfactory-tmp-")
+	assert.Nil(err)
+	defer os.RemoveAll(testDir)
 
 	config := VMConfig{
 		HypervisorType: MockHypervisor,
@@ -31,7 +33,7 @@ func TestNewVM(t *testing.T) {
 	ctx := WithNewAgentFunc(context.Background(), newMockAgent)
 
 	var vm *VM
-	_, err := NewVM(ctx, config)
+	_, err = NewVM(ctx, config)
 	assert.Error(err)
 
 	config.HypervisorConfig = hyperConfig
@@ -57,18 +59,6 @@ func TestNewVM(t *testing.T) {
 	assert.Nil(err)
 	err = vm.OnlineCPUMemory(context.Background())
 	assert.Nil(err)
-
-	// mock urandom device
-	savedUrandomDev := urandomDev
-	defer func() {
-		urandomDev = savedUrandomDev
-	}()
-	tmpdir := t.TempDir()
-	urandomDev = filepath.Join(tmpdir, "urandom")
-	data := make([]byte, 512)
-	err = os.WriteFile(urandomDev, data, os.FileMode(0640))
-	assert.NoError(err)
-
 	err = vm.ReseedRNG(context.Background())
 	assert.Nil(err)
 
@@ -94,7 +84,9 @@ func TestVMConfigValid(t *testing.T) {
 	err := config.Valid()
 	assert.Error(err)
 
-	testDir := t.TempDir()
+	testDir, err := ioutil.TempDir("", "vmfactory-tmp-")
+	assert.Nil(err)
+	defer os.RemoveAll(testDir)
 
 	config.HypervisorConfig = HypervisorConfig{
 		KernelPath: testDir,
@@ -115,6 +107,8 @@ func TestVMConfigGrpc(t *testing.T) {
 			Trace:              false,
 			EnableDebugConsole: false,
 			ContainerPipeSize:  0,
+			TraceMode:          "",
+			TraceType:          "",
 			KernelModules:      []string{}},
 	}
 

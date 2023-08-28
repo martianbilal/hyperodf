@@ -231,11 +231,11 @@ $ cp ${GOPATH}/${LINUX_VER}/vmlinux ${KATA_KERNEL_LOCATION}/${KATA_KERNEL_NAME}
 These instructions build upon the OS builder instructions located in the 
 [Developer Guide](../Developer-Guide.md). At this point it is recommended that
 [Docker](https://docs.docker.com/engine/install/ubuntu/) is installed first, and
-then [Kata-deploy](../../tools/packaging/kata-deploy)
+then [Kata-deploy](https://github.com/kata-containers/kata-containers/tree/main/tools/packaging/kata-deploy)
 is use to install Kata. This will make sure that the correct `agent` version 
 is installed into the rootfs in the steps below.
 
-The following instructions use Ubuntu as the root filesystem with systemd as 
+The following instructions use Debian as the root filesystem with systemd as 
 the init and will add in the `kmod` binary, which is not a standard binary in 
 a Kata rootfs image. The `kmod` binary is necessary to load the Intel® QAT 
 kernel modules when the virtual machine rootfs boots. 
@@ -257,7 +257,7 @@ $ cd $GOPATH
 $ export AGENT_VERSION=$(kata-runtime version | head -n 1 | grep -o "[0-9.]\+")
 $ cd ${OSBUILDER}/rootfs-builder
 $ sudo rm -rf ${ROOTFS_DIR}
-$ script -fec 'sudo -E GOPATH=$GOPATH USE_DOCKER=true SECCOMP=no ./rootfs.sh ubuntu'
+$ script -fec 'sudo -E GOPATH=$GOPATH USE_DOCKER=true SECCOMP=no ./rootfs.sh debian'
 ```
 
 ### Compile Intel® QAT drivers for Kata Containers kernel and add to Kata Containers rootfs
@@ -312,7 +312,7 @@ working properly with the Kata Containers VM.
 
 ### Build OpenSSL Intel® QAT engine container
 
-Use the OpenSSL Intel® QAT [Dockerfile](https://github.com/intel/intel-device-plugins-for-kubernetes/tree/main/demo/openssl-qat-engine) 
+Use the OpenSSL Intel® QAT [Dockerfile](https://github.com/intel/intel-device-plugins-for-kubernetes/tree/master/demo/openssl-qat-engine) 
 to build a container image with an optimized OpenSSL engine for 
 Intel® QAT. Using `docker build` with the Kata Containers runtime can sometimes
 have issues. Therefore, make sure that `runc` is the default Docker container 
@@ -355,10 +355,10 @@ this small script so that it redirects to be able to use either QEMU or
 Cloud Hypervisor with Kata.
 
 ```bash
-$ echo '#!/usr/bin/env bash' | sudo tee /usr/local/bin/containerd-shim-kata-qemu-v2
+$ echo '#!/bin/bash' | sudo tee /usr/local/bin/containerd-shim-kata-qemu-v2
 $ echo 'KATA_CONF_FILE=/opt/kata/share/defaults/kata-containers/configuration-qemu.toml /opt/kata/bin/containerd-shim-kata-v2 $@' | sudo tee -a /usr/local/bin/containerd-shim-kata-qemu-v2
 $ sudo chmod +x /usr/local/bin/containerd-shim-kata-qemu-v2
-$ echo '#!/usr/bin/env bash' | sudo tee /usr/local/bin/containerd-shim-kata-clh-v2
+$ echo '#!/bin/bash' | sudo tee /usr/local/bin/containerd-shim-kata-clh-v2
 $ echo 'KATA_CONF_FILE=/opt/kata/share/defaults/kata-containers/configuration-clh.toml /opt/kata/bin/containerd-shim-kata-v2 $@' | sudo tee -a /usr/local/bin/containerd-shim-kata-clh-v2
 $ sudo chmod +x /usr/local/bin/containerd-shim-kata-clh-v2
 ```
@@ -419,11 +419,11 @@ You might need to disable Docker before initializing Kubernetes. Be aware
 that the OpenSSL container image built above will need to be exported from
 Docker and imported into containerd.
 
-If Kata is installed through [`kata-deploy`](../../tools/packaging/kata-deploy/README.md)
+If Kata is installed through [`kata-deploy`](https://github.com/kata-containers/kata-containers/blob/stable-2.0/tools/packaging/kata-deploy/README.md)
 there will be multiple `configuration.toml` files associated with different 
 hypervisors. Rather than add in the custom Kata kernel, Kata rootfs, and 
 kernel modules to each `configuration.toml` as the default, instead use
-[annotations](../how-to/how-to-load-kernel-modules-with-kata.md)
+[annotations](https://github.com/kata-containers/kata-containers/blob/stable-2.0/docs/how-to/how-to-load-kernel-modules-with-kata.md)
 in the Kubernetes YAML file to tell Kata which kernel and rootfs to use. The 
 easy way to do this is to use `kata-deploy` which will install the Kata binaries
 to `/opt` and properly configure the `/etc/containerd/config.toml` with annotation 
@@ -444,7 +444,7 @@ $ sudo docker save -o openssl-qat-engine.tar openssl-qat-engine:latest
 $ sudo ctr -n=k8s.io images import openssl-qat-engine.tar
 ```
 
-The [Intel® QAT Plugin](https://github.com/intel/intel-device-plugins-for-kubernetes/blob/main/cmd/qat_plugin/README.md)
+The [Intel® QAT Plugin](https://github.com/intel/intel-device-plugins-for-kubernetes/blob/master/cmd/qat_plugin/README.md)
 needs to be started so that the virtual functions can be discovered and
 used by Kubernetes. 
 

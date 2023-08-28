@@ -50,15 +50,9 @@ type SandboxState struct {
 
 	State StateString `json:"state"`
 
-	// SandboxCgroupPath is the cgroup path for all the sandbox processes,
-	// when sandbox_cgroup_only is set. When it's not set, part of those
-	// processes will be living under the overhead cgroup.
-	SandboxCgroupPath string `json:"sandboxCgroupPath,omitempty"`
-
-	// OverheadCgroupPath is the path to the optional overhead cgroup
-	// path holding processes that should not be part of the sandbox
-	// cgroup.
-	OverheadCgroupPath string `json:"overheadCgroupPath,omitempty"`
+	// CgroupPath is the cgroup hierarchy where sandbox's processes
+	// including the hypervisor are placed.
+	CgroupPath string `json:"cgroupPath,omitempty"`
 
 	// PersistVersion indicates current storage api version.
 	// It's also known as ABI version of kata-runtime.
@@ -314,6 +308,7 @@ type Cmd struct {
 	User         string
 	PrimaryGroup string
 	WorkDir      string
+	Console      string
 
 	Args                []string
 	Envs                []EnvVar

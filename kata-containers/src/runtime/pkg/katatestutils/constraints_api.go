@@ -9,6 +9,7 @@ package katatestutils
 
 import (
 	"os"
+	"strings"
 )
 
 // Operator represents an operator to apply to a test constraint value.
@@ -26,6 +27,13 @@ const (
 // Constraints encapsulates all information about a test constraint.
 type Constraints struct {
 	Issue string
+
+	// DistroName is the name of a distro in all lower-case letters.
+	DistroName string
+
+	// DistroVersion is the version of the particular distro in string
+	// format. It may contain periods and dashes.
+	DistroVersion string
 
 	// KernelVersion is the version of a particular kernel.
 	KernelVersion string
@@ -46,6 +54,8 @@ type Constraint func(c *Constraints)
 
 // TestConstraint records details about test constraints.
 type TestConstraint struct {
+	DistroName    string
+	DistroVersion string
 	KernelVersion string
 
 	// Optionally used to record an issue number that relates to the
@@ -66,6 +76,11 @@ type TestConstraint struct {
 // NewKataTest creates a new TestConstraint object and is the main interface
 // to the test constraints feature.
 func NewTestConstraint(debug bool) TestConstraint {
+	distroName, distroVersion, err := getDistroDetails()
+	if err != nil {
+		panic(err)
+	}
+
 	kernelVersion, err := getKernelVersion()
 	if err != nil {
 		panic(err)
@@ -75,6 +90,8 @@ func NewTestConstraint(debug bool) TestConstraint {
 		Debug: debug,
 
 		ActualEUID:    os.Geteuid(),
+		DistroName:    distroName,
+		DistroVersion: distroVersion,
 		KernelVersion: kernelVersion,
 	}
 }
@@ -85,7 +102,7 @@ func NewTestConstraint(debug bool) TestConstraint {
 // Notes:
 //
 // - Constraints are applied in the order specified.
-// - A constraint type (user, kernel) can only be specified once.
+// - A constraint type (user, distro) can only be specified once.
 // - If the function fails to determine whether it can check the constraints,
 //   it will panic. Since this is facility is used for testing, this seems like
 //   the best approach as it unburdens the caller from checking for an error
@@ -129,7 +146,99 @@ func NeedNonRoot() Constraint {
 	return NeedUID(0, neOperator)
 }
 
-// NeedKernelVersionWithOp skips the test unless the kernel version constraint
+// NeedDistroWithOp skips the test unless the distro constraint specified by
+// the arguments is true.
+func NeedDistroWithOp(distro string, op Operator) Constraint {
+	return func(c *Constraints) {
+		c.DistroName = strings.ToLower(distro)
+		c.Operator = op
+	}
+}
+
+// NeedDistroEquals will skip the test unless running on the specified distro.
+func NeedDistroEquals(distro string) Constraint {
+	return NeedDistroWithOp(distro, eqOperator)
+}
+
+// NeedDistroNotEquals will skip the test unless run a distro that does not
+// match the specified name.
+func NeedDistroNotEquals(distro string) Constraint {
+	return NeedDistroWithOp(distro, neOperator)
+}
+
+// NeedDistro will skip the test unless running on the specified distro.
+func NeedDistro(distro string) Constraint {
+	return NeedDistroEquals(distro)
+}
+
+// NeedDistroVersionWithOp skips the test unless the distro version constraint
+// specified by the arguments is true.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersionWithOp(version string, op Operator) Constraint {
+	return func(c *Constraints) {
+		c.DistroVersion = version
+		c.Operator = op
+	}
+}
+
+// NeedDistroVersionEquals will skip the test unless the distro version is the
+// same as the specified version.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersionEquals(version string) Constraint {
+	return NeedDistroVersionWithOp(version, eqOperator)
+}
+
+// NeedDistroVersionNotEquals will skip the test unless the distro version is
+// different to the specified version.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersionNotEquals(version string) Constraint {
+	return NeedDistroVersionWithOp(version, neOperator)
+}
+
+// NeedDistroVersionLE will skip the test unless the distro version is older
+// than or the same as the specified version.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersionLE(version string) Constraint {
+	return NeedDistroVersionWithOp(version, leOperator)
+}
+
+// NeedDistroVersionLT will skip the test unless the distro version is older
+// than the specified version.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersionLT(version string) Constraint {
+	return NeedDistroVersionWithOp(version, ltOperator)
+}
+
+// NeedDistroVersionGE will skip the test unless the distro version is newer
+// than or the same as the specified version.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersionGE(version string) Constraint {
+	return NeedDistroVersionWithOp(version, geOperator)
+}
+
+// NeedDistroVersionGT will skip the test unless the distro version is newer
+// than the specified version.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersionGT(version string) Constraint {
+	return NeedDistroVersionWithOp(version, gtOperator)
+}
+
+// NeedDistroVersion will skip the test unless running on the specified
+// (exact) version of some distro.
+//
+// Note: distro versions vary in format.
+func NeedDistroVersion(version string) Constraint {
+	return NeedDistroVersionEquals(version)
+}
+
+// NeedKernelVersionWithOp skips the test unless the distro version constraint
 // specified by the arguments is true.
 func NeedKernelVersionWithOp(version string, op Operator) Constraint {
 	return func(c *Constraints) {
@@ -138,44 +247,54 @@ func NeedKernelVersionWithOp(version string, op Operator) Constraint {
 	}
 }
 
-// NeedKernelVersionEquals will skip the test unless the kernel version is same as
-// the specified version.
+// NeedKernelVersionLT will skip the test unless the distro version is older
+// than the specified version.
 func NeedKernelVersionEquals(version string) Constraint {
 	return NeedKernelVersionWithOp(version, eqOperator)
 }
 
-// NeedKernelVersionNotEquals will skip the test unless the kernel version is
+// NeedKernelVersionNotEquals will skip the test unless the distro version is
 // different to the specified version.
 func NeedKernelVersionNotEquals(version string) Constraint {
 	return NeedKernelVersionWithOp(version, neOperator)
 }
 
-// NeedKernelVersionLT will skip the test unless the kernel version is older
+// NeedKernelVersionLT will skip the test unless the distro version is older
 // than the specified version.
+//
+// Note: distro versions vary in format.
 func NeedKernelVersionLT(version string) Constraint {
 	return NeedKernelVersionWithOp(version, ltOperator)
 }
 
-// NeedKernelVersionLE will skip the test unless the kernel version is older
+// NeedKernelVersionLE will skip the test unless the distro version is older
 // than or the same as the specified version.
+//
+// Note: distro versions vary in format.
 func NeedKernelVersionLE(version string) Constraint {
 	return NeedKernelVersionWithOp(version, leOperator)
 }
 
-// NeedKernelVersionGT will skip the test unless the kernel version is newer
+// NeedKernelVersionGT will skip the test unless the distro version is newer
 // than the specified version.
+//
+// Note: distro versions vary in format.
 func NeedKernelVersionGT(version string) Constraint {
 	return NeedKernelVersionWithOp(version, gtOperator)
 }
 
-// NeedKernelVersionGE will skip the test unless the kernel version is newer
+// NeedKernelVersionGE will skip the test unless the distro version is newer
 // than or the same as the specified version.
+//
+// Note: distro versions vary in format.
 func NeedKernelVersionGE(version string) Constraint {
 	return NeedKernelVersionWithOp(version, geOperator)
 }
 
-// NeedKernelVersion will skip the test unless the kernel version is same as
-// the specified version.
+// NeedKernelVersion will skip the test unless running on the specified
+// (exact) version of some distro.
+//
+// Note: distro versions vary in format.
 func NeedKernelVersion(version string) Constraint {
 	return NeedKernelVersionEquals(version)
 }

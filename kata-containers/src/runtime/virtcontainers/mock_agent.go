@@ -12,6 +12,7 @@ import (
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
 	pbTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols/grpc"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
@@ -172,11 +173,11 @@ func (n *mockAgent) resumeContainer(ctx context.Context, sandbox *Sandbox, c Con
 }
 
 // configure is the Noop agent configuration implementation. It does nothing.
-func (n *mockAgent) configure(ctx context.Context, h Hypervisor, id, sharePath string, config KataAgentConfig) error {
+func (n *mockAgent) configure(ctx context.Context, h hypervisor, id, sharePath string, config KataAgentConfig) error {
 	return nil
 }
 
-func (n *mockAgent) configureFromGrpc(ctx context.Context, h Hypervisor, id string, config KataAgentConfig) error {
+func (n *mockAgent) configureFromGrpc(ctx context.Context, h hypervisor, id string, config KataAgentConfig) error {
 	return nil
 }
 
@@ -216,14 +217,14 @@ func (n *mockAgent) copyFile(ctx context.Context, src, dst string) error {
 }
 
 // addSwap is the Noop agent setup swap. It does nothing.
-func (n *mockAgent) addSwap(ctx context.Context, PCIPath types.PciPath) error {
+func (n *mockAgent) addSwap(ctx context.Context, PCIPath vcTypes.PciPath) error {
 	return nil
 }
 
 func (n *mockAgent) markDead(ctx context.Context) {
 }
 
-func (n *mockAgent) cleanup(ctx context.Context) {
+func (n *mockAgent) cleanup(ctx context.Context, s *Sandbox) {
 }
 
 // save is the Noop agent state saver. It does nothing.
@@ -240,20 +241,4 @@ func (n *mockAgent) getOOMEvent(ctx context.Context) (string, error) {
 
 func (n *mockAgent) getAgentMetrics(ctx context.Context, req *grpc.GetMetricsRequest) (*grpc.Metrics, error) {
 	return nil, nil
-}
-
-func (n *mockAgent) getGuestVolumeStats(ctx context.Context, volumeGuestPath string) ([]byte, error) {
-	return nil, nil
-}
-
-func (n *mockAgent) resizeGuestVolume(ctx context.Context, volumeGuestPath string, size uint64) error {
-	return nil
-}
-
-func (k *mockAgent) getIPTables(ctx context.Context, isIPv6 bool) ([]byte, error) {
-	return nil, nil
-}
-
-func (k *mockAgent) setIPTables(ctx context.Context, isIPv6 bool, data []byte) error {
-	return nil
 }

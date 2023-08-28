@@ -53,7 +53,7 @@ source "${project_dir}/scripts/lib.sh"
 
 usage()
 {
-	cat <<EOF
+	cat <<EOT
 Usage: $script_name [options] [command | <distro>]
 
 Options:
@@ -72,7 +72,7 @@ Otherwise, tests are run on all distros.
 $(basename ${test_config}) includes a list of distros to exclude from testing,
 depending on the detected test environment. However, when a <distro> is specified,
 distro exclusion based on $(basename ${test_config}) is not enforced.
-EOF
+EOT
 }
 
 # Add an entry to the specified stats file
@@ -640,6 +640,8 @@ test_dracut()
 		die "Could not detect the required Go version for AGENT_VERSION='${AGENT_VERSION:-master}'."
 	detect_rust_version ||
 		die "Could not detect the required rust version for AGENT_VERSION='${AGENT_VERSION:-master}'."
+	detect_musl_version ||
+		die "Could not detect the required musl version for AGENT_VERSION='${AGENT_VERSION:-master}'."
 
 	generate_dockerfile ${dracut_dir}
 	info "Creating container for dracut"

@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // GetMachineConfigurationReader is a Reader for the GetMachineConfiguration structure.
@@ -23,12 +24,14 @@ type GetMachineConfigurationReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *GetMachineConfigurationReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 200:
 		result := NewGetMachineConfigurationOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	default:
 		result := NewGetMachineConfigurationDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -46,7 +49,7 @@ func NewGetMachineConfigurationOK() *GetMachineConfigurationOK {
 	return &GetMachineConfigurationOK{}
 }
 
-/* GetMachineConfigurationOK describes a response with status code 200, with default header values.
+/*GetMachineConfigurationOK handles this case with default header values.
 
 OK
 */
@@ -56,9 +59,6 @@ type GetMachineConfigurationOK struct {
 
 func (o *GetMachineConfigurationOK) Error() string {
 	return fmt.Sprintf("[GET /machine-config][%d] getMachineConfigurationOK  %+v", 200, o.Payload)
-}
-func (o *GetMachineConfigurationOK) GetPayload() *models.MachineConfiguration {
-	return o.Payload
 }
 
 func (o *GetMachineConfigurationOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -80,7 +80,7 @@ func NewGetMachineConfigurationDefault(code int) *GetMachineConfigurationDefault
 	}
 }
 
-/* GetMachineConfigurationDefault describes a response with status code -1, with default header values.
+/*GetMachineConfigurationDefault handles this case with default header values.
 
 Internal server error
 */
@@ -97,9 +97,6 @@ func (o *GetMachineConfigurationDefault) Code() int {
 
 func (o *GetMachineConfigurationDefault) Error() string {
 	return fmt.Sprintf("[GET /machine-config][%d] getMachineConfiguration default  %+v", o._statusCode, o.Payload)
-}
-func (o *GetMachineConfigurationDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *GetMachineConfigurationDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

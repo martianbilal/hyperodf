@@ -30,7 +30,10 @@ func setHugeTlb(dirPath string, r *configs.Resources) error {
 }
 
 func statHugeTlb(dirPath string, stats *cgroups.Stats) error {
-	hugePageSizes, _ := cgroups.GetHugePageSize()
+	hugePageSizes, err := cgroups.GetHugePageSize()
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch hugetlb info")
+	}
 	hugetlbStats := cgroups.HugetlbStats{}
 
 	for _, pagesize := range hugePageSizes {

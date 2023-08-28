@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // PutGuestDriveByIDReader is a Reader for the PutGuestDriveByID structure.
@@ -23,18 +24,21 @@ type PutGuestDriveByIDReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *PutGuestDriveByIDReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewPutGuestDriveByIDNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewPutGuestDriveByIDBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewPutGuestDriveByIDDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewPutGuestDriveByIDNoContent() *PutGuestDriveByIDNoContent {
 	return &PutGuestDriveByIDNoContent{}
 }
 
-/* PutGuestDriveByIDNoContent describes a response with status code 204, with default header values.
+/*PutGuestDriveByIDNoContent handles this case with default header values.
 
 Drive created/updated
 */
@@ -73,7 +77,7 @@ func NewPutGuestDriveByIDBadRequest() *PutGuestDriveByIDBadRequest {
 	return &PutGuestDriveByIDBadRequest{}
 }
 
-/* PutGuestDriveByIDBadRequest describes a response with status code 400, with default header values.
+/*PutGuestDriveByIDBadRequest handles this case with default header values.
 
 Drive cannot be created/updated due to bad input
 */
@@ -83,9 +87,6 @@ type PutGuestDriveByIDBadRequest struct {
 
 func (o *PutGuestDriveByIDBadRequest) Error() string {
 	return fmt.Sprintf("[PUT /drives/{drive_id}][%d] putGuestDriveByIdBadRequest  %+v", 400, o.Payload)
-}
-func (o *PutGuestDriveByIDBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PutGuestDriveByIDBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewPutGuestDriveByIDDefault(code int) *PutGuestDriveByIDDefault {
 	}
 }
 
-/* PutGuestDriveByIDDefault describes a response with status code -1, with default header values.
+/*PutGuestDriveByIDDefault handles this case with default header values.
 
 Internal server error.
 */
@@ -124,9 +125,6 @@ func (o *PutGuestDriveByIDDefault) Code() int {
 
 func (o *PutGuestDriveByIDDefault) Error() string {
 	return fmt.Sprintf("[PUT /drives/{drive_id}][%d] putGuestDriveByID default  %+v", o._statusCode, o.Payload)
-}
-func (o *PutGuestDriveByIDDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PutGuestDriveByIDDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

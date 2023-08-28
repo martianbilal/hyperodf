@@ -5,6 +5,7 @@ package systemd
 import (
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -306,10 +307,9 @@ func (m *unifiedManager) Destroy() error {
 		return err
 	}
 
-	// systemd 239 do not remove sub-cgroups.
-	err := cgroups.RemovePath(m.path)
-	// cgroups.RemovePath has handled ErrNotExist
-	if err != nil {
+	// XXX this is probably not needed, systemd should handle it
+	err := os.Remove(m.path)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 

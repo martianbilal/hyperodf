@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // PutGuestBootSourceReader is a Reader for the PutGuestBootSource structure.
@@ -23,18 +24,21 @@ type PutGuestBootSourceReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *PutGuestBootSourceReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewPutGuestBootSourceNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewPutGuestBootSourceBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewPutGuestBootSourceDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewPutGuestBootSourceNoContent() *PutGuestBootSourceNoContent {
 	return &PutGuestBootSourceNoContent{}
 }
 
-/* PutGuestBootSourceNoContent describes a response with status code 204, with default header values.
+/*PutGuestBootSourceNoContent handles this case with default header values.
 
 Boot source created/updated
 */
@@ -73,7 +77,7 @@ func NewPutGuestBootSourceBadRequest() *PutGuestBootSourceBadRequest {
 	return &PutGuestBootSourceBadRequest{}
 }
 
-/* PutGuestBootSourceBadRequest describes a response with status code 400, with default header values.
+/*PutGuestBootSourceBadRequest handles this case with default header values.
 
 Boot source cannot be created due to bad input
 */
@@ -83,9 +87,6 @@ type PutGuestBootSourceBadRequest struct {
 
 func (o *PutGuestBootSourceBadRequest) Error() string {
 	return fmt.Sprintf("[PUT /boot-source][%d] putGuestBootSourceBadRequest  %+v", 400, o.Payload)
-}
-func (o *PutGuestBootSourceBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PutGuestBootSourceBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewPutGuestBootSourceDefault(code int) *PutGuestBootSourceDefault {
 	}
 }
 
-/* PutGuestBootSourceDefault describes a response with status code -1, with default header values.
+/*PutGuestBootSourceDefault handles this case with default header values.
 
 Internal server error
 */
@@ -124,9 +125,6 @@ func (o *PutGuestBootSourceDefault) Code() int {
 
 func (o *PutGuestBootSourceDefault) Error() string {
 	return fmt.Sprintf("[PUT /boot-source][%d] putGuestBootSource default  %+v", o._statusCode, o.Payload)
-}
-func (o *PutGuestBootSourceDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PutGuestBootSourceDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

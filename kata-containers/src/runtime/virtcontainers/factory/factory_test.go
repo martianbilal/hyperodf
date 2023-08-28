@@ -7,11 +7,13 @@ package factory
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
 	vc "github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/factory/base"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/fs"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/mock"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 	"github.com/sirupsen/logrus"
@@ -38,10 +40,10 @@ func TestNewFactory(t *testing.T) {
 	_, err = NewFactory(ctx, config, false)
 	assert.Error(err)
 
-	testDir := t.TempDir()
+	defer fs.MockStorageDestroy()
 	config.VMConfig.HypervisorConfig = vc.HypervisorConfig{
-		KernelPath: testDir,
-		ImagePath:  testDir,
+		KernelPath: fs.MockStorageRootPath(),
+		ImagePath:  fs.MockStorageRootPath(),
 	}
 
 	// direct
@@ -59,16 +61,15 @@ func TestNewFactory(t *testing.T) {
 
 	url, err := mock.GenerateKataMockHybridVSock()
 	assert.NoError(err)
-	defer mock.RemoveKataMockHybridVSock(url)
 	vc.MockHybridVSockPath = url
 
 	hybridVSockTTRPCMock := mock.HybridVSockTTRPCMock{}
-	err = hybridVSockTTRPCMock.Start(url)
+	err = hybridVSockTTRPCMock.Start(fmt.Sprintf("mock://%s", url))
 	assert.NoError(err)
 	defer hybridVSockTTRPCMock.Stop()
 
 	config.Template = true
-	config.TemplatePath = testDir
+	config.TemplatePath = fs.MockStorageRootPath()
 	f, err = NewFactory(ctx, config, false)
 	assert.Nil(err)
 	f.CloseFactory(ctx)
@@ -133,7 +134,8 @@ func TestCheckVMConfig(t *testing.T) {
 	err = checkVMConfig(config1, config2)
 	assert.Nil(err)
 
-	testDir := t.TempDir()
+	testDir := fs.MockStorageRootPath()
+	defer fs.MockStorageDestroy()
 
 	config1.HypervisorConfig = vc.HypervisorConfig{
 		KernelPath: testDir,
@@ -153,7 +155,8 @@ func TestCheckVMConfig(t *testing.T) {
 func TestFactoryGetVM(t *testing.T) {
 	assert := assert.New(t)
 
-	testDir := t.TempDir()
+	testDir := fs.MockStorageRootPath()
+	defer fs.MockStorageDestroy()
 
 	hyperConfig := vc.HypervisorConfig{
 		KernelPath: testDir,
@@ -176,11 +179,10 @@ func TestFactoryGetVM(t *testing.T) {
 
 	url, err := mock.GenerateKataMockHybridVSock()
 	assert.NoError(err)
-	defer mock.RemoveKataMockHybridVSock(url)
 	vc.MockHybridVSockPath = url
 
 	hybridVSockTTRPCMock := mock.HybridVSockTTRPCMock{}
-	err = hybridVSockTTRPCMock.Start(url)
+	err = hybridVSockTTRPCMock.Start(fmt.Sprintf("mock://%s", url))
 	assert.NoError(err)
 	defer hybridVSockTTRPCMock.Stop()
 
@@ -261,6 +263,7 @@ func TestFactoryGetVM(t *testing.T) {
 	assert.Nil(err)
 
 	// checkConfig fall back
+	vmConfig.HypervisorConfig.Mlock = true
 	vm, err = f.GetVM(ctx, vmConfig)
 	assert.Nil(err)
 
@@ -318,7 +321,8 @@ func TestDeepCompare(t *testing.T) {
 	config.VMConfig = vc.VMConfig{
 		HypervisorType: vc.MockHypervisor,
 	}
-	testDir := t.TempDir()
+	testDir := fs.MockStorageRootPath()
+	defer fs.MockStorageDestroy()
 
 	config.VMConfig.HypervisorConfig = vc.HypervisorConfig{
 		KernelPath: testDir,

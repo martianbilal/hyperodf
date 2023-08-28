@@ -7,10 +7,7 @@ Name | Type | Description | Notes
 **BootVcpus** | **int32** |  | [default to 1]
 **MaxVcpus** | **int32** |  | [default to 1]
 **Topology** | Pointer to [**CpuTopology**](CpuTopology.md) |  | [optional] 
-**KvmHyperv** | Pointer to **bool** |  | [optional] [default to false]
 **MaxPhysBits** | Pointer to **int32** |  | [optional] 
-**Affinity** | Pointer to [**[]CpuAffinity**](CpuAffinity.md) |  | [optional] 
-**Features** | Pointer to [**CpuFeatures**](CpuFeatures.md) |  | [optional] 
 
 ## Methods
 
@@ -96,31 +93,6 @@ SetTopology sets Topology field to given value.
 
 HasTopology returns a boolean if a field has been set.
 
-### GetKvmHyperv
-
-`func (o *CpusConfig) GetKvmHyperv() bool`
-
-GetKvmHyperv returns the KvmHyperv field if non-nil, zero value otherwise.
-
-### GetKvmHypervOk
-
-`func (o *CpusConfig) GetKvmHypervOk() (*bool, bool)`
-
-GetKvmHypervOk returns a tuple with the KvmHyperv field if it's non-nil, zero value otherwise
-and a boolean to check if the value has been set.
-
-### SetKvmHyperv
-
-`func (o *CpusConfig) SetKvmHyperv(v bool)`
-
-SetKvmHyperv sets KvmHyperv field to given value.
-
-### HasKvmHyperv
-
-`func (o *CpusConfig) HasKvmHyperv() bool`
-
-HasKvmHyperv returns a boolean if a field has been set.
-
 ### GetMaxPhysBits
 
 `func (o *CpusConfig) GetMaxPhysBits() int32`
@@ -145,56 +117,6 @@ SetMaxPhysBits sets MaxPhysBits field to given value.
 `func (o *CpusConfig) HasMaxPhysBits() bool`
 
 HasMaxPhysBits returns a boolean if a field has been set.
-
-### GetAffinity
-
-`func (o *CpusConfig) GetAffinity() []CpuAffinity`
-
-GetAffinity returns the Affinity field if non-nil, zero value otherwise.
-
-### GetAffinityOk
-
-`func (o *CpusConfig) GetAffinityOk() (*[]CpuAffinity, bool)`
-
-GetAffinityOk returns a tuple with the Affinity field if it's non-nil, zero value otherwise
-and a boolean to check if the value has been set.
-
-### SetAffinity
-
-`func (o *CpusConfig) SetAffinity(v []CpuAffinity)`
-
-SetAffinity sets Affinity field to given value.
-
-### HasAffinity
-
-`func (o *CpusConfig) HasAffinity() bool`
-
-HasAffinity returns a boolean if a field has been set.
-
-### GetFeatures
-
-`func (o *CpusConfig) GetFeatures() CpuFeatures`
-
-GetFeatures returns the Features field if non-nil, zero value otherwise.
-
-### GetFeaturesOk
-
-`func (o *CpusConfig) GetFeaturesOk() (*CpuFeatures, bool)`
-
-GetFeaturesOk returns a tuple with the Features field if it's non-nil, zero value otherwise
-and a boolean to check if the value has been set.
-
-### SetFeatures
-
-`func (o *CpusConfig) SetFeatures(v CpuFeatures)`
-
-SetFeatures sets Features field to given value.
-
-### HasFeatures
-
-`func (o *CpusConfig) HasFeatures() bool`
-
-HasFeatures returns a boolean if a field has been set.
 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

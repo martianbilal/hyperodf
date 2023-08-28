@@ -3,7 +3,7 @@
 This document describes how to set up a single-machine Kubernetes (k8s) cluster.
 
 The Kubernetes cluster will use the
-[CRI containerd](https://github.com/containerd/containerd/) and
+[CRI containerd plugin](https://github.com/containerd/cri) and
 [Kata Containers](https://katacontainers.io) to launch untrusted workloads.
 
 ## Requirements
@@ -71,12 +71,12 @@ $ for service in ${services}; do
     service_dir="/etc/systemd/system/${service}.service.d/"
     sudo mkdir -p ${service_dir}
 
-    cat << EOF | sudo tee "${service_dir}/proxy.conf"
+    cat << EOT | sudo tee "${service_dir}/proxy.conf"
 [Service]
 Environment="HTTP_PROXY=${http_proxy}"
 Environment="HTTPS_PROXY=${https_proxy}"
 Environment="NO_PROXY=${no_proxy}"
-EOF
+EOT
 done
 
 $ sudo systemctl daemon-reload
@@ -154,7 +154,7 @@ From Kubernetes v1.12, users can use [`RuntimeClass`](https://kubernetes.io/docs
 
 ```bash
 $ cat > runtime.yaml <<EOF
-apiVersion: node.k8s.io/v1
+apiVersion: node.k8s.io/v1beta1
 kind: RuntimeClass
 metadata:
   name: kata
@@ -172,7 +172,7 @@ If a pod has the `runtimeClassName` set to `kata`, the CRI plugin runs the pod w
 - Create an pod configuration that using Kata Containers runtime
 
   ```bash
-  $ cat << EOF | tee nginx-kata.yaml
+  $ cat << EOT | tee nginx-kata.yaml
   apiVersion: v1
   kind: Pod
   metadata:
@@ -183,7 +183,7 @@ If a pod has the `runtimeClassName` set to `kata`, the CRI plugin runs the pod w
     - name: nginx
       image: nginx
       
-  EOF
+  EOT
   ```
 
 - Create the pod

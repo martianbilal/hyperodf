@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2018 Intel Corporation
 #
@@ -38,7 +38,7 @@ readonly GV_NVIDIA="nvidia"
 #Path to kernel directory
 kernel_path=""
 #Experimental kernel support. Pull from virtio-fs GitLab instead of kernel.org
-build_type=""
+experimental_kernel="false"
 #Force generate config when setup
 force_setup_generate_config="false"
 #GPU kernel support
@@ -53,8 +53,6 @@ hypervisor_target=""
 arch_target=""
 #
 kernel_config_path=""
-#
-skip_config_checks="false"
 # destdir
 DESTDIR="${DESTDIR:-/}"
 #PREFIX=
@@ -65,7 +63,7 @@ source "${packaging_scripts_dir}/lib.sh"
 
 usage() {
 	exit_code="$1"
-	cat <<EOF
+	cat <<EOT
 Overview:
 
 	Build a kernel for Kata Containers
@@ -85,21 +83,18 @@ Commands:
 Options:
 
 	-a <arch>   	: Arch target to build the kernel, such as aarch64/ppc64le/s390x/x86_64.
-	-b <type>    	: Enable optional config type.
 	-c <path>   	: Path to config file to build the kernel.
 	-d          	: Enable bash debug.
 	-e          	: Enable experimental kernel.
-	-E          	: Enable arch-specific experimental kernel, arch info offered by "-a".
 	-f          	: Enable force generate config when setup.
 	-g <vendor> 	: GPU vendor, intel or nvidia.
 	-h          	: Display this help.
 	-k <path>   	: Path to kernel to build.
 	-p <path>   	: Path to a directory with patches to apply to kernel.
-	-s          	: Skip .config checks
 	-t <hypervisor>	: Hypervisor_target.
 	-v <version>	: Kernel version to use if kernel path not provided.
-	-x <type>	: Confidential guest protection type, such as sev and tdx
-EOF
+	-x <type>	: Confidential guest protection type, such as sev
+EOT
 	exit "$exit_code"
 }
 
@@ -116,39 +111,6 @@ arch_to_kernel() {
 	esac
 }
 
-get_tdx_kernel() {
-	local version="${1}"
-	local kernel_path=${2}
-
-	mkdir -p ${kernel_path}
-
-	kernel_url=$(get_from_kata_deps "assets.kernel.tdx.url")
-	kernel_tarball="${version}.tar.gz"
-
-	if [ ! -f "${kernel_tarball}" ]; then
-	   curl --fail -OL "${kernel_url}/${kernel_tarball}"
-	fi
-
-	tar --strip-components=1 -xf ${kernel_tarball} -C ${kernel_path}
-}
-
-get_sev_kernel() {
-	local version="${1}"
-	local kernel_path=${2}
-
-	mkdir -p ${kernel_path}
-
-	kernel_url=$(get_from_kata_deps "assets.kernel.sev.url")
-	kernel_tarball="${version}.tar.gz"
-
-	if [ ! -f "${kernel_tarball}" ]; then
-	   curl --fail -OL "${kernel_url}${kernel_tarball}"
-	fi
-	
-	mkdir -p ${kernel_path}
-	tar --strip-components=1 -xf ${kernel_tarball} -C ${kernel_path}
-}
-
 get_kernel() {
 	local version="${1:-}"
 
@@ -156,13 +118,7 @@ get_kernel() {
 	[ -n "${kernel_path}" ] || die "kernel_path not provided"
 	[ ! -d "${kernel_path}" ] || die "kernel_path already exist"
 
-	if [ "${conf_guest}" == "tdx" ]; then
-		get_tdx_kernel ${version} ${kernel_path}
-		return
-	elif [ "${conf_guest}" == "sev" ]; then
-		get_sev_kernel ${version} ${kernel_path}
-		return
-	fi
+
 
 		#Remove extra 'v'
 		version=${version#v}
@@ -171,9 +127,8 @@ get_kernel() {
 		kernel_tarball="linux-${version}.tar.xz"
 
                 if [ ! -f sha256sums.asc ] || ! grep -q "${kernel_tarball}" sha256sums.asc; then
-                        shasum_url="https://cdn.kernel.org/pub/linux/kernel/v${major_version}.x/sha256sums.asc"
-                        info "Download kernel checksum file: sha256sums.asc from ${shasum_url}"
-                        curl --fail -OL "${shasum_url}"
+                        info "Download kernel checksum file: sha256sums.asc"
+                        curl --fail -OL "https://cdn.kernel.org/pub/linux/kernel/v${major_version}.x/sha256sums.asc"
                 fi
                 grep "${kernel_tarball}" sha256sums.asc >"${kernel_tarball}.sha256"
 
@@ -223,31 +178,25 @@ get_kernel_frag_path() {
 	# Exclude configs if they have !$arch tag in the header
 	local common_configs="$(grep "\!${arch}" ${common_path}/*.conf -L)"
 
-	local extra_configs=""
-	if [ "${build_type}" != "" ];then
-		local build_type_dir=$(readlink -m "${arch_path}/../build-type/${build_type}")
-		if [ ! -d "$build_type_dir" ]; then
-			die "No config fragments dir for ${build_type}: ${build_type_dir}"
-		fi
-		extra_configs=$(find "$build_type_dir" -name '*.conf')
-		if [ "${extra_configs}" == "" ];then
-			die "No extra configs found in ${build_type_dir}"
-		fi
+	local experimental_configs=""
+	local experimental_dir="${common_path}/experimental"
+	if [ -d "$experimental_dir" ]; then
+		experimental_configs=$(find "$experimental_dir" -name '*.conf')
 	fi
 
 	# These are the strings that the kernel merge_config.sh script kicks out
 	# when it reports an error or warning condition. We search for them in the
 	# output to try and fail when we think something has been misconfigured.
 	local not_in_string="not in final"
-	local redefined_string="redefined"
-	local redundant_string="redundant"
+	local redefined_string="not in final"
+	local redundant_string="not in final"
 
 	# Later, if we need to add kernel version specific subdirs in order to
 	# handle specific cases, then add the path definition and search/list/cat
 	# here.
 	local all_configs="${common_configs} ${arch_configs}"
-	if [[ ${build_type} != "" ]]; then
-		all_configs="${all_configs} ${extra_configs}"
+	if [[ ${experimental_kernel} == "true" ]]; then
+		all_configs="${all_configs} ${experimental_configs}"
 	fi
 
 	if [[ "${gpu_vendor}" != "" ]];then
@@ -276,8 +225,6 @@ get_kernel_frag_path() {
 	# Do not care about options that are in whitelist
 	results=$(grep -v -f ${default_config_whitelist} <<< "$results")
 
-	[[ "${skip_config_checks}" == "true" ]] && echo "${config_path}" && return
-
 	# Did we request any entries that did not make it?
 	local missing=$(echo $results | grep -v -q "${not_in_string}"; echo $?)
 	if [ ${missing} -ne 0 ]; then
@@ -300,7 +247,7 @@ get_kernel_frag_path() {
 	# might be convenient to allow it, but for now, let's pick up on them.
 	local redundant=$(echo ${results} | grep -v -q "${redundant_string}"; echo $?)
 	if [ ${redundant} -ne 0 ]; then
-		info "Some CONFIG elements are redundant in fragments:"
+		info "Some CONFIG elements failed to make the final .config"
 		info "${results}"
 		info "Generated config file can be found in ${config_path}"
 		die "Failed to construct requested .config file"
@@ -386,7 +333,7 @@ setup_kernel() {
 	local major_kernel
 	major_kernel=$(get_major_kernel_version "${kernel_version}")
 	local patches_dir_for_version="${patches_path}/${major_kernel}.x"
-	local build_type_patches_dir="${patches_path}/${major_kernel}.x/${build_type}"
+	local experimental_patches_dir="${patches_path}/${major_kernel}.x/experimental"
 
 	[ -n "${arch_target}" ] || arch_target="$(uname -m)"
 	arch_target=$(arch_to_kernel "${arch_target}")
@@ -396,10 +343,10 @@ setup_kernel() {
 	# Apply version specific patches
 	${packaging_scripts_dir}/apply_patches.sh "${patches_dir_for_version}"
 
-	# Apply version specific patches for build_type build
-	if [ "${build_type}" != "" ] ;then
-		info "Apply build_type patches from ${build_type_patches_dir}"
-		${packaging_scripts_dir}/apply_patches.sh "${build_type_patches_dir}"
+	# Apply version specific patches for experimental build
+	if [ "${experimental_kernel}" == "true" ] ;then
+		info "Apply experimental patches"
+		${packaging_scripts_dir}/apply_patches.sh "${experimental_patches_dir}"
 	fi
 
 	[ -n "${hypervisor_target}" ] || hypervisor_target="kvm"
@@ -419,9 +366,6 @@ build_kernel() {
 	arch_target=$(arch_to_kernel "${arch_target}")
 	pushd "${kernel_path}" >>/dev/null
 	make -j $(nproc) ARCH="${arch_target}"
-	if [ "${conf_guest}" == "sev" ]; then
-		make -j $(nproc --ignore=1) INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=${kernel_path} modules_install
-	fi
 	[ "$arch_target" != "powerpc" ] && ([ -e "arch/${arch_target}/boot/bzImage" ] || [ -e "arch/${arch_target}/boot/Image.gz" ])
 	[ -e "vmlinux" ]
 	([ "${hypervisor_target}" == "firecracker" ] || [ "${hypervisor_target}" == "cloud-hypervisor" ]) && [ "${arch_target}" == "arm64" ] && [ -e "arch/${arch_target}/boot/Image" ]
@@ -438,8 +382,8 @@ install_kata() {
 	install_path=$(readlink -m "${DESTDIR}/${PREFIX}/share/${project_name}")
 
 	suffix=""
-	if [[ ${build_type} != "" ]]; then
-		suffix="-${build_type}"
+	if [[ ${experimental_kernel} == "true" ]]; then
+		suffix="-experimental"
 	fi
 	if [[ ${gpu_vendor} != "" ]];then
 		suffix="-${gpu_vendor}-gpu${suffix}"
@@ -462,37 +406,34 @@ install_kata() {
 
 	# Install compressed kernel
 	if [ "${arch_target}" = "powerpc" ]; then
-		sudo install --mode 0644 -D "vmlinux" "${install_path}/${vmlinuz}"
+		install --mode 0644 -D "vmlinux" "${install_path}/${vmlinuz}"
 	else
-		sudo install --mode 0644 -D "${bzImage}" "${install_path}/${vmlinuz}"
+		install --mode 0644 -D "${bzImage}" "${install_path}/${vmlinuz}"
 	fi
 
 	# Install uncompressed kernel
 	if [ "${arch_target}" = "arm64" ]; then
-		sudo install --mode 0644 -D "arch/${arch_target}/boot/Image" "${install_path}/${vmlinux}"
+		install --mode 0644 -D "arch/${arch_target}/boot/Image" "${install_path}/${vmlinux}"
 	elif [ "${arch_target}" = "s390" ]; then
-		sudo install --mode 0644 -D "arch/${arch_target}/boot/vmlinux" "${install_path}/${vmlinux}"
+		install --mode 0644 -D "arch/${arch_target}/boot/compressed/vmlinux" "${install_path}/${vmlinux}"
 	else
-		sudo install --mode 0644 -D "vmlinux" "${install_path}/${vmlinux}"
+		install --mode 0644 -D "vmlinux" "${install_path}/${vmlinux}"
 	fi
 
-	sudo install --mode 0644 -D ./.config "${install_path}/config-${kernel_version}"
+	install --mode 0644 -D ./.config "${install_path}/config-${kernel_version}"
 
-	sudo ln -sf "${vmlinuz}" "${install_path}/vmlinuz${suffix}.container"
-	sudo ln -sf "${vmlinux}" "${install_path}/vmlinux${suffix}.container"
-	sudo ls -la "${install_path}/vmlinux${suffix}.container"
-	sudo ls -la "${install_path}/vmlinuz${suffix}.container"
+	ln -sf "${vmlinuz}" "${install_path}/vmlinuz${suffix}.container"
+	ln -sf "${vmlinux}" "${install_path}/vmlinux${suffix}.container"
+	ls -la "${install_path}/vmlinux${suffix}.container"
+	ls -la "${install_path}/vmlinuz${suffix}.container"
 	popd >>/dev/null
 }
 
 main() {
-	while getopts "a:b:c:deEfg:hk:p:t:v:x:" opt; do	
+	while getopts "a:c:defg:hk:p:t:v:x:" opt; do
 		case "$opt" in
 			a)
 				arch_target="${OPTARG}"
-				;;
-			b)
-				build_type="${OPTARG}"
 				;;
 			c)
 				kernel_config_path="${OPTARG}"
@@ -502,10 +443,7 @@ main() {
 				set -x
 				;;
 			e)
-				build_type="experimental"
-				;;
-			E)
-				build_type="arch-experimental"
+				experimental_kernel="true"
 				;;
 			f)
 				force_setup_generate_config="true"
@@ -518,13 +456,10 @@ main() {
 				usage 0
 				;;
 			k)
-				kernel_path="$(realpath ${OPTARG})"
+				kernel_path="${OPTARG}"
 				;;
 			p)
 				patches_path="${OPTARG}"
-				;;
-			s)
-				skip_config_checks="true"
 				;;
 			t)
 				hypervisor_target="${OPTARG}"
@@ -535,7 +470,7 @@ main() {
 			x)
 				conf_guest="${OPTARG}"
 				case "$conf_guest" in
-					sev|tdx) ;;
+					sev) ;;
 					*) die "Confidential guest type '$conf_guest' not supported" ;;
 				esac
 				;;
@@ -550,24 +485,8 @@ main() {
 
 	# If not kernel version take it from versions.yaml
 	if [ -z "$kernel_version" ]; then
-		if [[ ${build_type} == "experimental" ]]; then
+		if [[ ${experimental_kernel} == "true" ]]; then
 			kernel_version=$(get_from_kata_deps "assets.kernel-experimental.tag")
-		elif [[ ${build_type} == "arch-experimental" ]]; then
-			case "${arch_target}" in
-			"aarch64")
-				build_type="arm-experimental"
-				kernel_version=$(get_from_kata_deps "assets.arm-kernel-experimental.version")
-			;;
-			*)
-				info "No arch-specific experimental kernel supported, using experimental one instead"
-				kernel_version=$(get_from_kata_deps "assets.kernel-experimental.tag")
-			;;
-			esac
-		elif [[ "${conf_guest}" == "tdx" ]]; then
-			 kernel_version=$(get_from_kata_deps "assets.kernel.tdx.tag")
-		elif [[ "${conf_guest}" == "sev" ]]; then
-			#If specifying a tag for kernel_version, must be formatted version-like to avoid unintended parsing issues
-			 kernel_version=$(get_from_kata_deps "assets.kernel.sev.tag")
 		else
 			kernel_version=$(get_from_kata_deps "assets.kernel.version")
 		fi
@@ -577,8 +496,8 @@ main() {
 
 	if [ -z "${kernel_path}" ]; then
 		config_version=$(get_config_version)
-		if [[ ${build_type} != "" ]]; then
-			kernel_path="${PWD}/kata-linux-${build_type}-${kernel_version}-${config_version}"
+		if [[ ${experimental_kernel} == "true" ]]; then
+			kernel_path="${PWD}/kata-linux-experimental-${kernel_version}-${config_version}"
 		else
 			kernel_path="${PWD}/kata-linux-${kernel_version}-${config_version}"
 		fi

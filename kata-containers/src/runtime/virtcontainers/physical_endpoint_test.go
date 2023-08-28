@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -80,7 +77,7 @@ func TestIsPhysicalIface(t *testing.T) {
 
 	netlinkHandle, err := netlink.NewHandleAt(netnsHandle)
 	assert.NoError(err)
-	defer netlinkHandle.Close()
+	defer netlinkHandle.Delete()
 
 	err = netlinkHandle.LinkAdd(link)
 	assert.NoError(err)

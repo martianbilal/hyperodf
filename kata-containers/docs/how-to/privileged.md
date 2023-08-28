@@ -16,9 +16,9 @@ from the host, a potentially undesirable side-effect that decreases the security
 
 The following sections document how to configure this behavior in different container runtimes.
 
-#### Containerd
+#### Containerd and CRI
 
-The Containerd allows configuring the privileged host devices behavior for each runtime in the containerd config. This is
+The Containerd CRI allows configuring the privileged host devices behavior for each runtime in the CRI config. This is
 done with the `privileged_without_host_devices` option. Setting this to `true` will disable hot plugging of the host 
 devices into the guest, even when privileged is enabled.
 
@@ -31,7 +31,7 @@ See below example config:
   [plugins.cri]
     [plugins.cri.containerd]
        [plugins.cri.containerd.runtimes.runc]
-         runtime_type = "io.containerd.runc.v2"
+         runtime_type = "io.containerd.runc.v1"
          privileged_without_host_devices = false
        [plugins.cri.containerd.runtimes.kata]
          runtime_type = "io.containerd.kata.v2"
@@ -41,7 +41,7 @@ See below example config:
 ```
 
  - [Kata Containers with Containerd and CRI documentation](how-to-use-k8s-with-cri-containerd-and-kata.md)
- - [Containerd CRI config documentation](https://github.com/containerd/containerd/blob/main/docs/cri/config.md)
+ - [Containerd CRI config documentation](https://github.com/containerd/cri/blob/master/docs/config.md)
 
 #### CRI-O
 

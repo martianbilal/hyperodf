@@ -8,14 +8,16 @@ package katamonitor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/xeipuuv/gojsonpointer"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	pb "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
@@ -40,18 +42,19 @@ func getAddressAndDialer(endpoint string) (string, func(ctx context.Context, add
 
 func getConnection(endPoint string) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
+	monitorLog.Debugf("connect using endpoint '%s' with '%s' timeout", endPoint, defaultTimeout)
 	addr, dialer, err := getAddressAndDialer(endPoint)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	conn, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithContextDialer(dialer))
+	conn, err = grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithContextDialer(dialer))
 	if err != nil {
 		errMsg := errors.Wrapf(err, "connect endpoint '%s', make sure you are running as root and the endpoint has been started", endPoint)
 		return nil, errMsg
 	}
-	monitorLog.Tracef("connected successfully using endpoint: %s", endPoint)
+	monitorLog.Debugf("connected successfully using endpoint: %s", endPoint)
 	return conn, nil
 }
 
@@ -114,15 +117,17 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	}
 }
 
-// syncSandboxes gets pods metadata from the container manager and updates the sandbox cache.
-func (km *KataMonitor) syncSandboxes(sandboxList []string) ([]string, error) {
+// getSandboxes get kata sandbox from the container engine.
+// this will be called only after monitor start.
+func (km *KataMonitor) getSandboxes() (map[string]struct{}, error) {
+
+	sandboxMap := make(map[string]struct{})
 	runtimeClient, runtimeConn, err := getRuntimeClient(km.runtimeEndpoint)
 	if err != nil {
-		return sandboxList, err
+		return sandboxMap, err
 	}
 	defer closeConnection(runtimeConn)
 
-	// TODO: if len(sandboxList) is 1, better we just runtimeClient.PodSandboxStatus(...) targeting the single sandbox
 	filter := &pb.PodSandboxFilter{
 		State: &pb.PodSandboxStateValue{
 			State: pb.PodSandboxState_SANDBOX_READY,
@@ -132,35 +137,64 @@ func (km *KataMonitor) syncSandboxes(sandboxList []string) ([]string, error) {
 	request := &pb.ListPodSandboxRequest{
 		Filter: filter,
 	}
-	monitorLog.Tracef("ListPodSandboxRequest: %v", request)
+	monitorLog.Debugf("ListPodSandboxRequest: %v", request)
 	r, err := runtimeClient.ListPodSandbox(context.Background(), request)
 	if err != nil {
-		return sandboxList, err
+		return sandboxMap, err
 	}
-	monitorLog.Tracef("ListPodSandboxResponse: %v", r)
+	monitorLog.Debugf("ListPodSandboxResponse: %v", r)
 
 	for _, pod := range r.Items {
-		for _, sandbox := range sandboxList {
-			if pod.Id == sandbox {
-				km.sandboxCache.setCRIMetadata(sandbox, sandboxCRIMetadata{
-					uid:       pod.Metadata.Uid,
-					name:      pod.Metadata.Name,
-					namespace: pod.Metadata.Namespace,
-				})
+		request := &pb.PodSandboxStatusRequest{
+			PodSandboxId: pod.Id,
+			Verbose:      true,
+		}
 
-				sandboxList = removeFromSandboxList(sandboxList, sandbox)
+		r, err := runtimeClient.PodSandboxStatus(context.Background(), request)
+		if err != nil {
+			return sandboxMap, err
+		}
 
-				monitorLog.WithFields(logrus.Fields{
-					"cri-name":      pod.Metadata.Name,
-					"cri-namespace": pod.Metadata.Namespace,
-					"cri-uid":       pod.Metadata.Uid,
-				}).Debugf("Synced KATA POD %s", pod.Id)
+		lowRuntime := ""
+		var res map[string]interface{}
+		if err := json.Unmarshal([]byte(r.Info["info"]), &res); err != nil {
+			monitorLog.WithError(err).WithField("pod", r).Error("failed to Unmarshal pod info")
+			continue
+		} else {
+			monitorLog.WithField("pod info", res).Debug("")
 
-				break
+			// get low level container runtime
+			// containerd stores the pod runtime in "/runtimeType" while CRI-O stores it the
+			// io.kubernetes.cri-o.RuntimeHandler annotation: check for both.
+			keys := []string{"/runtimeType", "/runtimeSpec/annotations/io.kubernetes.cri-o.RuntimeHandler"}
+			for _, key := range keys {
+				pointer, _ := gojsonpointer.NewJsonPointer(key)
+				rt, _, _ := pointer.Get(res)
+				if rt != nil {
+					if str, ok := rt.(string); ok {
+						lowRuntime = str
+						break
+					}
+				}
 			}
 		}
+
+		// If lowRuntime is empty something changed in containerd/CRI-O or we are dealing with an unknown container engine.
+		// Safest options is to add the POD in the list: we will be able to connect to the shim to retrieve the actual info
+		// only for kata PODs.
+		if lowRuntime == "" {
+			monitorLog.WithField("pod", r).Info("unable to retrieve the runtime type")
+			sandboxMap[pod.Id] = struct{}{}
+			continue
+		}
+
+		monitorLog.WithFields(logrus.Fields{
+			"low runtime": lowRuntime,
+		}).Debug("")
+		if strings.Contains(lowRuntime, "kata") {
+			sandboxMap[pod.Id] = struct{}{}
+		}
 	}
-	// TODO: here we should mark the sandboxes we failed to retrieve info from: we should try a finite number of times
-	// to retrieve their metadata: if we fail resign and remove them from the sanbox cache (with a Warning log).
-	return sandboxList, nil
+
+	return sandboxMap, nil
 }

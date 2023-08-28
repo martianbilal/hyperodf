@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2019 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -10,6 +7,7 @@ package virtcontainers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,32 +20,33 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
-	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/uuid"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/uuid"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 )
 
-// acrnTracingTags defines tags for the trace span
-var acrnTracingTags = map[string]string{
-	"source":    "runtime",
-	"package":   "virtcontainers",
-	"subsystem": "hypervisor",
-	"type":      "acrn",
+// tracingTags defines tags for the trace span
+func (a *Acrn) tracingTags() map[string]string {
+	return map[string]string{
+		"source":     "runtime",
+		"package":    "virtcontainers",
+		"subsystem":  "hypervisor",
+		"type":       "acrn",
+		"sandbox_id": a.id,
+	}
 }
 
 // Since ACRN is using the store in a quite abnormal way, let's first draw it back from store to here
 
-/*
 // UUIDPathSuffix is the suffix used for uuid storage
 const (
 	UUIDPathSuffix = "uuid"
 	uuidFile       = "uuid.json"
 )
-*/
 
 // ACRN currently supports only known UUIDs for security
 // reasons (FuSa). When launching VM, only these pre-defined
@@ -159,14 +158,14 @@ func (a *Acrn) kernelParameters() string {
 }
 
 // Adds all capabilities supported by Acrn implementation of hypervisor interface
-func (a *Acrn) Capabilities(ctx context.Context) types.Capabilities {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "Capabilities", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) capabilities(ctx context.Context) types.Capabilities {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "capabilities", a.tracingTags())
 	defer span.End()
 
 	return a.arch.capabilities()
 }
 
-func (a *Acrn) HypervisorConfig() HypervisorConfig {
+func (a *Acrn) hypervisorConfig() HypervisorConfig {
 	return a.config
 }
 
@@ -252,7 +251,7 @@ func (a *Acrn) buildDevices(ctx context.Context, imagePath string) ([]Device, er
 		return nil, fmt.Errorf("Image Path should not be empty: %s", imagePath)
 	}
 
-	_, console, err := a.GetVMConsole(ctx, a.id)
+	_, console, err := a.getSandboxConsole(ctx, a.id)
 	if err != nil {
 		return nil, err
 	}
@@ -285,14 +284,16 @@ func (a *Acrn) buildDevices(ctx context.Context, imagePath string) ([]Device, er
 
 // setup sets the Acrn structure up.
 func (a *Acrn) setup(ctx context.Context, id string, hypervisorConfig *HypervisorConfig) error {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "setup", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+	span, _ := katatrace.Trace(ctx, a.Logger(), "setup", a.tracingTags())
 	defer span.End()
 
-	if err := a.setConfig(hypervisorConfig); err != nil {
+	err := hypervisorConfig.valid()
+	if err != nil {
 		return err
 	}
 
 	a.id = id
+	a.config = *hypervisorConfig
 	a.arch = newAcrnArch(a.config)
 
 	var create bool
@@ -304,9 +305,6 @@ func (a *Acrn) setup(ctx context.Context, id string, hypervisorConfig *Hyperviso
 
 	if create {
 		a.Logger().Debug("Setting UUID")
-
-		var err error
-
 		if uuid, err = a.GetNextAvailableUUID(); err != nil {
 			return err
 		}
@@ -316,7 +314,7 @@ func (a *Acrn) setup(ctx context.Context, id string, hypervisorConfig *Hyperviso
 
 		// The path might already exist, but in case of VM templating,
 		// we have to create it since the sandbox has not created it yet.
-		if err = os.MkdirAll(filepath.Join(a.config.RunStorePath, id), DirMode); err != nil {
+		if err = os.MkdirAll(filepath.Join(a.store.RunStoragePath(), id), DirMode); err != nil {
 			return err
 		}
 
@@ -329,7 +327,7 @@ func (a *Acrn) setup(ctx context.Context, id string, hypervisorConfig *Hyperviso
 }
 
 func (a *Acrn) createDummyVirtioBlkDev(ctx context.Context, devices []Device) ([]Device, error) {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "createDummyVirtioBlkDev", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+	span, _ := katatrace.Trace(ctx, a.Logger(), "createDummyVirtioBlkDev", a.tracingTags())
 	defer span.End()
 
 	// Since acrn doesn't support hot-plug, dummy virtio-blk
@@ -347,18 +345,12 @@ func (a *Acrn) createDummyVirtioBlkDev(ctx context.Context, devices []Device) ([
 	return devices, nil
 }
 
-func (a *Acrn) setConfig(config *HypervisorConfig) error {
-	a.config = *config
-
-	return nil
-}
-
-// CreateVM is the VM creation
-func (a *Acrn) CreateVM(ctx context.Context, id string, network Network, hypervisorConfig *HypervisorConfig) error {
+// createSandbox is the Hypervisor sandbox creation.
+func (a *Acrn) createSandbox(ctx context.Context, id string, networkNS NetworkNamespace, hypervisorConfig *HypervisorConfig) error {
 	// Save the tracing context
 	a.ctx = ctx
 
-	span, ctx := katatrace.Trace(ctx, a.Logger(), "CreateVM", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+	span, ctx := katatrace.Trace(ctx, a.Logger(), "createSandbox", a.tracingTags())
 	defer span.End()
 
 	if err := a.setup(ctx, id, hypervisorConfig); err != nil {
@@ -421,9 +413,9 @@ func (a *Acrn) CreateVM(ctx context.Context, id string, network Network, hypervi
 	return nil
 }
 
-// StartVM will start the Sandbox's VM.
-func (a *Acrn) StartVM(ctx context.Context, timeoutSecs int) error {
-	span, ctx := katatrace.Trace(ctx, a.Logger(), "StartVM", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+// startSandbox will start the Sandbox's VM.
+func (a *Acrn) startSandbox(ctx context.Context, timeoutSecs int) error {
+	span, ctx := katatrace.Trace(ctx, a.Logger(), "startSandbox", a.tracingTags())
 	defer span.End()
 
 	if a.config.Debug {
@@ -438,7 +430,7 @@ func (a *Acrn) StartVM(ctx context.Context, timeoutSecs int) error {
 		a.Logger().WithField("default-kernel-parameters", formatted).Debug()
 	}
 
-	vmPath := filepath.Join(a.config.VMStorePath, a.id)
+	vmPath := filepath.Join(a.store.RunVMStoragePath(), a.id)
 	err := os.MkdirAll(vmPath, DirMode)
 	if err != nil {
 		return err
@@ -459,7 +451,7 @@ func (a *Acrn) StartVM(ctx context.Context, timeoutSecs int) error {
 	}
 	a.state.PID = PID
 
-	if err = a.waitVM(ctx, timeoutSecs); err != nil {
+	if err = a.waitSandbox(ctx, timeoutSecs); err != nil {
 		a.Logger().WithField("acrn wait failed:", err).Debug()
 		return err
 	}
@@ -467,9 +459,9 @@ func (a *Acrn) StartVM(ctx context.Context, timeoutSecs int) error {
 	return nil
 }
 
-// waitVM will wait for the Sandbox's VM to be up and running.
-func (a *Acrn) waitVM(ctx context.Context, timeoutSecs int) error {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "waitVM", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+// waitSandbox will wait for the Sandbox's VM to be up and running.
+func (a *Acrn) waitSandbox(ctx context.Context, timeoutSecs int) error {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "waitSandbox", a.tracingTags())
 	defer span.End()
 
 	if timeoutSecs < 0 {
@@ -481,16 +473,16 @@ func (a *Acrn) waitVM(ctx context.Context, timeoutSecs int) error {
 	return nil
 }
 
-// StopVM will stop the Sandbox's VM.
-func (a *Acrn) StopVM(ctx context.Context, waitOnly bool) (err error) {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "StopVM", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+// stopSandbox will stop the Sandbox's VM.
+func (a *Acrn) stopSandbox(ctx context.Context, waitOnly bool) (err error) {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "stopSandbox", a.tracingTags())
 	defer span.End()
 
 	a.Logger().Info("Stopping acrn VM")
 
 	defer func() {
 		if err != nil {
-			a.Logger().Info("StopVM failed")
+			a.Logger().Info("stopSandbox failed")
 		} else {
 			a.Logger().Info("acrn VM stopped")
 		}
@@ -501,7 +493,7 @@ func (a *Acrn) StopVM(ctx context.Context, waitOnly bool) (err error) {
 	Idx := acrnUUIDsToIdx[uuid]
 
 	if err = a.loadInfo(); err != nil {
-		a.Logger().Info("Failed to Load UUID availabiity info")
+		a.Logger().Info("Failed to load UUID availabiity info")
 		return err
 	}
 
@@ -538,7 +530,7 @@ func (a *Acrn) updateBlockDevice(drive *config.BlockDrive) error {
 	slot := AcrnBlkdDevSlot[drive.Index]
 
 	//Explicitly set PCIPath to NULL, so that VirtPath can be used
-	drive.PCIPath = types.PciPath{}
+	drive.PCIPath = vcTypes.PciPath{}
 
 	args := []string{"blkrescan", a.acrnConfig.Name, fmt.Sprintf("%d,%s", slot, drive.File)}
 
@@ -554,22 +546,22 @@ func (a *Acrn) updateBlockDevice(drive *config.BlockDrive) error {
 	return err
 }
 
-func (a *Acrn) HotplugAddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) (interface{}, error) {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "HotplugAddDevice", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) hotplugAddDevice(ctx context.Context, devInfo interface{}, devType deviceType) (interface{}, error) {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "hotplugAddDevice", a.tracingTags())
 	defer span.End()
 
 	switch devType {
-	case BlockDev:
+	case blockDev:
 		//The drive placeholder has to exist prior to Update
 		return nil, a.updateBlockDevice(devInfo.(*config.BlockDrive))
 	default:
-		return nil, fmt.Errorf("HotplugAddDevice: unsupported device: devInfo:%v, deviceType%v",
+		return nil, fmt.Errorf("hotplugAddDevice: unsupported device: devInfo:%v, deviceType%v",
 			devInfo, devType)
 	}
 }
 
-func (a *Acrn) HotplugRemoveDevice(ctx context.Context, devInfo interface{}, devType DeviceType) (interface{}, error) {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "HotplugRemoveDevice", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) hotplugRemoveDevice(ctx context.Context, devInfo interface{}, devType deviceType) (interface{}, error) {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "hotplugRemoveDevice", a.tracingTags())
 	defer span.End()
 
 	// Not supported. return success
@@ -577,8 +569,8 @@ func (a *Acrn) HotplugRemoveDevice(ctx context.Context, devInfo interface{}, dev
 	return nil, nil
 }
 
-func (a *Acrn) PauseVM(ctx context.Context) error {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "PauseVM", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) pauseSandbox(ctx context.Context) error {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "pauseSandbox", a.tracingTags())
 	defer span.End()
 
 	// Not supported. return success
@@ -586,8 +578,8 @@ func (a *Acrn) PauseVM(ctx context.Context) error {
 	return nil
 }
 
-func (a *Acrn) ResumeVM(ctx context.Context) error {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "ResumeVM", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) resumeSandbox(ctx context.Context) error {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "resumeSandbox", a.tracingTags())
 	defer span.End()
 
 	// Not supported. return success
@@ -595,10 +587,10 @@ func (a *Acrn) ResumeVM(ctx context.Context) error {
 	return nil
 }
 
-// AddDevice will add extra devices to acrn command line.
-func (a *Acrn) AddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) error {
+// addDevice will add extra devices to acrn command line.
+func (a *Acrn) addDevice(ctx context.Context, devInfo interface{}, devType deviceType) error {
 	var err error
-	span, _ := katatrace.Trace(ctx, a.Logger(), "AddDevice", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+	span, _ := katatrace.Trace(ctx, a.Logger(), "addDevice", a.tracingTags())
 	defer span.End()
 
 	switch v := devInfo.(type) {
@@ -628,13 +620,13 @@ func (a *Acrn) AddDevice(ctx context.Context, devInfo interface{}, devType Devic
 	return err
 }
 
-// GetVMConsole builds the path of the console where we can read logs coming
-// from the sandbox.
-func (a *Acrn) GetVMConsole(ctx context.Context, id string) (string, string, error) {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "GetVMConsole", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+// getSandboxConsole builds the path of the console where we can read
+// logs coming from the sandbox.
+func (a *Acrn) getSandboxConsole(ctx context.Context, id string) (string, string, error) {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "getSandboxConsole", a.tracingTags())
 	defer span.End()
 
-	consoleURL, err := utils.BuildSocketPath(a.config.VMStorePath, id, acrnConsoleSocket)
+	consoleURL, err := utils.BuildSocketPath(a.store.RunVMStoragePath(), id, acrnConsoleSocket)
 	if err != nil {
 		return consoleProtoUnix, "", err
 	}
@@ -642,55 +634,51 @@ func (a *Acrn) GetVMConsole(ctx context.Context, id string) (string, string, err
 	return consoleProtoUnix, consoleURL, nil
 }
 
-func (a *Acrn) SaveVM() error {
-	a.Logger().Info("Save sandbox")
+func (a *Acrn) saveSandbox() error {
+	a.Logger().Info("save sandbox")
 
 	// Not supported. return success
 
 	return nil
 }
 
-func (a *Acrn) Disconnect(ctx context.Context) {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "Disconnect", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) disconnect(ctx context.Context) {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "disconnect", a.tracingTags())
 	defer span.End()
 
 	// Not supported.
 }
 
-func (a *Acrn) GetThreadIDs(ctx context.Context) (VcpuThreadIDs, error) {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "GetThreadIDs", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) getThreadIDs(ctx context.Context) (vcpuThreadIDs, error) {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "getThreadIDs", a.tracingTags())
 	defer span.End()
 
 	// Not supported. return success
 	//Just allocating an empty map
 
-	return VcpuThreadIDs{}, nil
+	return vcpuThreadIDs{}, nil
 }
 
-func (a *Acrn) GetTotalMemoryMB(ctx context.Context) uint32 {
-	return a.config.MemorySize
+func (a *Acrn) resizeMemory(ctx context.Context, reqMemMB uint32, memoryBlockSizeMB uint32, probe bool) (uint32, memoryDevice, error) {
+	return 0, memoryDevice{}, nil
 }
 
-func (a *Acrn) ResizeMemory(ctx context.Context, reqMemMB uint32, memoryBlockSizeMB uint32, probe bool) (uint32, MemoryDevice, error) {
-	return 0, MemoryDevice{}, nil
-}
-
-func (a *Acrn) ResizeVCPUs(ctx context.Context, reqVCPUs uint32) (currentVCPUs uint32, newVCPUs uint32, err error) {
+func (a *Acrn) resizeVCPUs(ctx context.Context, reqVCPUs uint32) (currentVCPUs uint32, newVCPUs uint32, err error) {
 	return 0, 0, nil
 }
 
-func (a *Acrn) Cleanup(ctx context.Context) error {
-	span, _ := katatrace.Trace(ctx, a.Logger(), "Cleanup", acrnTracingTags, map[string]string{"sandbox_id": a.id})
+func (a *Acrn) cleanup(ctx context.Context) error {
+	span, _ := katatrace.Trace(ctx, a.Logger(), "cleanup", a.tracingTags())
 	defer span.End()
 
 	return nil
 }
 
-func (a *Acrn) GetPids() []int {
+func (a *Acrn) getPids() []int {
 	return []int{a.state.PID}
 }
 
-func (a *Acrn) GetVirtioFsPid() *int {
+func (a *Acrn) getVirtioFsPid() *int {
 	return nil
 }
 
@@ -702,19 +690,19 @@ func (a *Acrn) toGrpc(ctx context.Context) ([]byte, error) {
 	return nil, errors.New("acrn is not supported by VM cache")
 }
 
-func (a *Acrn) Save() (s hv.HypervisorState) {
+func (a *Acrn) save() (s persistapi.HypervisorState) {
 	s.Pid = a.state.PID
 	s.Type = string(AcrnHypervisor)
 	s.UUID = a.state.UUID
 	return
 }
 
-func (a *Acrn) Load(s hv.HypervisorState) {
+func (a *Acrn) load(s persistapi.HypervisorState) {
 	a.state.PID = s.Pid
 	a.state.UUID = s.UUID
 }
 
-func (a *Acrn) Check() error {
+func (a *Acrn) check() error {
 	if err := syscall.Kill(a.state.PID, syscall.Signal(0)); err != nil {
 		return errors.Wrapf(err, "failed to ping acrn process")
 	}
@@ -722,8 +710,8 @@ func (a *Acrn) Check() error {
 	return nil
 }
 
-func (a *Acrn) GenerateSocket(id string) (interface{}, error) {
-	return generateVMSocket(id, a.config.VMStorePath)
+func (a *Acrn) generateSocket(id string) (interface{}, error) {
+	return generateVMSocket(id, a.store.RunVMStoragePath())
 }
 
 // GetACRNUUIDBytes returns UUID bytes that is used for VM creation
@@ -786,36 +774,38 @@ func (a *Acrn) GetMaxSupportedACRNVM() (uint8, error) {
 }
 
 func (a *Acrn) storeInfo() error {
-	/*
-		relPath := filepath.Join(UUIDPathSuffix, uuidFile)
+	relPath := filepath.Join(UUIDPathSuffix, uuidFile)
 
-		jsonOut, err := json.Marshal(a.info)
-		if err != nil {
-			return fmt.Errorf("Could not marshal data: %s", err)
-		}
+	jsonOut, err := json.Marshal(a.info)
+	if err != nil {
+		return fmt.Errorf("Could not marshal data: %s", err)
+	}
 
-		if err := a.store.GlobalWrite(relPath, jsonOut); err != nil {
-			return fmt.Errorf("failed to write uuid to file: %v", err)
-		}*/
+	if err := a.store.GlobalWrite(relPath, jsonOut); err != nil {
+		return fmt.Errorf("failed to write uuid to file: %v", err)
+	}
 
 	return nil
 }
 
 func (a *Acrn) loadInfo() error {
-	/*
-		relPath := filepath.Join(UUIDPathSuffix, uuidFile)
-			data, err := a.store.GlobalRead(relPath)
-			if err != nil {
-				return fmt.Errorf("failed to read uuid from file: %v", err)
-			}
+	relPath := filepath.Join(UUIDPathSuffix, uuidFile)
 
-			if err := json.Unmarshal(data, &a.info); err != nil {
-				return fmt.Errorf("failed to unmarshal uuid info: %v", err)
-			}*/
+	data, err := a.store.GlobalRead(relPath)
+	if err != nil {
+		return fmt.Errorf("failed to read uuid from file: %v", err)
+	}
 
+	if err := json.Unmarshal(data, &a.info); err != nil {
+		return fmt.Errorf("failed to unmarshal uuid info: %v", err)
+	}
 	return nil
 }
 
-func (a *Acrn) IsRateLimiterBuiltin() bool {
+func (a *Acrn) isRateLimiterBuiltin() bool {
 	return false
+}
+
+func (a *Acrn) setSandbox(sandbox *Sandbox) {
+	a.sandbox = sandbox
 }

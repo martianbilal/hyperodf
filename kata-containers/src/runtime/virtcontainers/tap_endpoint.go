@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 Huawei Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -15,9 +12,9 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/uuid"
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
-	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/uuid"
 )
 
 var tapTrace = getNetworkTrace(TapEndpointType)
@@ -93,18 +90,18 @@ func (endpoint *TapEndpoint) Detach(ctx context.Context, netNsCreated bool, netN
 }
 
 // HotAttach for the tap endpoint uses hot plug device
-func (endpoint *TapEndpoint) HotAttach(ctx context.Context, h Hypervisor) error {
+func (endpoint *TapEndpoint) HotAttach(ctx context.Context, h hypervisor) error {
 	networkLogger().Info("Hot attaching tap endpoint")
 
 	span, ctx := tapTrace(ctx, "HotAttach", endpoint)
 	defer span.End()
 
-	if err := tapNetwork(endpoint, h.HypervisorConfig().NumVCPUs, h.HypervisorConfig().DisableVhostNet); err != nil {
+	if err := tapNetwork(endpoint, h.hypervisorConfig().NumVCPUs, h.hypervisorConfig().DisableVhostNet); err != nil {
 		networkLogger().WithError(err).Error("Error bridging tap ep")
 		return err
 	}
 
-	if _, err := h.HotplugAddDevice(ctx, endpoint, NetDev); err != nil {
+	if _, err := h.hotplugAddDevice(ctx, endpoint, netDev); err != nil {
 		networkLogger().WithError(err).Error("Error attach tap ep")
 		return err
 	}
@@ -112,7 +109,7 @@ func (endpoint *TapEndpoint) HotAttach(ctx context.Context, h Hypervisor) error 
 }
 
 // HotDetach for the tap endpoint uses hot pull device
-func (endpoint *TapEndpoint) HotDetach(ctx context.Context, h Hypervisor, netNsCreated bool, netNsPath string) error {
+func (endpoint *TapEndpoint) HotDetach(ctx context.Context, h hypervisor, netNsCreated bool, netNsPath string) error {
 	networkLogger().Info("Hot detaching tap endpoint")
 
 	span, ctx := tapTrace(ctx, "HotDetach", endpoint)
@@ -124,7 +121,7 @@ func (endpoint *TapEndpoint) HotDetach(ctx context.Context, h Hypervisor, netNsC
 		networkLogger().WithError(err).Warn("Error un-bridging tap ep")
 	}
 
-	if _, err := h.HotplugRemoveDevice(ctx, endpoint, NetDev); err != nil {
+	if _, err := h.hotplugRemoveDevice(ctx, endpoint, netDev); err != nil {
 		networkLogger().WithError(err).Error("Error detach tap ep")
 		return err
 	}
@@ -159,7 +156,7 @@ func tapNetwork(endpoint *TapEndpoint, numCPUs uint32, disableVhostNet bool) err
 	if err != nil {
 		return err
 	}
-	defer netHandle.Close()
+	defer netHandle.Delete()
 
 	tapLink, fds, err := createLink(netHandle, endpoint.TapInterface.TAPIface.Name, &netlink.Tuntap{}, int(numCPUs))
 	if err != nil {
@@ -195,7 +192,7 @@ func unTapNetwork(name string) error {
 	if err != nil {
 		return err
 	}
-	defer netHandle.Close()
+	defer netHandle.Delete()
 	tapLink, err := getLinkByName(netHandle, name, &netlink.Tuntap{})
 	if err != nil {
 		return fmt.Errorf("Could not get TAP interface: %s", err)

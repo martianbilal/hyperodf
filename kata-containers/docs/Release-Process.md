@@ -4,11 +4,11 @@
 ## Requirements
 
 - [hub](https://github.com/github/hub)
-  * Using an [application token](https://github.com/settings/tokens) is required for hub (set to a GITHUB_TOKEN environment variable).
+  * Using an [application token](https://github.com/settings/tokens) is required for hub.
 
 - GitHub permissions to push tags and create releases in Kata repositories.
 
-- GPG configured to sign git tags. https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key
+- GPG configured to sign git tags. https://help.github.com/articles/generating-a-new-gpg-key/
 
 - You should configure your GitHub to use your ssh keys (to push to branches). See https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/.
     * As an alternative, configure hub to push and fork with HTTPS, `git config --global hub.protocol https` (Not tested yet) *
@@ -48,7 +48,6 @@
 ### Merge all bump version Pull requests
 
   - The above step will create a GitHub pull request in the Kata projects. Trigger the CI using `/test` command on each bump Pull request.
-  - Trigger the `test-kata-deploy` workflow which is under the `Actions` tab on the repository GitHub page (make sure to select the correct branch and validate it passes).
   - Check any failures and fix if needed.
   - Work with the Kata approvers to verify that the CI works and the pull requests are merged.
 
@@ -65,7 +64,7 @@
 
 ### Check Git-hub Actions
 
-  We make use of [GitHub actions](https://github.com/features/actions) in this [file](../.github/workflows/release.yaml) in the `kata-containers/kata-containers` repository to build and upload release artifacts. This action is auto triggered with the above step when a new tag is pushed to the `kata-containers/kata-containers` repository.
+  We make use of [GitHub actions](https://github.com/features/actions) in this [file](https://github.com/kata-containers/kata-containers/blob/main/.github/workflows/main.yaml) in the `kata-containers/kata-containers` repository to build and upload release artifacts. This action is auto triggered with the above step when a new tag is pushed to the `kata-containers/kata-containers` repository.
 
   Check the [actions status page](https://github.com/kata-containers/kata-containers/actions) to verify all steps in the actions workflow have completed successfully. On success, a static tarball containing Kata release artifacts will be uploaded to the [Release page](https://github.com/kata-containers/kata-containers/releases).
 

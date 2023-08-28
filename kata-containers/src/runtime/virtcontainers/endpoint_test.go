@@ -6,6 +6,7 @@
 package virtcontainers
 
 import (
+	"io/ioutil"
 	"net"
 	"os"
 	"reflect"
@@ -34,8 +35,8 @@ func TestVhostUserEndpointTypeSet(t *testing.T) {
 	testEndpointTypeSet(t, "vhost-user", VhostUserEndpointType)
 }
 
-func TestMacvlanEndpointTypeSet(t *testing.T) {
-	testEndpointTypeSet(t, "macvlan", MacvlanEndpointType)
+func TestBridgedMacvlanEndpointTypeSet(t *testing.T) {
+	testEndpointTypeSet(t, "macvlan", BridgedMacvlanEndpointType)
 }
 
 func TestMacvtapEndpointTypeSet(t *testing.T) {
@@ -68,9 +69,9 @@ func TestVhostUserEndpointTypeString(t *testing.T) {
 	testEndpointTypeString(t, &endpointType, string(VhostUserEndpointType))
 }
 
-func TestMacvlanEndpointTypeString(t *testing.T) {
-	endpointType := MacvlanEndpointType
-	testEndpointTypeString(t, &endpointType, string(MacvlanEndpointType))
+func TestBridgedMacvlanEndpointTypeString(t *testing.T) {
+	endpointType := BridgedMacvlanEndpointType
+	testEndpointTypeString(t, &endpointType, string(BridgedMacvlanEndpointType))
 }
 
 func TestMacvtapEndpointTypeString(t *testing.T) {
@@ -86,7 +87,7 @@ func TestIncorrectEndpointTypeString(t *testing.T) {
 func TestSaveLoadIfPair(t *testing.T) {
 	macAddr := net.HardwareAddr{0x02, 0x00, 0xCA, 0xFE, 0x00, 0x04}
 
-	tmpfile, err := os.CreateTemp("", "vc-Save-Load-net-")
+	tmpfile, err := ioutil.TempFile("", "vc-save-load-net-")
 	assert.Nil(t, err)
 	defer os.Remove(tmpfile.Name())
 
@@ -108,7 +109,7 @@ func TestSaveLoadIfPair(t *testing.T) {
 		NetInterworkingModel: DefaultNetInterworkingModel,
 	}
 
-	// Save to disk then Load it back.
+	// Save to disk then load it back.
 	savedIfPair := saveNetIfPair(netPair)
 	loadedIfPair := loadNetIfPair(savedIfPair)
 

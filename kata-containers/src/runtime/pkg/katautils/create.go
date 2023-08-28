@@ -1,6 +1,5 @@
 // Copyright (c) 2018 Intel Corporation
 // Copyright (c) 2018 HyperHQ Inc.
-// Copyright (c) 2021 Adobe Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -10,14 +9,14 @@ package katautils
 import (
 	"context"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"strconv"
 	"strings"
 
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/oci"
 	vc "github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
 	vf "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/factory"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -97,12 +96,12 @@ func HandleFactory(ctx context.Context, vci vc.VC, runtimeConfig *oci.RuntimeCon
 // For the given pod ephemeral volume is created only once
 // backed by tmpfs inside the VM. For successive containers
 // of the same pod the already existing volume is reused.
-func SetEphemeralStorageType(ociSpec specs.Spec, disableGuestEmptyDir bool) specs.Spec {
+func SetEphemeralStorageType(ociSpec specs.Spec) specs.Spec {
 	for idx, mnt := range ociSpec.Mounts {
 		if vc.IsEphemeralStorage(mnt.Source) {
 			ociSpec.Mounts[idx].Type = vc.KataEphemeralDevType
 		}
-		if vc.Isk8sHostEmptyDir(mnt.Source) && !disableGuestEmptyDir {
+		if vc.Isk8sHostEmptyDir(mnt.Source) {
 			ociSpec.Mounts[idx].Type = vc.KataLocalDevType
 		}
 	}
@@ -111,18 +110,15 @@ func SetEphemeralStorageType(ociSpec specs.Spec, disableGuestEmptyDir bool) spec
 
 // CreateSandbox create a sandbox container
 func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeConfig oci.RuntimeConfig, rootFs vc.RootFs,
-	containerID, bundlePath string, disableOutput, systemdCgroup bool) (_ vc.VCSandbox, _ vc.Process, err error) {
+	containerID, bundlePath, console string, disableOutput, systemdCgroup bool) (_ vc.VCSandbox, _ vc.Process, err error) {
 	span, ctx := katatrace.Trace(ctx, nil, "CreateSandbox", createTracingTags)
-	katatrace.AddTags(span, "container_id", containerID)
+	katatrace.AddTag(span, "container_id", containerID)
 	defer span.End()
 
-	sandboxConfig, err := oci.SandboxConfig(ociSpec, runtimeConfig, bundlePath, containerID, disableOutput, systemdCgroup)
+	sandboxConfig, err := oci.SandboxConfig(ociSpec, runtimeConfig, bundlePath, containerID, console, disableOutput, systemdCgroup)
 	if err != nil {
 		return nil, vc.Process{}, err
 	}
-
-	// setup shared path in hypervisor config:
-	sandboxConfig.HypervisorConfig.SharedPath = vc.GetSharePath(containerID)
 
 	if err := checkForFIPS(&sandboxConfig); err != nil {
 		return nil, vc.Process{}, err
@@ -149,26 +145,18 @@ func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeCo
 	defer func() {
 		// cleanup netns if kata creates it
 		ns := sandboxConfig.NetworkConfig
-		if err != nil && ns.NetworkCreated {
-			if ex := cleanupNetNS(ns.NetworkID); ex != nil {
-				kataUtilsLogger.WithField("id", ns.NetworkID).WithError(ex).Warn("failed to cleanup network")
+		if err != nil && ns.NetNsCreated {
+			if ex := cleanupNetNS(ns.NetNSPath); ex != nil {
+				kataUtilsLogger.WithField("path", ns.NetNSPath).WithError(ex).Warn("failed to cleanup netns")
 			}
 		}
 	}()
 
-	if ociSpec.Annotations == nil {
-		ociSpec.Annotations = make(map[string]string)
-	}
-	ociSpec.Annotations["nerdctl/network-namespace"] = sandboxConfig.NetworkConfig.NetworkID
-	sandboxConfig.Annotations["nerdctl/network-namespace"] = ociSpec.Annotations["nerdctl/network-namespace"]
-
-	// Run pre-start OCI hooks, in the runtime namespace.
-	if err := PreStartHooks(ctx, ociSpec, containerID, bundlePath); err != nil {
-		return nil, vc.Process{}, err
-	}
-
-	// Run create runtime OCI hooks, in the runtime namespace.
-	if err := CreateRuntimeHooks(ctx, ociSpec, containerID, bundlePath); err != nil {
+	// Run pre-start OCI hooks.
+	err = EnterNetNS(sandboxConfig.NetworkConfig.NetNSPath, func() error {
+		return PreStartHooks(ctx, ociSpec, containerID, bundlePath)
+	})
+	if err != nil {
 		return nil, vc.Process{}, err
 	}
 
@@ -179,7 +167,7 @@ func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeCo
 
 	sid := sandbox.ID()
 	kataUtilsLogger = kataUtilsLogger.WithField("sandbox", sid)
-	katatrace.AddTags(span, "sandbox_id", sid)
+	katatrace.AddTag(span, "sandbox_id", sid)
 
 	containers := sandbox.GetAllContainers()
 	if len(containers) != 1 {
@@ -192,7 +180,7 @@ func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeCo
 var procFIPS = "/proc/sys/crypto/fips_enabled"
 
 func checkForFIPS(sandboxConfig *vc.SandboxConfig) error {
-	content, err := os.ReadFile(procFIPS)
+	content, err := ioutil.ReadFile(procFIPS)
 	if err != nil {
 		// In case file cannot be found or read, simply return
 		return nil
@@ -219,22 +207,22 @@ func checkForFIPS(sandboxConfig *vc.SandboxConfig) error {
 }
 
 // CreateContainer create a container
-func CreateContainer(ctx context.Context, sandbox vc.VCSandbox, ociSpec specs.Spec, rootFs vc.RootFs, containerID, bundlePath string, disableOutput bool, disableGuestEmptyDir bool) (vc.Process, error) {
+func CreateContainer(ctx context.Context, sandbox vc.VCSandbox, ociSpec specs.Spec, rootFs vc.RootFs, containerID, bundlePath, console string, disableOutput bool) (vc.Process, error) {
 	var c vc.VCContainer
 
 	span, ctx := katatrace.Trace(ctx, nil, "CreateContainer", createTracingTags)
-	katatrace.AddTags(span, "container_id", containerID)
+	katatrace.AddTag(span, "container_id", containerID)
 	defer span.End()
 
-	ociSpec = SetEphemeralStorageType(ociSpec, disableGuestEmptyDir)
+	ociSpec = SetEphemeralStorageType(ociSpec)
 
-	contConfig, err := oci.ContainerConfig(ociSpec, bundlePath, containerID, disableOutput)
+	contConfig, err := oci.ContainerConfig(ociSpec, bundlePath, containerID, console, disableOutput)
 	if err != nil {
 		return vc.Process{}, err
 	}
 
 	if !rootFs.Mounted {
-		if rootFs.Source != "" && rootFs.Type != vc.NydusRootFSType {
+		if rootFs.Source != "" {
 			realPath, err := ResolvePath(rootFs.Source)
 			if err != nil {
 				return vc.Process{}, err
@@ -243,12 +231,13 @@ func CreateContainer(ctx context.Context, sandbox vc.VCSandbox, ociSpec specs.Sp
 		}
 		contConfig.RootFs = rootFs
 	}
+
 	sandboxID, err := oci.SandboxID(ociSpec)
 	if err != nil {
 		return vc.Process{}, err
 	}
 
-	katatrace.AddTags(span, "sandbox_id", sandboxID)
+	katatrace.AddTag(span, "sandbox_id", sandboxID)
 
 	c, err = sandbox.CreateContainer(ctx, contConfig)
 	if err != nil {

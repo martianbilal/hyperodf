@@ -33,7 +33,7 @@ $ ./rootfs.sh -r "$PWD/kata-overlay"
 
 The rootfs must provide at least the following components:
 
-- [Kata agent](../../../src/agent)
+- [Kata agent](https://github.com/kata-containers/kata-containers/tree/main/src/agent)
 
   Path: `/bin/kata-agent` - Kata Containers guest.
 
@@ -82,6 +82,12 @@ must be met:
    $ docker info | grep 'Default Runtime: runc'
    ```
 
+   Note:
+
+   This requirement is specific to the Clear Containers runtime.
+   See [issue](https://github.com/clearcontainers/runtime/issues/828) for
+   more information.
+
 3. Export `USE_DOCKER` variable.
 
    ```
@@ -93,10 +99,10 @@ must be met:
    Example:
    ```
    $ export USE_DOCKER=true
-   $ # build guest O/S rootfs based on debian
-   $ ./rootfs-builder/rootfs.sh -r "${PWD}/debian_rootfs" debian
+   $ # build guest O/S rootfs based on fedora
+   $ ./rootfs-builder/rootfs.sh -r "${PWD}/fedora_rootfs" fedora
    $ # build image based rootfs created above
-   $ ./image-builder/image_builder.sh "${PWD}/debian_rootfs"
+   $ ./image-builder/image_builder.sh "${PWD}/fedora_rootfs"
    ```
 
 ## Adding support for a new guest OS
@@ -174,7 +180,7 @@ To add additional packages, use one of the following methods:
   Example:
 
   ```
-  $ EXTRA_PKGS="vim emacs" ./rootfs-builder/rootfs.sh -r ${PWD}/myrootfs debian
+  $ EXTRA_PKGS="vim emacs" ./rootfs-builder/rootfs.sh -r ${PWD}/myrootfs fedora
   ```
 
 - Modify the variable `PACKAGES` in `rootfs-builder/<distro>/config.sh`.

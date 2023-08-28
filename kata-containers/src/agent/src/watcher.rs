@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#![allow(unknown_lints)]
+#![allow(clippy::unknown_clippy_lints)]
 
 use std::collections::HashMap;
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -14,7 +13,6 @@ use std::time::SystemTime;
 use anyhow::{ensure, Context, Result};
 use async_recursion::async_recursion;
 use nix::mount::{umount, MsFlags};
-use nix::unistd::{Gid, Uid};
 use slog::{debug, error, info, warn, Logger};
 use thiserror::Error;
 use tokio::fs;
@@ -22,7 +20,7 @@ use tokio::sync::Mutex;
 use tokio::task;
 use tokio::time::{self, Duration};
 
-use crate::mount::baremount;
+use crate::mount::BareMount;
 use crate::protocols::agent as protos;
 
 /// The maximum number of file system entries agent will watch for each mount.
@@ -51,7 +49,7 @@ struct Storage {
     /// the source becomes too large, either in number of files (>16) or total size (>1MB).
     watch: bool,
 
-    /// The list of files, directories, symlinks to watch from the source mount point and updated in the target one.
+    /// The list of files to watch from the source mount point and updated in the target one.
     watched_files: HashMap<PathBuf, SystemTime>,
 }
 
@@ -81,28 +79,6 @@ impl Drop for Storage {
     }
 }
 
-async fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<()> {
-    let metadata = fs::symlink_metadata(&from).await?;
-    if metadata.file_type().is_symlink() {
-        // if source is a symlink, create new symlink with same link source. If
-        // the symlink exists, remove and create new one:
-        if fs::symlink_metadata(&to).await.is_ok() {
-            fs::remove_file(&to).await?;
-        }
-        fs::symlink(fs::read_link(&from).await?, &to).await?;
-    } else {
-        fs::copy(&from, &to).await?;
-    }
-    // preserve the source uid and gid to the destination.
-    nix::unistd::chown(
-        to.as_ref(),
-        Some(Uid::from_raw(metadata.uid())),
-        Some(Gid::from_raw(metadata.gid())),
-    )?;
-
-    Ok(())
-}
-
 impl Storage {
     async fn new(storage: protos::Storage) -> Result<Storage> {
         let entry = Storage {
@@ -116,33 +92,7 @@ impl Storage {
 
     async fn update_target(&self, logger: &Logger, source_path: impl AsRef<Path>) -> Result<()> {
         let source_file_path = source_path.as_ref();
-        let metadata = source_file_path.symlink_metadata()?;
 
-        // if we are creating a directory: just create it, nothing more to do
-        if metadata.file_type().is_dir() {
-            let dest_file_path = self.make_target_path(&source_file_path)?;
-
-            fs::create_dir_all(&dest_file_path)
-                .await
-                .with_context(|| format!("Unable to mkdir all for {}", dest_file_path.display()))?;
-            // set the directory permissions to match the source directory permissions
-            fs::set_permissions(&dest_file_path, metadata.permissions())
-                .await
-                .with_context(|| {
-                    format!("Unable to set permissions for {}", dest_file_path.display())
-                })?;
-            // preserve the source directory uid and gid to the destination.
-            nix::unistd::chown(
-                &dest_file_path,
-                Some(Uid::from_raw(metadata.uid())),
-                Some(Gid::from_raw(metadata.gid())),
-            )
-            .with_context(|| format!("Unable to set ownership for {}", dest_file_path.display()))?;
-
-            return Ok(());
-        }
-
-        // Assume we are dealing with either a file or a symlink now:
         let dest_file_path = if self.source_mount_point.is_file() {
             // Simple file to file copy
             // Assume target mount is a file path
@@ -160,13 +110,19 @@ impl Storage {
             dest_file_path
         };
 
-        copy(&source_file_path, &dest_file_path)
+        debug!(
+            logger,
+            "Copy from {} to {}",
+            source_file_path.display(),
+            dest_file_path.display()
+        );
+        fs::copy(&source_file_path, &dest_file_path)
             .await
             .with_context(|| {
                 format!(
                     "Copy from {} to {} failed",
                     source_file_path.display(),
-                    dest_file_path.display(),
+                    dest_file_path.display()
                 )
             })?;
 
@@ -179,7 +135,7 @@ impl Storage {
         let mut remove_list = Vec::new();
         let mut updated_files: Vec<PathBuf> = Vec::new();
 
-        // Remove deleted files for tracking list.
+        // Remove deleted files for tracking list
         self.watched_files.retain(|st, _| {
             if st.exists() {
                 true
@@ -191,19 +147,10 @@ impl Storage {
 
         // Delete from target
         for path in remove_list {
+            // File has been deleted, remove it from target mount
             let target = self.make_target_path(path)?;
-            // The target may be a directory or a file. If it is a directory that is removed,
-            // we'll remove all files under that directory as well. Because of this, there's a
-            // chance the target (a subdirectory or file under a prior removed target) was already
-            // removed. Make sure we check if the target exists before checking the metadata, and
-            // don't return an error if the remove fails
-            if target.exists() && target.symlink_metadata()?.file_type().is_dir() {
-                debug!(logger, "Removing a directory: {}", target.display());
-                let _ = fs::remove_dir_all(target).await;
-            } else {
-                debug!(logger, "Removing a file: {}", target.display());
-                let _ = fs::remove_file(target).await;
-            }
+            debug!(logger, "Removing file from mount: {}", target.display());
+            let _ = fs::remove_file(target).await;
         }
 
         // Scan new & changed files
@@ -235,17 +182,24 @@ impl Storage {
         let mut size: u64 = 0;
         debug!(logger, "Scanning path: {}", path.display());
 
-        let metadata = path
-            .symlink_metadata()
-            .with_context(|| format!("Failed to query metadata for: {}", path.display()))?;
+        if path.is_file() {
+            let metadata = path
+                .metadata()
+                .with_context(|| format!("Failed to query metadata for: {}", path.display()))?;
 
-        let modified = metadata
-            .modified()
-            .with_context(|| format!("Failed to get modified date for: {}", path.display()))?;
+            let modified = metadata
+                .modified()
+                .with_context(|| format!("Failed to get modified date for: {}", path.display()))?;
 
-        // Treat files and symlinks the same:
-        if path.is_file() || metadata.file_type().is_symlink() {
             size += metadata.len();
+
+            ensure!(
+                self.watched_files.len() <= MAX_ENTRIES_PER_STORAGE,
+                WatcherError::MountTooManyFiles {
+                    count: self.watched_files.len(),
+                    mnt: self.source_mount_point.display().to_string()
+                }
+            );
 
             // Insert will return old entry if any
             if let Some(old_st) = self.watched_files.insert(path.to_path_buf(), modified) {
@@ -257,25 +211,7 @@ impl Storage {
                 debug!(logger, "New entry: {}", path.display());
                 update_list.push(PathBuf::from(&path))
             }
-
-            ensure!(
-                self.watched_files.len() <= MAX_ENTRIES_PER_STORAGE,
-                WatcherError::MountTooManyFiles {
-                    count: self.watched_files.len(),
-                    mnt: self.source_mount_point.display().to_string()
-                }
-            );
         } else {
-            // Handling regular directories - check  to see if this directory is already being tracked, and
-            // track if not:
-            if self
-                .watched_files
-                .insert(path.to_path_buf(), modified)
-                .is_none()
-            {
-                update_list.push(path.to_path_buf());
-            }
-
             // Scan dir recursively
             let mut entries = fs::read_dir(path)
                 .await
@@ -309,7 +245,7 @@ impl Storage {
             .with_context(|| {
                 format!(
                     "Failed to strip prefix: {} - {}",
-                    source_file_path.as_ref().display(),
+                    source_file_path.as_ref().display().to_string(),
                     &self.source_mount_point.display()
                 )
             })?;
@@ -333,19 +269,6 @@ impl SandboxStorages {
             let entry = Storage::new(storage)
                 .await
                 .with_context(|| "Failed to add storage")?;
-
-            // If the storage source is a directory, let's create the target mount point:
-            if entry.source_mount_point.as_path().is_dir() {
-                fs::create_dir_all(&entry.target_mount_point)
-                    .await
-                    .with_context(|| {
-                        format!(
-                            "Unable to mkdir all for {}",
-                            entry.target_mount_point.display()
-                        )
-                    })?;
-            }
-
             self.0.push(entry);
         }
 
@@ -391,14 +314,16 @@ impl SandboxStorages {
                             }
                         }
 
-                        match baremount(
-                            entry.source_mount_point.as_path(),
-                            entry.target_mount_point.as_path(),
+                        match BareMount::new(
+                            entry.source_mount_point.to_str().unwrap(),
+                            entry.target_mount_point.to_str().unwrap(),
                             "bind",
                             MsFlags::MS_BIND,
                             "bind",
                             logger,
-                        ) {
+                        )
+                        .mount()
+                        {
                             Ok(_) => {
                                 entry.watch = false;
                                 info!(logger, "watchable mount replaced with bind mount")
@@ -502,14 +427,15 @@ impl BindWatcher {
     async fn mount(&self, logger: &Logger) -> Result<()> {
         fs::create_dir_all(WATCH_MOUNT_POINT_PATH).await?;
 
-        baremount(
-            Path::new("tmpfs"),
-            Path::new(WATCH_MOUNT_POINT_PATH),
+        BareMount::new(
+            "tmpfs",
+            WATCH_MOUNT_POINT_PATH,
             "tmpfs",
             MsFlags::empty(),
             "",
             logger,
-        )?;
+        )
+        .mount()?;
 
         Ok(())
     }
@@ -529,7 +455,6 @@ mod tests {
     use super::*;
     use crate::mount::is_mounted;
     use crate::skip_if_not_root;
-    use nix::unistd::{Gid, Uid};
     use std::fs;
     use std::thread;
 
@@ -548,85 +473,6 @@ mod tests {
         };
 
         Ok((storage, src_path))
-    }
-
-    #[tokio::test]
-    async fn test_empty_sourcedir_check() {
-        //skip_if_not_root!();
-        let dir = tempfile::tempdir().expect("failed to create tempdir");
-
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        let src_path = dir.path().join("src");
-        let dest_path = dir.path().join("dest");
-        let src_filename = src_path.to_str().expect("failed to create src filename");
-        let dest_filename = dest_path.to_str().expect("failed to create dest filename");
-
-        std::fs::create_dir_all(src_filename).expect("failed to create path");
-
-        let storage = protos::Storage {
-            source: src_filename.to_string(),
-            mount_point: dest_filename.to_string(),
-            ..Default::default()
-        };
-
-        let mut entries = SandboxStorages {
-            ..Default::default()
-        };
-
-        entries
-            .add(std::iter::once(storage), &logger)
-            .await
-            .unwrap();
-
-        assert!(entries.check(&logger).await.is_ok());
-        assert_eq!(entries.0.len(), 1);
-
-        assert_eq!(std::fs::read_dir(src_path).unwrap().count(), 0);
-        assert_eq!(std::fs::read_dir(dest_path).unwrap().count(), 0);
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_single_file_check() {
-        //skip_if_not_root!();
-        let dir = tempfile::tempdir().expect("failed to create tempdir");
-
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        let src_file_path = dir.path().join("src.txt");
-        let dest_file_path = dir.path().join("dest.txt");
-
-        let src_filename = src_file_path
-            .to_str()
-            .expect("failed to create src filename");
-        let dest_filename = dest_file_path
-            .to_str()
-            .expect("failed to create dest filename");
-
-        let storage = protos::Storage {
-            source: src_filename.to_string(),
-            mount_point: dest_filename.to_string(),
-            ..Default::default()
-        };
-
-        //create file
-        fs::write(src_file_path, "original").unwrap();
-
-        let mut entries = SandboxStorages::default();
-
-        entries
-            .add(std::iter::once(storage), &logger)
-            .await
-            .unwrap();
-
-        assert!(entries.check(&logger).await.is_ok());
-        assert_eq!(entries.0.len(), 1);
-
-        // there should only be 2 files
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
-
-        assert_eq!(fs::read_to_string(dest_file_path).unwrap(), "original");
     }
 
     #[tokio::test]
@@ -677,7 +523,7 @@ mod tests {
             .unwrap();
 
         // setup storage3: many files, but still watchable
-        for i in 1..MAX_ENTRIES_PER_STORAGE {
+        for i in 1..MAX_ENTRIES_PER_STORAGE + 1 {
             fs::write(src3_path.join(format!("{}.txt", i)), "original").unwrap();
         }
 
@@ -686,9 +532,6 @@ mod tests {
         let mut entries = SandboxStorages {
             ..Default::default()
         };
-
-        // delay 20 ms between writes to files in order to ensure filesystem timestamps are unique
-        thread::sleep(Duration::from_millis(20));
 
         entries
             .add(std::iter::once(storage0), &logger)
@@ -742,7 +585,7 @@ mod tests {
             std::fs::read_dir(entries.0[3].target_mount_point.as_path())
                 .unwrap()
                 .count(),
-            MAX_ENTRIES_PER_STORAGE - 1
+            MAX_ENTRIES_PER_STORAGE
         );
 
         // Add two files to storage 0, verify it is updated without needing to run check:
@@ -759,9 +602,6 @@ mod tests {
             fs::read_to_string(&entries.0[0].target_mount_point.as_path().join("1.txt")).unwrap(),
             "updated"
         );
-
-        // delay 20 ms between writes to files in order to ensure filesystem timestamps are unique
-        thread::sleep(Duration::from_millis(20));
 
         //
         // Prepare for second check: update mount sources
@@ -815,7 +655,7 @@ mod tests {
             std::fs::read_dir(entries.0[3].target_mount_point.as_path())
                 .unwrap()
                 .count(),
-            MAX_ENTRIES_PER_STORAGE
+            MAX_ENTRIES_PER_STORAGE + 1
         );
 
         // verify that we can remove files as well, but that it isn't observed until check is run
@@ -893,20 +733,15 @@ mod tests {
         fs::remove_file(source_dir.path().join("big.txt")).unwrap();
         fs::remove_file(source_dir.path().join("too-big.txt")).unwrap();
 
-        assert_eq!(entry.scan(&logger).await.unwrap(), 0);
-
-        // Up to 15 files should be okay (can watch 15 files + 1 directory)
-        for i in 1..MAX_ENTRIES_PER_STORAGE {
+        // Up to 16 files should be okay:
+        for i in 1..MAX_ENTRIES_PER_STORAGE + 1 {
             fs::write(source_dir.path().join(format!("{}.txt", i)), "original").unwrap();
         }
 
-        assert_eq!(
-            entry.scan(&logger).await.unwrap(),
-            MAX_ENTRIES_PER_STORAGE - 1
-        );
+        assert_eq!(entry.scan(&logger).await.unwrap(), MAX_ENTRIES_PER_STORAGE);
 
-        // 16 files wll be too many:
-        fs::write(source_dir.path().join("16.txt"), "updated").unwrap();
+        // 17 files is too many:
+        fs::write(source_dir.path().join("17.txt"), "updated").unwrap();
         thread::sleep(Duration::from_secs(1));
 
         // Expect to receive a MountTooManyFiles error
@@ -920,193 +755,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_copy() {
-        skip_if_not_root!();
-
-        // prepare tmp src/destination
-        let source_dir = tempfile::tempdir().unwrap();
-        let dest_dir = tempfile::tempdir().unwrap();
-        let uid = Uid::from_raw(10);
-        let gid = Gid::from_raw(200);
-
-        // verify copy of a regular file
-        let src_file = source_dir.path().join("file.txt");
-        let dst_file = dest_dir.path().join("file.txt");
-        fs::write(&src_file, "foo").unwrap();
-        nix::unistd::chown(&src_file, Some(uid), Some(gid)).unwrap();
-
-        copy(&src_file, &dst_file).await.unwrap();
-        // verify destination:
-        assert!(!fs::symlink_metadata(&dst_file)
-            .unwrap()
-            .file_type()
-            .is_symlink());
-        assert_eq!(fs::metadata(&dst_file).unwrap().uid(), uid.as_raw());
-        assert_eq!(fs::metadata(&dst_file).unwrap().gid(), gid.as_raw());
-
-        // verify copy of a symlink
-        let src_symlink_file = source_dir.path().join("symlink_file.txt");
-        let dst_symlink_file = dest_dir.path().join("symlink_file.txt");
-        tokio::fs::symlink(&src_file, &src_symlink_file)
-            .await
-            .unwrap();
-        copy(&src_symlink_file, &dst_symlink_file).await.unwrap();
-        // verify destination:
-        assert!(fs::symlink_metadata(&dst_symlink_file)
-            .unwrap()
-            .file_type()
-            .is_symlink());
-        assert_eq!(fs::read_link(&dst_symlink_file).unwrap(), src_file);
-        assert_eq!(fs::read_to_string(&dst_symlink_file).unwrap(), "foo");
-        assert_ne!(fs::metadata(&dst_symlink_file).unwrap().uid(), uid.as_raw());
-        assert_ne!(fs::metadata(&dst_symlink_file).unwrap().gid(), gid.as_raw());
-    }
-
-    #[tokio::test]
-    async fn watch_directory_verify_dir_removal() {
-        let source_dir = tempfile::tempdir().unwrap();
-        let dest_dir = tempfile::tempdir().unwrap();
-
-        let mut entry = Storage::new(protos::Storage {
-            source: source_dir.path().display().to_string(),
-            mount_point: dest_dir.path().display().to_string(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        // create a path we'll remove later
-        fs::create_dir_all(source_dir.path().join("tmp")).unwrap();
-        fs::write(&source_dir.path().join("tmp/test-file"), "foo").unwrap();
-        assert_eq!(entry.scan(&logger).await.unwrap(), 3); // root, ./tmp, test-file
-
-        // Verify expected directory, file:
-        assert_eq!(
-            std::fs::read_dir(dest_dir.path().join("tmp"))
-                .unwrap()
-                .count(),
-            1
-        );
-        assert_eq!(std::fs::read_dir(&dest_dir).unwrap().count(), 1);
-
-        // Now, remove directory, and verify that the directory (and its file) are removed:
-        fs::remove_dir_all(source_dir.path().join("tmp")).unwrap();
-        thread::sleep(Duration::from_secs(1));
-        assert_eq!(entry.scan(&logger).await.unwrap(), 0);
-
-        assert_eq!(std::fs::read_dir(&dest_dir).unwrap().count(), 0);
-
-        assert_eq!(entry.scan(&logger).await.unwrap(), 0);
-    }
-
-    #[tokio::test]
-    async fn watch_directory_with_symlinks() {
-        // Prepare source directory:
-        // ..2021_10_29_03_10_48.161654083/file.txt
-        // ..data -> ..2021_10_29_03_10_48.161654083
-        // file.txt -> ..data/file.txt
-
-        let source_dir = tempfile::tempdir().unwrap();
-        let actual_dir = source_dir.path().join("..2021_10_29_03_10_48.161654083");
-        let actual_file = actual_dir.join("file.txt");
-        let sym_dir = source_dir.path().join("..data");
-        let sym_file = source_dir.path().join("file.txt");
-
-        let relative_to_dir = PathBuf::from("..2021_10_29_03_10_48.161654083");
-
-        // create backing file/path
-        fs::create_dir_all(&actual_dir).unwrap();
-        fs::write(&actual_file, "two").unwrap();
-
-        // create indirection symlink directory that points to the directory that holds the actual file:
-        tokio::fs::symlink(&relative_to_dir, &sym_dir)
-            .await
-            .unwrap();
-
-        // create presented data file symlink:
-        tokio::fs::symlink(PathBuf::from("..data/file.txt"), sym_file)
-            .await
-            .unwrap();
-
-        let dest_dir = tempfile::tempdir().unwrap();
-
-        // delay 20 ms between writes to files in order to ensure filesystem timestamps are unique
-        thread::sleep(Duration::from_millis(20));
-
-        let mut entry = Storage::new(protos::Storage {
-            source: source_dir.path().display().to_string(),
-            mount_point: dest_dir.path().display().to_string(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-        let logger = slog::Logger::root(slog::Discard, o!());
-
-        assert_eq!(entry.scan(&logger).await.unwrap(), 5);
-
-        // Should copy no files since nothing is changed since last check
-        assert_eq!(entry.scan(&logger).await.unwrap(), 0);
-
-        // now what, what is updated?
-        fs::write(actual_file, "updated").unwrap();
-
-        // delay 20 ms between writes to files in order to ensure filesystem timestamps are unique
-        thread::sleep(Duration::from_millis(20));
-
-        assert_eq!(entry.scan(&logger).await.unwrap(), 1);
-
-        assert_eq!(
-            fs::read_to_string(dest_dir.path().join("file.txt")).unwrap(),
-            "updated"
-        );
-
-        // Verify that resulting file.txt is a symlink:
-        assert!(
-            tokio::fs::symlink_metadata(dest_dir.path().join("file.txt"))
-                .await
-                .unwrap()
-                .file_type()
-                .is_symlink()
-        );
-
-        // Verify that .data directory is a symlink:
-        assert!(tokio::fs::symlink_metadata(&dest_dir.path().join("..data"))
-            .await
-            .unwrap()
-            .file_type()
-            .is_symlink());
-
-        // Should copy no new files after copy happened
-        assert_eq!(entry.scan(&logger).await.unwrap(), 0);
-
-        // Now, simulate configmap update.
-        //  - create a new actual dir/file,
-        //  - update the symlink directory to point to this one
-        //  - remove old dir/file
-        let new_actual_dir = source_dir.path().join("..2021_10_31");
-        let new_actual_file = new_actual_dir.join("file.txt");
-        fs::create_dir_all(&new_actual_dir).unwrap();
-        fs::write(&new_actual_file, "new configmap").unwrap();
-
-        tokio::fs::remove_file(&sym_dir).await.unwrap();
-        tokio::fs::symlink(PathBuf::from("..2021_10_31"), &sym_dir)
-            .await
-            .unwrap();
-        tokio::fs::remove_dir_all(&actual_dir).await.unwrap();
-
-        assert_eq!(entry.scan(&logger).await.unwrap(), 3); // file, file-dir, symlink
-        assert_eq!(
-            fs::read_to_string(dest_dir.path().join("file.txt")).unwrap(),
-            "new configmap"
-        );
-    }
-
-    #[tokio::test]
     async fn watch_directory() {
-        skip_if_not_root!();
-
         // Prepare source directory:
         // ./tmp/1.txt
         // ./tmp/A/B/2.txt
@@ -1115,15 +764,6 @@ mod tests {
         fs::create_dir_all(source_dir.path().join("A/B")).unwrap();
         fs::write(source_dir.path().join("A/B/1.txt"), "two").unwrap();
 
-        // A/C is an empty directory
-        let empty_dir = "A/C";
-        let path = source_dir.path().join(empty_dir);
-        fs::create_dir_all(&path).unwrap();
-        nix::unistd::chown(&path, Some(Uid::from_raw(10)), Some(Gid::from_raw(200))).unwrap();
-
-        // delay 20 ms between writes to files in order to ensure filesystem timestamps are unique
-        thread::sleep(Duration::from_millis(20));
-
         let dest_dir = tempfile::tempdir().unwrap();
 
         let mut entry = Storage::new(protos::Storage {
@@ -1136,14 +776,13 @@ mod tests {
 
         let logger = slog::Logger::root(slog::Discard, o!());
 
-        assert_eq!(entry.scan(&logger).await.unwrap(), 6);
-
-        // check empty directory
-        assert!(dest_dir.path().join(empty_dir).exists());
+        assert_eq!(entry.scan(&logger).await.unwrap(), 2);
 
         // Should copy no files since nothing is changed since last check
         assert_eq!(entry.scan(&logger).await.unwrap(), 0);
 
+        // Should copy 1 file
+        thread::sleep(Duration::from_secs(1));
         fs::write(source_dir.path().join("A/B/1.txt"), "updated").unwrap();
         assert_eq!(entry.scan(&logger).await.unwrap(), 1);
         assert_eq!(
@@ -1151,23 +790,12 @@ mod tests {
             "updated"
         );
 
-        // delay 20 ms between writes to files in order to ensure filesystem timestamps are unique
-        thread::sleep(Duration::from_millis(20));
-
         // Should copy no new files after copy happened
         assert_eq!(entry.scan(&logger).await.unwrap(), 0);
 
         // Update another file
         fs::write(source_dir.path().join("1.txt"), "updated").unwrap();
         assert_eq!(entry.scan(&logger).await.unwrap(), 1);
-
-        // create another empty directory A/C/D
-        let empty_dir = "A/C/D";
-        let path = source_dir.path().join(empty_dir);
-        fs::create_dir_all(&path).unwrap();
-        nix::unistd::chown(&path, Some(Uid::from_raw(10)), Some(Gid::from_raw(200))).unwrap();
-        assert_eq!(entry.scan(&logger).await.unwrap(), 1);
-        assert!(dest_dir.path().join(empty_dir).exists());
     }
 
     #[tokio::test]
@@ -1192,9 +820,7 @@ mod tests {
 
         assert_eq!(entry.scan(&logger).await.unwrap(), 1);
 
-        // delay 20 ms between writes to files in order to ensure filesystem timestamps are unique
-        thread::sleep(Duration::from_millis(20));
-
+        thread::sleep(Duration::from_secs(1));
         fs::write(&source_file, "two").unwrap();
         assert_eq!(entry.scan(&logger).await.unwrap(), 1);
         assert_eq!(fs::read_to_string(&dest_file).unwrap(), "two");
@@ -1220,9 +846,8 @@ mod tests {
 
         let logger = slog::Logger::root(slog::Discard, o!());
 
-        // expect the root directory and the file:
-        assert_eq!(entry.scan(&logger).await.unwrap(), 2);
-        assert_eq!(entry.watched_files.len(), 2);
+        assert_eq!(entry.scan(&logger).await.unwrap(), 1);
+        assert_eq!(entry.watched_files.len(), 1);
 
         assert!(target_file.exists());
         assert!(entry.watched_files.contains_key(&source_file));
@@ -1232,7 +857,7 @@ mod tests {
 
         assert_eq!(entry.scan(&logger).await.unwrap(), 0);
 
-        assert_eq!(entry.watched_files.len(), 1);
+        assert_eq!(entry.watched_files.len(), 0);
         assert!(!target_file.exists());
     }
 
@@ -1265,10 +890,7 @@ mod tests {
         );
     }
 
-    use serial_test::serial;
-
     #[tokio::test]
-    #[serial]
     async fn create_tmpfs() {
         skip_if_not_root!();
 
@@ -1278,14 +900,11 @@ mod tests {
         watcher.mount(&logger).await.unwrap();
         assert!(is_mounted(WATCH_MOUNT_POINT_PATH).unwrap());
 
-        thread::sleep(Duration::from_millis(20));
-
         watcher.cleanup();
         assert!(!is_mounted(WATCH_MOUNT_POINT_PATH).unwrap());
     }
 
     #[tokio::test]
-    #[serial]
     async fn spawn_thread() {
         skip_if_not_root!();
 
@@ -1315,7 +934,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn verify_container_cleanup_watching() {
         skip_if_not_root!();
 

@@ -6,204 +6,7 @@
 
 package katatestutils
 
-import (
-	"encoding/json"
-	"errors"
-	"os"
-	"path/filepath"
-	"strconv"
-	"testing"
-
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/assert"
-)
-
-const (
-	testDirMode  = os.FileMode(0750)
-	testFileMode = os.FileMode(0640)
-
-	busyboxConfigJson = `
-{
-	"ociVersion": "1.0.1-dev",
-	"process": {
-		"terminal": true,
-		"user": {
-			"uid": 0,
-			"gid": 0
-		},
-		"args": [
-			"sh"
-		],
-		"env": [
-			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-			"TERM=xterm"
-		],
-		"cwd": "/",
-		"capabilities": {
-			"bounding": [
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
-				"CAP_NET_BIND_SERVICE"
-			],
-			"effective": [
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
-				"CAP_NET_BIND_SERVICE"
-			],
-			"inheritable": [
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
-				"CAP_NET_BIND_SERVICE"
-			],
-			"permitted": [
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
-				"CAP_NET_BIND_SERVICE"
-			],
-			"ambient": [
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
-				"CAP_NET_BIND_SERVICE"
-			]
-		},
-		"rlimits": [
-			{
-				"type": "RLIMIT_NOFILE",
-				"hard": 1024,
-				"soft": 1024
-			}
-		],
-		"noNewPrivileges": true
-	},
-	"root": {
-		"path": "rootfs",
-		"readonly": true
-	},
-	"hostname": "runc",
-	"mounts": [
-		{
-			"destination": "/proc",
-			"type": "proc",
-			"source": "proc"
-		},
-		{
-			"destination": "/dev",
-			"type": "tmpfs",
-			"source": "tmpfs",
-			"options": [
-				"nosuid",
-				"strictatime",
-				"mode=755",
-				"size=65536k"
-			]
-		},
-		{
-			"destination": "/dev/pts",
-			"type": "devpts",
-			"source": "devpts",
-			"options": [
-				"nosuid",
-				"noexec",
-				"newinstance",
-				"ptmxmode=0666",
-				"mode=0620",
-				"gid=5"
-			]
-		},
-		{
-			"destination": "/dev/shm",
-			"type": "tmpfs",
-			"source": "shm",
-			"options": [
-				"nosuid",
-				"noexec",
-				"nodev",
-				"mode=1777",
-				"size=65536k"
-			]
-		},
-		{
-			"destination": "/dev/mqueue",
-			"type": "mqueue",
-			"source": "mqueue",
-			"options": [
-				"nosuid",
-				"noexec",
-				"nodev"
-			]
-		},
-		{
-			"destination": "/sys",
-			"type": "sysfs",
-			"source": "sysfs",
-			"options": [
-				"nosuid",
-				"noexec",
-				"nodev",
-				"ro"
-			]
-		},
-		{
-			"destination": "/sys/fs/cgroup",
-			"type": "cgroup",
-			"source": "cgroup",
-			"options": [
-				"nosuid",
-				"noexec",
-				"nodev",
-				"relatime",
-				"ro"
-			]
-		}
-	],
-	"linux": {
-		"resources": {
-			"devices": [
-				{
-					"allow": false,
-					"access": "rwm"
-				}
-			]
-		},
-		"namespaces": [
-			{
-				"type": "pid"
-			},
-			{
-				"type": "network"
-			},
-			{
-				"type": "ipc"
-			},
-			{
-				"type": "uts"
-			},
-			{
-				"type": "mount"
-			}
-		],
-		"maskedPaths": [
-			"/proc/acpi",
-			"/proc/asound",
-			"/proc/kcore",
-			"/proc/keys",
-			"/proc/latency_stats",
-			"/proc/timer_list",
-			"/proc/timer_stats",
-			"/proc/sched_debug",
-			"/sys/firmware",
-			"/proc/scsi"
-		],
-		"readonlyPaths": [
-			"/proc/bus",
-			"/proc/fs",
-			"/proc/irq",
-			"/proc/sys",
-			"/proc/sysrq-trigger"
-		]
-	}
-}`
-)
+import "strconv"
 
 type RuntimeConfigOptions struct {
 	Hypervisor           string
@@ -214,8 +17,11 @@ type RuntimeConfigOptions struct {
 	KernelParams         string
 	MachineType          string
 	ShimPath             string
+	NetmonPath           string
 	LogPath              string
 	BlockDeviceDriver    string
+	AgentTraceMode       string
+	AgentTraceType       string
 	SharedFS             string
 	VirtioFSDaemon       string
 	JaegerEndpoint       string
@@ -226,7 +32,6 @@ type RuntimeConfigOptions struct {
 	DefaultVCPUCount     uint32
 	DefaultMaxVCPUCount  uint32
 	DefaultMemSize       uint32
-	DefaultMaxMemorySize uint64
 	DefaultMsize9p       uint32
 	DisableBlock         bool
 	EnableIOThreads      bool
@@ -236,6 +41,7 @@ type RuntimeConfigOptions struct {
 	RuntimeDebug         bool
 	RuntimeTrace         bool
 	ShimDebug            bool
+	NetmonDebug          bool
 	AgentDebug           bool
 	AgentTrace           bool
 	EnablePprof          bool
@@ -328,6 +134,12 @@ func MakeRuntimeConfigFileData(config RuntimeConfigOptions) string {
 	[agent.kata]
 	enable_debug = ` + strconv.FormatBool(config.AgentDebug) + `
 	enable_tracing = ` + strconv.FormatBool(config.AgentTrace) + `
+	trace_mode = "` + config.AgentTraceMode + `"` + `
+	trace_type = "` + config.AgentTraceType + `"` + `
+
+	[netmon]
+	path = "` + config.NetmonPath + `"
+	enable_debug = ` + strconv.FormatBool(config.NetmonDebug) + `
 
 	[runtime]
 	enable_debug = ` + strconv.FormatBool(config.RuntimeDebug) + `
@@ -337,39 +149,4 @@ func MakeRuntimeConfigFileData(config RuntimeConfigOptions) string {
 	jaeger_endpoint= "` + config.JaegerEndpoint + `"
 	jaeger_user= "` + config.JaegerUser + `"
 	jaeger_password= "` + config.JaegerPassword + `"`
-}
-
-func IsInGitHubActions() bool {
-	// https://docs.github.com/en/actions/reference/environment-variables#default-environment-variables
-	return os.Getenv("GITHUB_ACTIONS") == "true"
-}
-
-func SetupOCIConfigFile(t *testing.T) (rootPath string, bundlePath, ociConfigFile string) {
-	assert := assert.New(t)
-
-	tmpdir := t.TempDir()
-
-	bundlePath = filepath.Join(tmpdir, "bundle")
-	err := os.MkdirAll(bundlePath, testDirMode)
-	assert.NoError(err)
-
-	ociConfigFile = filepath.Join(bundlePath, "config.json")
-	err = os.WriteFile(ociConfigFile, []byte(busyboxConfigJson), testFileMode)
-	assert.NoError(err)
-
-	return tmpdir, bundlePath, ociConfigFile
-}
-
-// WriteOCIConfigFile using spec to update OCI config file by path configPath
-func WriteOCIConfigFile(spec specs.Spec, configPath string) error {
-	if configPath == "" {
-		return errors.New("BUG: need config file path")
-	}
-
-	bytes, err := json.MarshalIndent(spec, "", "\t")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(configPath, bytes, testFileMode)
 }

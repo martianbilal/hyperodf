@@ -17,73 +17,16 @@ standard implementation of lightweight Virtual Machines (VMs) that feel and
 perform like containers, but provide the workload isolation and security
 advantages of VMs.
 
-## License
-
-The code is licensed under the Apache 2.0 license.
-See [the license file](LICENSE) for further details.
-
-## Platform support
-
-Kata Containers currently runs on 64-bit systems supporting the following
-technologies:
-
-| Architecture | Virtualization technology |
-|-|-|
-| `x86_64`, `amd64` | [Intel](https://www.intel.com) VT-x, AMD SVM |
-| `aarch64` ("`arm64`")| [ARM](https://www.arm.com) Hyp |
-| `ppc64le` | [IBM](https://www.ibm.com) Power |
-| `s390x` | [IBM](https://www.ibm.com) Z & LinuxONE SIE |
-
-### Hardware requirements
-
-The [Kata Containers runtime](src/runtime) provides a command to
-determine if your host system is capable of running and creating a
-Kata Container:
-
-```bash
-$ kata-runtime check
-```
-
-> **Notes:**
->
-> - This command runs a number of checks including connecting to the
->   network to determine if a newer release of Kata Containers is
->   available on GitHub. If you do not wish this to check to run, add
->   the `--no-network-checks` option.
->
-> - By default, only a brief success / failure message is printed.
->   If more details are needed, the `--verbose` flag can be used to display the
->   list of all the checks performed.
->
-> - If the command is run as the `root` user additional checks are
->   run (including checking if another incompatible hypervisor is running).
->   When running as `root`, network checks are automatically disabled.
-
 ## Getting started
 
 See the [installation documentation](docs/install).
 
 ## Documentation
 
-See the [official documentation](docs) including:
-
-- [Installation guides](docs/install)
-- [Developer guide](docs/Developer-Guide.md)
-- [Design documents](docs/design)
-  - [Architecture overview](docs/design/architecture)
-
-## Configuration
-
-Kata Containers uses a single
-[configuration file](src/runtime/README.md#configuration)
-which contains a number of sections for various parts of the Kata
-Containers system including the [runtime](src/runtime), the
-[agent](src/agent) and the [hypervisor](#hypervisors).
-
-## Hypervisors
-
-See the [hypervisors document](docs/hypervisors.md) and the
-[Hypervisor specific configuration details](src/runtime/README.md#hypervisor-specific-configuration).
+See the [official documentation](docs)
+(including [installation guides](docs/install),
+[the developer guide](docs/Developer-Guide.md),
+[design documents](docs/design) and more).
 
 ## Community
 
@@ -105,8 +48,6 @@ Please raise an issue
 
 ## Developers
 
-See the [developer guide](docs/Developer-Guide.md).
-
 ### Components
 
 ### Main components
@@ -118,7 +59,6 @@ The table below lists the core parts of the project:
 | [runtime](src/runtime) | core | Main component run by a container manager and providing a containerd shimv2 runtime implementation. |
 | [agent](src/agent) | core | Management process running inside the virtual machine / POD that sets up the container environment. |
 | [documentation](docs) | documentation | Documentation common to all components (such as design and install documentation). |
-| [libraries](src/libs) | core | Library crates shared by multiple Kata Container components or published to [`crates.io`](https://crates.io/index.html) |
 | [tests](https://github.com/kata-containers/tests) | tests | Excludes unit tests which live with the main code. |
 
 ### Additional components
@@ -130,9 +70,8 @@ The table below lists the remaining parts of the project:
 | [packaging](tools/packaging) | infrastructure | Scripts and metadata for producing packaged binaries<br/>(components, hypervisors, kernel and rootfs). |
 | [kernel](https://www.kernel.org) | kernel | Linux kernel used by the hypervisor to boot the guest image. Patches are stored [here](tools/packaging/kernel). |
 | [osbuilder](tools/osbuilder) | infrastructure | Tool to create "mini O/S" rootfs and initrd images and kernel for the hypervisor. |
-| [`agent-ctl`](src/tools/agent-ctl) | utility | Tool that provides low-level access for testing the agent. |
-| [`trace-forwarder`](src/tools/trace-forwarder) | utility | Agent tracing helper. |
-| [`runk`](src/tools/runk) | utility | Standard OCI container runtime based on the agent. |
+| [`agent-ctl`](tools/agent-ctl) | utility | Tool that provides low-level access for testing the agent. |
+| [`trace-forwarder`](src/trace-forwarder) | utility | Agent tracing helper. |
 | [`ci`](https://github.com/kata-containers/ci) | CI | Continuous Integration configuration files and scripts. |
 | [`katacontainers.io`](https://github.com/kata-containers/www.katacontainers.io) | Source for the [`katacontainers.io`](https://www.katacontainers.io) site. |
 
@@ -140,9 +79,13 @@ The table below lists the remaining parts of the project:
 
 Kata Containers is now
 [available natively for most distributions](docs/install/README.md#packaged-installation-methods).
-However, packaging scripts and metadata are still used to generate [snap](snap/local) and GitHub releases. See
+However, packaging scripts and metadata are still used to generate snap and GitHub releases. See
 the [components](#components) section for further details.
 
 ## Glossary of Terms
 
-See the [glossary of terms](https://github.com/kata-containers/kata-containers/wiki/Glossary) related to Kata Containers.
+See the [glossary of terms](Glossary.md) related to Kata Containers.
+---
+
+[kernel]: https://www.kernel.org
+[github-katacontainers.io]: https://github.com/kata-containers/www.katacontainers.io

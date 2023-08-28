@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Tap** | Pointer to **string** |  | [optional] 
+**Tap** | Pointer to **string** |  | [optional] [default to ""]
 **Ip** | Pointer to **string** |  | [optional] [default to "192.168.249.1"]
 **Mask** | Pointer to **string** |  | [optional] [default to "255.255.255.0"]
 **Mac** | Pointer to **string** |  | [optional] 
@@ -13,9 +13,9 @@ Name | Type | Description | Notes
 **QueueSize** | Pointer to **int32** |  | [optional] [default to 256]
 **VhostUser** | Pointer to **bool** |  | [optional] [default to false]
 **VhostSocket** | Pointer to **string** |  | [optional] 
-**VhostMode** | Pointer to **string** |  | [optional] [default to "Client"]
+**VhostMode** | Pointer to **string** |  | [optional] [default to "client"]
 **Id** | Pointer to **string** |  | [optional] 
-**PciSegment** | Pointer to **int32** |  | [optional] 
+**Fd** | Pointer to **[]int32** |  | [optional] 
 **RateLimiterConfig** | Pointer to [**RateLimiterConfig**](RateLimiterConfig.md) |  | [optional] 
 
 ## Methods
@@ -312,30 +312,30 @@ SetId sets Id field to given value.
 
 HasId returns a boolean if a field has been set.
 
-### GetPciSegment
+### GetFd
 
-`func (o *NetConfig) GetPciSegment() int32`
+`func (o *NetConfig) GetFd() []int32`
 
-GetPciSegment returns the PciSegment field if non-nil, zero value otherwise.
+GetFd returns the Fd field if non-nil, zero value otherwise.
 
-### GetPciSegmentOk
+### GetFdOk
 
-`func (o *NetConfig) GetPciSegmentOk() (*int32, bool)`
+`func (o *NetConfig) GetFdOk() (*[]int32, bool)`
 
-GetPciSegmentOk returns a tuple with the PciSegment field if it's non-nil, zero value otherwise
+GetFdOk returns a tuple with the Fd field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetPciSegment
+### SetFd
 
-`func (o *NetConfig) SetPciSegment(v int32)`
+`func (o *NetConfig) SetFd(v []int32)`
 
-SetPciSegment sets PciSegment field to given value.
+SetFd sets Fd field to given value.
 
-### HasPciSegment
+### HasFd
 
-`func (o *NetConfig) HasPciSegment() bool`
+`func (o *NetConfig) HasFd() bool`
 
-HasPciSegment returns a boolean if a field has been set.
+HasFd returns a boolean if a field has been set.
 
 ### GetRateLimiterConfig
 

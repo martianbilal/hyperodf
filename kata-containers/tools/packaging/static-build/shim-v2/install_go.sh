@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2018 Intel Corporation
 #
@@ -31,7 +31,7 @@ info() {
 
 usage(){
 	exit_code="$1"
-	cat <<EOF
+	cat <<EOT
 Usage:
 
 ${script_name} [options]
@@ -41,9 +41,7 @@ ${script_name}
 
 Options
 -d <path> : destination path, path where go will be installed.
--f        : enable force install, remove existent go pkg before installation.
--h        : display this help.
-EOF
+EOT
 
 	exit "$exit_code"
 }
@@ -52,7 +50,7 @@ trap finish EXIT
 
 pushd "${tmp_dir}"
 
-while getopts "d:fh" opt
+while getopts "d:fhp" opt
 do
 	case $opt in
 		d)	install_dest="${OPTARG}" ;;

@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // PatchGuestNetworkInterfaceByIDReader is a Reader for the PatchGuestNetworkInterfaceByID structure.
@@ -23,18 +24,21 @@ type PatchGuestNetworkInterfaceByIDReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *PatchGuestNetworkInterfaceByIDReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewPatchGuestNetworkInterfaceByIDNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewPatchGuestNetworkInterfaceByIDBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewPatchGuestNetworkInterfaceByIDDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewPatchGuestNetworkInterfaceByIDNoContent() *PatchGuestNetworkInterfaceByI
 	return &PatchGuestNetworkInterfaceByIDNoContent{}
 }
 
-/* PatchGuestNetworkInterfaceByIDNoContent describes a response with status code 204, with default header values.
+/*PatchGuestNetworkInterfaceByIDNoContent handles this case with default header values.
 
 Network interface updated
 */
@@ -73,7 +77,7 @@ func NewPatchGuestNetworkInterfaceByIDBadRequest() *PatchGuestNetworkInterfaceBy
 	return &PatchGuestNetworkInterfaceByIDBadRequest{}
 }
 
-/* PatchGuestNetworkInterfaceByIDBadRequest describes a response with status code 400, with default header values.
+/*PatchGuestNetworkInterfaceByIDBadRequest handles this case with default header values.
 
 Network interface cannot be updated due to bad input
 */
@@ -83,9 +87,6 @@ type PatchGuestNetworkInterfaceByIDBadRequest struct {
 
 func (o *PatchGuestNetworkInterfaceByIDBadRequest) Error() string {
 	return fmt.Sprintf("[PATCH /network-interfaces/{iface_id}][%d] patchGuestNetworkInterfaceByIdBadRequest  %+v", 400, o.Payload)
-}
-func (o *PatchGuestNetworkInterfaceByIDBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PatchGuestNetworkInterfaceByIDBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewPatchGuestNetworkInterfaceByIDDefault(code int) *PatchGuestNetworkInterf
 	}
 }
 
-/* PatchGuestNetworkInterfaceByIDDefault describes a response with status code -1, with default header values.
+/*PatchGuestNetworkInterfaceByIDDefault handles this case with default header values.
 
 Internal server error
 */
@@ -124,9 +125,6 @@ func (o *PatchGuestNetworkInterfaceByIDDefault) Code() int {
 
 func (o *PatchGuestNetworkInterfaceByIDDefault) Error() string {
 	return fmt.Sprintf("[PATCH /network-interfaces/{iface_id}][%d] patchGuestNetworkInterfaceByID default  %+v", o._statusCode, o.Payload)
-}
-func (o *PatchGuestNetworkInterfaceByIDDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PatchGuestNetworkInterfaceByIDDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

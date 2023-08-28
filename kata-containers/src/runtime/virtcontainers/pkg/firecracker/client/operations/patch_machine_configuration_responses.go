@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // PatchMachineConfigurationReader is a Reader for the PatchMachineConfiguration structure.
@@ -23,18 +24,21 @@ type PatchMachineConfigurationReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *PatchMachineConfigurationReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewPatchMachineConfigurationNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewPatchMachineConfigurationBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewPatchMachineConfigurationDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewPatchMachineConfigurationNoContent() *PatchMachineConfigurationNoContent
 	return &PatchMachineConfigurationNoContent{}
 }
 
-/* PatchMachineConfigurationNoContent describes a response with status code 204, with default header values.
+/*PatchMachineConfigurationNoContent handles this case with default header values.
 
 Machine Configuration created/updated
 */
@@ -73,7 +77,7 @@ func NewPatchMachineConfigurationBadRequest() *PatchMachineConfigurationBadReque
 	return &PatchMachineConfigurationBadRequest{}
 }
 
-/* PatchMachineConfigurationBadRequest describes a response with status code 400, with default header values.
+/*PatchMachineConfigurationBadRequest handles this case with default header values.
 
 Machine Configuration cannot be updated due to bad input
 */
@@ -83,9 +87,6 @@ type PatchMachineConfigurationBadRequest struct {
 
 func (o *PatchMachineConfigurationBadRequest) Error() string {
 	return fmt.Sprintf("[PATCH /machine-config][%d] patchMachineConfigurationBadRequest  %+v", 400, o.Payload)
-}
-func (o *PatchMachineConfigurationBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PatchMachineConfigurationBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewPatchMachineConfigurationDefault(code int) *PatchMachineConfigurationDef
 	}
 }
 
-/* PatchMachineConfigurationDefault describes a response with status code -1, with default header values.
+/*PatchMachineConfigurationDefault handles this case with default header values.
 
 Internal server error
 */
@@ -124,9 +125,6 @@ func (o *PatchMachineConfigurationDefault) Code() int {
 
 func (o *PatchMachineConfigurationDefault) Error() string {
 	return fmt.Sprintf("[PATCH /machine-config][%d] patchMachineConfiguration default  %+v", o._statusCode, o.Payload)
-}
-func (o *PatchMachineConfigurationDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PatchMachineConfigurationDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

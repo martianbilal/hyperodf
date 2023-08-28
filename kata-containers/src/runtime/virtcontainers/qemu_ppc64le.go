@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 IBM
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -12,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	govmmQemu "github.com/kata-containers/kata-containers/src/runtime/pkg/govmm/qemu"
+	govmmQemu "github.com/kata-containers/govmm/qemu"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	"github.com/sirupsen/logrus"
 )
@@ -41,6 +38,8 @@ const tpmHostPath = "/dev/tpmrm0"
 var kernelParams = []Param{
 	{"rcupdate.rcu_expedited", "1"},
 	{"reboot", "k"},
+	{"console", "hvc0"},
+	{"console", "hvc1"},
 	{"cryptomgr.notests", ""},
 	{"net.ifnames", "0"},
 }
@@ -52,7 +51,12 @@ var supportedQemuMachine = govmmQemu.Machine{
 
 // Logger returns a logrus logger appropriate for logging qemu messages
 func (q *qemuPPC64le) Logger() *logrus.Entry {
-	return hvLogger.WithField("subsystem", "qemuPPC64le")
+	return virtLog.WithField("subsystem", "qemuPPC64le")
+}
+
+// MaxQemuVCPUs returns the maximum number of vCPUs supported
+func MaxQemuVCPUs() uint32 {
+	return uint32(128)
 }
 
 func newQemuArch(config HypervisorConfig) (qemuArch, error) {
@@ -74,18 +78,12 @@ func newQemuArch(config HypervisorConfig) (qemuArch, error) {
 			kernelParamsDebug:    kernelParamsDebug,
 			kernelParams:         kernelParams,
 			protection:           noneProtection,
-			legacySerial:         config.LegacySerial,
 		},
 	}
 
 	if config.ConfidentialGuest {
 		if err := q.enableProtection(); err != nil {
 			return nil, err
-		}
-
-		if !q.qemuArchBase.disableNvdimm {
-			hvLogger.WithField("subsystem", "qemuPPC64le").Warn("Nvdimm is not supported with confidential guest, disabling it.")
-			q.qemuArchBase.disableNvdimm = true
 		}
 	}
 
@@ -125,6 +123,11 @@ func (q *qemuPPC64le) memoryTopology(memoryMb, hostMemoryMb uint64, slots uint8)
 	return genericMemoryTopology(memoryMb, hostMemoryMb, slots, q.memoryOffset)
 }
 
+// appendBridges appends to devices the given bridges
+func (q *qemuPPC64le) appendBridges(devices []govmmQemu.Device) []govmmQemu.Device {
+	return genericAppendBridges(devices, q.Bridges, q.qemuMachine.Type)
+}
+
 func (q *qemuPPC64le) appendIOMMU(devices []govmmQemu.Device) ([]govmmQemu.Device, error) {
 	return devices, fmt.Errorf("PPC64le does not support appending a vIOMMU")
 }
@@ -143,7 +146,7 @@ func (q *qemuPPC64le) enableProtection() error {
 			q.qemuMachine.Options += ","
 		}
 		q.qemuMachine.Options += fmt.Sprintf("confidential-guest-support=%s", pefID)
-		hvLogger.WithFields(logrus.Fields{
+		virtLog.WithFields(logrus.Fields{
 			"subsystem":     "qemuPPC64le",
 			"machine":       q.qemuMachine,
 			"kernel-params": q.kernelParams,
@@ -156,7 +159,7 @@ func (q *qemuPPC64le) enableProtection() error {
 }
 
 // append protection device
-func (q *qemuPPC64le) appendProtectionDevice(devices []govmmQemu.Device, firmware, firmwareVolume string) ([]govmmQemu.Device, string, error) {
+func (q *qemuPPC64le) appendProtectionDevice(devices []govmmQemu.Device, firmware string) ([]govmmQemu.Device, string, error) {
 	switch q.protection {
 	case pefProtection:
 		return append(devices,

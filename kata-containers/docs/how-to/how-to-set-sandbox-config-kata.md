@@ -34,6 +34,8 @@ There are several kinds of Kata configurations and they are listed below.
 | `io.katacontainers.config.agent.enable_tracing` | `boolean` | enable tracing for the agent |
 | `io.katacontainers.config.agent.container_pipe_size` | uint32 | specify the size of the std(in/out) pipes created for containers |
 | `io.katacontainers.config.agent.kernel_modules` | string | the list of kernel modules and their parameters that will be loaded in the guest kernel. Semicolon separated list of kernel modules and their parameters. These modules will be loaded in the guest kernel using `modprobe`(8). E.g., `e1000e InterruptThrottleRate=3000,3000,3000 EEE=1; i915 enable_ppgtt=0` |
+| `io.katacontainers.config.agent.trace_mode` | string | the trace mode for the agent |
+| `io.katacontainers.config.agent.trace_type` | string | the trace type for the agent |
 
 ## Hypervisor Options
 | Key | Value Type | Comments |
@@ -56,14 +58,13 @@ There are several kinds of Kata configurations and they are listed below.
 | `io.katacontainers.config.hypervisor.enable_iommu` | `boolean` | enable `iommu` on Q35 (QEMU x86_64) |
 | `io.katacontainers.config.hypervisor.enable_iothreads` | `boolean`| enable IO to be processed in a separate thread. Supported currently for virtio-`scsi` driver |
 | `io.katacontainers.config.hypervisor.enable_mem_prealloc` | `boolean` | the memory space used for `nvdimm` device by the hypervisor |
+| `io.katacontainers.config.hypervisor.enable_swap` | `boolean` | enable swap of VM memory |
 | `io.katacontainers.config.hypervisor.enable_vhost_user_store` | `boolean` | enable vhost-user storage device (QEMU) |
 | `io.katacontainers.config.hypervisor.enable_virtio_mem` | `boolean` | enable virtio-mem (QEMU) |
 | `io.katacontainers.config.hypervisor.entropy_source` (R) | string| the path to a host source of entropy (`/dev/random`, `/dev/urandom` or real hardware RNG device) |
 | `io.katacontainers.config.hypervisor.file_mem_backend` (R) | string | file based memory backend root directory |
 | `io.katacontainers.config.hypervisor.firmware_hash` | string | container firmware SHA-512 hash value |
 | `io.katacontainers.config.hypervisor.firmware` | string | the guest firmware that will run the container VM |
-| `io.katacontainers.config.hypervisor.firmware_volume_hash` | string | container firmware volume SHA-512 hash value |
-| `io.katacontainers.config.hypervisor.firmware_volume` | string | the guest firmware volume that will be passed to the container VM |
 | `io.katacontainers.config.hypervisor.guest_hook_path` | string | the path within the VM that will be used for drop in hooks |
 | `io.katacontainers.config.hypervisor.hotplug_vfio_on_root_bus` | `boolean` | indicate if devices need to be hotplugged on the root bus instead of a bridge|
 | `io.katacontainers.config.hypervisor.hypervisor_hash` | string | container hypervisor binary SHA-512 hash value |
@@ -90,14 +91,6 @@ There are several kinds of Kata configurations and they are listed below.
 | `io.katacontainers.config.hypervisor.virtio_fs_cache` | string | the cache mode for virtio-fs, valid values are `always`, `auto` and `none` |
 | `io.katacontainers.config.hypervisor.virtio_fs_daemon` | string | virtio-fs `vhost-user` daemon path |
 | `io.katacontainers.config.hypervisor.virtio_fs_extra_args` | string | extra options passed to `virtiofs` daemon |
-| `io.katacontainers.config.hypervisor.enable_guest_swap` | `boolean` | enable swap in the guest |
-| `io.katacontainers.config.hypervisor.use_legacy_serial` | `boolean` | uses legacy serial device for guest's console (QEMU) |
-
-## Container Options
-| Key | Value Type | Comments |
-|-------| ----- | ----- |
-| `io.katacontainers.container.resource.swappiness"` | `uint64` | specify the `Resources.Memory.Swappiness` |
-| `io.katacontainers.container.resource.swap_in_bytes"` | `uint64` | specify the `Resources.Memory.Swap` |
 
 # CRI-O Configuration
 
@@ -107,12 +100,11 @@ In case of CRI-O, all annotations specified in the pod spec are passed down to K
 
 For containerd, annotations specified in the pod spec are passed down to Kata
 starting with version `1.3.0` of containerd. Additionally, extra configuration is
-needed for containerd, by providing `pod_annotations` field and
-`container_annotations` field in the containerd config
-file.  The `pod_annotations` field and `container_annotations` field are two lists of
-annotations that can be passed down to Kata as OCI annotations. They support golang match
-patterns. Since annotations supported by Kata follow the pattern `io.katacontainers.*`,
-the following configuration would work for passing annotations to Kata from containerd:
+needed for containerd, by providing a `pod_annotations` field in the containerd config
+file.  The `pod_annotations` field is a list of annotations that can be passed down to
+Kata as OCI annotations. It supports golang match patterns. Since annotations supported
+by Kata follow the pattern `io.katacontainers.*`, the following configuration would work
+for passing annotations to Kata from containerd:
 
 ```
 $ cat /etc/containerd/config
@@ -121,7 +113,6 @@ $ cat /etc/containerd/config
          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.kata]
            runtime_type = "io.containerd.kata.v2"
            pod_annotations = ["io.katacontainers.*"]
-           container_annotations = ["io.katacontainers.*"]
 ....
 
 ```
@@ -173,7 +164,7 @@ kind: Pod
 metadata:
   name: pod2
   annotations:
-    io.katacontainers.config.runtime.disable_guest_seccomp: "false"
+    io.katacontainers.config.runtime.disable_guest_seccomp: false
 spec:
   runtimeClassName: kata
   containers:

@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -14,9 +11,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
-	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 )
 
@@ -99,7 +96,7 @@ func (endpoint *VhostUserEndpoint) Attach(ctx context.Context, s *Sandbox) error
 		Type:       config.VhostUserNet,
 	}
 
-	return s.hypervisor.AddDevice(ctx, d, VhostuserDev)
+	return s.hypervisor.addDevice(ctx, d, vhostuserDev)
 }
 
 // Detach for vhostuser endpoint
@@ -108,12 +105,12 @@ func (endpoint *VhostUserEndpoint) Detach(ctx context.Context, netNsCreated bool
 }
 
 // HotAttach for vhostuser endpoint not supported yet
-func (endpoint *VhostUserEndpoint) HotAttach(ctx context.Context, h Hypervisor) error {
+func (endpoint *VhostUserEndpoint) HotAttach(ctx context.Context, h hypervisor) error {
 	return fmt.Errorf("VhostUserEndpoint does not support Hot attach")
 }
 
 // HotDetach for vhostuser endpoint not supported yet
-func (endpoint *VhostUserEndpoint) HotDetach(ctx context.Context, h Hypervisor, netNsCreated bool, netNsPath string) error {
+func (endpoint *VhostUserEndpoint) HotDetach(ctx context.Context, h hypervisor, netNsCreated bool, netNsPath string) error {
 	return fmt.Errorf("VhostUserEndpoint does not support Hot detach")
 }
 
@@ -136,7 +133,7 @@ func findVhostUserNetSocketPath(netInfo NetworkInfo) (string, error) {
 		return "", nil
 	}
 
-	// Check for socket file existence at known location.
+	// check for socket file existence at known location.
 	for _, addr := range netInfo.Addrs {
 		socketPath := fmt.Sprintf(hostSocketSearchPath, addr.IPNet.IP)
 		if _, err := os.Stat(socketPath); err == nil {

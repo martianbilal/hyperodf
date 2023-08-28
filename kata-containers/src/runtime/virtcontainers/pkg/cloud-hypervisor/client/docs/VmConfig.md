@@ -6,7 +6,9 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Cpus** | Pointer to [**CpusConfig**](CpusConfig.md) |  | [optional] 
 **Memory** | Pointer to [**MemoryConfig**](MemoryConfig.md) |  | [optional] 
-**Payload** | [**PayloadConfig**](PayloadConfig.md) |  | 
+**Kernel** | [**KernelConfig**](KernelConfig.md) |  | 
+**Initramfs** | Pointer to [**NullableInitramfsConfig**](InitramfsConfig.md) |  | [optional] 
+**Cmdline** | Pointer to [**CmdLineConfig**](CmdLineConfig.md) |  | [optional] 
 **Disks** | Pointer to [**[]DiskConfig**](DiskConfig.md) |  | [optional] 
 **Net** | Pointer to [**[]NetConfig**](NetConfig.md) |  | [optional] 
 **Rng** | Pointer to [**RngConfig**](RngConfig.md) |  | [optional] 
@@ -16,20 +18,17 @@ Name | Type | Description | Notes
 **Serial** | Pointer to [**ConsoleConfig**](ConsoleConfig.md) |  | [optional] 
 **Console** | Pointer to [**ConsoleConfig**](ConsoleConfig.md) |  | [optional] 
 **Devices** | Pointer to [**[]DeviceConfig**](DeviceConfig.md) |  | [optional] 
-**Vdpa** | Pointer to [**[]VdpaConfig**](VdpaConfig.md) |  | [optional] 
 **Vsock** | Pointer to [**VsockConfig**](VsockConfig.md) |  | [optional] 
 **SgxEpc** | Pointer to [**[]SgxEpcConfig**](SgxEpcConfig.md) |  | [optional] 
-**Tdx** | Pointer to [**TdxConfig**](TdxConfig.md) |  | [optional] 
 **Numa** | Pointer to [**[]NumaConfig**](NumaConfig.md) |  | [optional] 
 **Iommu** | Pointer to **bool** |  | [optional] [default to false]
 **Watchdog** | Pointer to **bool** |  | [optional] [default to false]
-**Platform** | Pointer to [**PlatformConfig**](PlatformConfig.md) |  | [optional] 
 
 ## Methods
 
 ### NewVmConfig
 
-`func NewVmConfig(payload PayloadConfig, ) *VmConfig`
+`func NewVmConfig(kernel KernelConfig, ) *VmConfig`
 
 NewVmConfig instantiates a new VmConfig object
 This constructor will assign default values to properties that have it defined,
@@ -94,25 +93,85 @@ SetMemory sets Memory field to given value.
 
 HasMemory returns a boolean if a field has been set.
 
-### GetPayload
+### GetKernel
 
-`func (o *VmConfig) GetPayload() PayloadConfig`
+`func (o *VmConfig) GetKernel() KernelConfig`
 
-GetPayload returns the Payload field if non-nil, zero value otherwise.
+GetKernel returns the Kernel field if non-nil, zero value otherwise.
 
-### GetPayloadOk
+### GetKernelOk
 
-`func (o *VmConfig) GetPayloadOk() (*PayloadConfig, bool)`
+`func (o *VmConfig) GetKernelOk() (*KernelConfig, bool)`
 
-GetPayloadOk returns a tuple with the Payload field if it's non-nil, zero value otherwise
+GetKernelOk returns a tuple with the Kernel field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetPayload
+### SetKernel
 
-`func (o *VmConfig) SetPayload(v PayloadConfig)`
+`func (o *VmConfig) SetKernel(v KernelConfig)`
 
-SetPayload sets Payload field to given value.
+SetKernel sets Kernel field to given value.
 
+
+### GetInitramfs
+
+`func (o *VmConfig) GetInitramfs() InitramfsConfig`
+
+GetInitramfs returns the Initramfs field if non-nil, zero value otherwise.
+
+### GetInitramfsOk
+
+`func (o *VmConfig) GetInitramfsOk() (*InitramfsConfig, bool)`
+
+GetInitramfsOk returns a tuple with the Initramfs field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetInitramfs
+
+`func (o *VmConfig) SetInitramfs(v InitramfsConfig)`
+
+SetInitramfs sets Initramfs field to given value.
+
+### HasInitramfs
+
+`func (o *VmConfig) HasInitramfs() bool`
+
+HasInitramfs returns a boolean if a field has been set.
+
+### SetInitramfsNil
+
+`func (o *VmConfig) SetInitramfsNil(b bool)`
+
+ SetInitramfsNil sets the value for Initramfs to be an explicit nil
+
+### UnsetInitramfs
+`func (o *VmConfig) UnsetInitramfs()`
+
+UnsetInitramfs ensures that no value is present for Initramfs, not even an explicit nil
+### GetCmdline
+
+`func (o *VmConfig) GetCmdline() CmdLineConfig`
+
+GetCmdline returns the Cmdline field if non-nil, zero value otherwise.
+
+### GetCmdlineOk
+
+`func (o *VmConfig) GetCmdlineOk() (*CmdLineConfig, bool)`
+
+GetCmdlineOk returns a tuple with the Cmdline field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCmdline
+
+`func (o *VmConfig) SetCmdline(v CmdLineConfig)`
+
+SetCmdline sets Cmdline field to given value.
+
+### HasCmdline
+
+`func (o *VmConfig) HasCmdline() bool`
+
+HasCmdline returns a boolean if a field has been set.
 
 ### GetDisks
 
@@ -339,31 +398,6 @@ SetDevices sets Devices field to given value.
 
 HasDevices returns a boolean if a field has been set.
 
-### GetVdpa
-
-`func (o *VmConfig) GetVdpa() []VdpaConfig`
-
-GetVdpa returns the Vdpa field if non-nil, zero value otherwise.
-
-### GetVdpaOk
-
-`func (o *VmConfig) GetVdpaOk() (*[]VdpaConfig, bool)`
-
-GetVdpaOk returns a tuple with the Vdpa field if it's non-nil, zero value otherwise
-and a boolean to check if the value has been set.
-
-### SetVdpa
-
-`func (o *VmConfig) SetVdpa(v []VdpaConfig)`
-
-SetVdpa sets Vdpa field to given value.
-
-### HasVdpa
-
-`func (o *VmConfig) HasVdpa() bool`
-
-HasVdpa returns a boolean if a field has been set.
-
 ### GetVsock
 
 `func (o *VmConfig) GetVsock() VsockConfig`
@@ -413,31 +447,6 @@ SetSgxEpc sets SgxEpc field to given value.
 `func (o *VmConfig) HasSgxEpc() bool`
 
 HasSgxEpc returns a boolean if a field has been set.
-
-### GetTdx
-
-`func (o *VmConfig) GetTdx() TdxConfig`
-
-GetTdx returns the Tdx field if non-nil, zero value otherwise.
-
-### GetTdxOk
-
-`func (o *VmConfig) GetTdxOk() (*TdxConfig, bool)`
-
-GetTdxOk returns a tuple with the Tdx field if it's non-nil, zero value otherwise
-and a boolean to check if the value has been set.
-
-### SetTdx
-
-`func (o *VmConfig) SetTdx(v TdxConfig)`
-
-SetTdx sets Tdx field to given value.
-
-### HasTdx
-
-`func (o *VmConfig) HasTdx() bool`
-
-HasTdx returns a boolean if a field has been set.
 
 ### GetNuma
 
@@ -513,31 +522,6 @@ SetWatchdog sets Watchdog field to given value.
 `func (o *VmConfig) HasWatchdog() bool`
 
 HasWatchdog returns a boolean if a field has been set.
-
-### GetPlatform
-
-`func (o *VmConfig) GetPlatform() PlatformConfig`
-
-GetPlatform returns the Platform field if non-nil, zero value otherwise.
-
-### GetPlatformOk
-
-`func (o *VmConfig) GetPlatformOk() (*PlatformConfig, bool)`
-
-GetPlatformOk returns a tuple with the Platform field if it's non-nil, zero value otherwise
-and a boolean to check if the value has been set.
-
-### SetPlatform
-
-`func (o *VmConfig) SetPlatform(v PlatformConfig)`
-
-SetPlatform sets Platform field to given value.
-
-### HasPlatform
-
-`func (o *VmConfig) HasPlatform() bool`
-
-HasPlatform returns a boolean if a field has been set.
 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

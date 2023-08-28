@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -11,15 +8,16 @@ package virtcontainers
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/drivers"
-	resCtrl "github.com/kata-containers/kata-containers/src/runtime/pkg/resourcecontrol"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/drivers"
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
-	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/cgroups"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
 	"github.com/safchain/ethtool"
 )
 
@@ -90,7 +88,7 @@ func (endpoint *PhysicalEndpoint) Attach(ctx context.Context, s *Sandbox) error 
 		return err
 	}
 
-	c, err := resCtrl.DeviceToCgroupDeviceRule(vfioPath)
+	c, err := cgroups.DeviceToCgroupDeviceRule(vfioPath)
 	if err != nil {
 		return err
 	}
@@ -123,12 +121,12 @@ func (endpoint *PhysicalEndpoint) Detach(ctx context.Context, netNsCreated bool,
 }
 
 // HotAttach for physical endpoint not supported yet
-func (endpoint *PhysicalEndpoint) HotAttach(ctx context.Context, h Hypervisor) error {
+func (endpoint *PhysicalEndpoint) HotAttach(ctx context.Context, h hypervisor) error {
 	return fmt.Errorf("PhysicalEndpoint does not support Hot attach")
 }
 
 // HotDetach for physical endpoint not supported yet
-func (endpoint *PhysicalEndpoint) HotDetach(ctx context.Context, h Hypervisor, netNsCreated bool, netNsPath string) error {
+func (endpoint *PhysicalEndpoint) HotDetach(ctx context.Context, h hypervisor, netNsCreated bool, netNsPath string) error {
 	return fmt.Errorf("PhysicalEndpoint does not support Hot detach")
 }
 
@@ -187,7 +185,7 @@ func createPhysicalEndpoint(netInfo NetworkInfo) (*PhysicalEndpoint, error) {
 	// Get vendor and device id from pci space (sys/bus/pci/devices/$bdf)
 
 	ifaceDevicePath := filepath.Join(sysPCIDevicesPath, bdf, "device")
-	contents, err := os.ReadFile(ifaceDevicePath)
+	contents, err := ioutil.ReadFile(ifaceDevicePath)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +194,7 @@ func createPhysicalEndpoint(netInfo NetworkInfo) (*PhysicalEndpoint, error) {
 
 	// Vendor id
 	ifaceVendorPath := filepath.Join(sysPCIDevicesPath, bdf, "vendor")
-	contents, err = os.ReadFile(ifaceVendorPath)
+	contents, err = ioutil.ReadFile(ifaceVendorPath)
 	if err != nil {
 		return nil, err
 	}

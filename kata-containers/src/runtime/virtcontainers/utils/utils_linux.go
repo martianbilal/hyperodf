@@ -28,6 +28,9 @@ var maxUInt uint64 = 1<<32 - 1
 
 func Ioctl(fd uintptr, request, data uintptr) error {
 	if _, _, errno := unix.Syscall(unix.SYS_IOCTL, fd, request, data); errno != 0 {
+		//uintptr(request)
+		//uintptr(unsafe.Pointer(&arg1)),
+		//); errno != 0 {
 		return os.NewSyscallError("ioctl", fmt.Errorf("%d", int(errno)))
 	}
 
@@ -74,6 +77,7 @@ func FindContextID() (*os.File, uint64, error) {
 		}
 	}
 
+	ioctlVhostVsockSetGuestCid := getIoctlVhostVsockGuestCid()
 	// Last chance to get a free context ID.
 	for cid := contextID - 1; cid >= firstContextID; cid-- {
 		if err = ioctlFunc(vsockFd.Fd(), ioctlVhostVsockSetGuestCid, uintptr(unsafe.Pointer(&cid))); err == nil {
@@ -96,12 +100,11 @@ const (
 	procDeviceIndex = iota
 	procPathIndex
 	procTypeIndex
-	procOptionIndex
 )
 
-// GetDevicePathAndFsTypeOptions gets the device for the mount point, the file system type
-// and mount options
-func GetDevicePathAndFsTypeOptions(mountPoint string) (devicePath, fsType string, fsOptions []string, err error) {
+// GetDevicePathAndFsType gets the device for the mount point and the file system type
+// of the mount.
+func GetDevicePathAndFsType(mountPoint string) (devicePath, fsType string, err error) {
 	if mountPoint == "" {
 		err = fmt.Errorf("Mount point cannot be empty")
 		return
@@ -135,7 +138,6 @@ func GetDevicePathAndFsTypeOptions(mountPoint string) (devicePath, fsType string
 		if mountPoint == fields[procPathIndex] {
 			devicePath = fields[procDeviceIndex]
 			fsType = fields[procTypeIndex]
-			fsOptions = strings.Split(fields[procOptionIndex], ",")
 			return
 		}
 	}

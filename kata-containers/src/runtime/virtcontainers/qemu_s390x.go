@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 IBM
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -13,8 +10,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
-	govmmQemu "github.com/kata-containers/kata-containers/src/runtime/pkg/govmm/qemu"
+	govmmQemu "github.com/kata-containers/govmm/qemu"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 	"github.com/sirupsen/logrus"
@@ -39,13 +36,23 @@ const (
 )
 
 // Verify needed parameters
-var kernelParams = []Param{}
+var kernelParams = []Param{
+	{"console", "ttysclp0"},
+}
 
 var ccwbridge = types.NewBridge(types.CCW, "", make(map[uint32]string, types.CCWBridgeMaxCapacity), 0)
 
 var supportedQemuMachine = govmmQemu.Machine{
 	Type:    QemuCCWVirtio,
 	Options: defaultQemuMachineOptions,
+}
+
+// MaxQemuVCPUs returns the maximum number of vCPUs supported
+func MaxQemuVCPUs() uint32 {
+	// Max number of virtual Cpu defined in qemu. See
+	// https://github.com/qemu/qemu/blob/80422b00196a7af4c6efb628fae0ad8b644e98af/target/s390x/cpu.h#L55
+	// #define S390_MAX_CPUS 248
+	return uint32(248)
 }
 
 func newQemuArch(config HypervisorConfig) (qemuArch, error) {
@@ -66,7 +73,6 @@ func newQemuArch(config HypervisorConfig) (qemuArch, error) {
 			kernelParamsNonDebug: kernelParamsNonDebug,
 			kernelParamsDebug:    kernelParamsDebug,
 			kernelParams:         kernelParams,
-			legacySerial:         false,
 		},
 	}
 	// Set first bridge type to CCW
@@ -75,11 +81,6 @@ func newQemuArch(config HypervisorConfig) (qemuArch, error) {
 	if config.ConfidentialGuest {
 		if err := q.enableProtection(); err != nil {
 			return nil, err
-		}
-
-		if !q.qemuArchBase.disableNvdimm {
-			hvLogger.WithField("subsystem", "qemuS390x").Warn("Nvdimm is not supported with confidential guest, disabling it.")
-			q.qemuArchBase.disableNvdimm = true
 		}
 	}
 
@@ -110,8 +111,6 @@ func (q *qemuS390x) appendConsole(ctx context.Context, devices []govmmQemu.Devic
 	if err != nil {
 		return devices, fmt.Errorf("Failed to append console %v", err)
 	}
-
-	q.kernelParams = append(q.kernelParams, Param{"console", "ttysclp0"})
 
 	serial := govmmQemu.SerialDevice{
 		Driver:        virtioSerialCCW,
@@ -257,6 +256,11 @@ func (q *qemuS390x) append9PVolume(ctx context.Context, devices []govmmQemu.Devi
 	return devices, nil
 }
 
+// appendBridges appends to devices the given bridges
+func (q *qemuS390x) appendBridges(devices []govmmQemu.Device) []govmmQemu.Device {
+	return genericAppendBridges(devices, q.Bridges, q.qemuMachine.Type)
+}
+
 func (q *qemuS390x) appendSCSIController(ctx context.Context, devices []govmmQemu.Device, enableIOThreads bool) ([]govmmQemu.Device, *govmmQemu.IOThread, error) {
 	d, t := genericSCSIController(enableIOThreads, q.nestedRun)
 	addr, b, err := q.addDeviceToBridge(ctx, d.ID, types.CCW)
@@ -325,7 +329,7 @@ func (q *qemuS390x) enableProtection() error {
 		q.qemuMachine.Options += ","
 	}
 	q.qemuMachine.Options += fmt.Sprintf("confidential-guest-support=%s", secExecID)
-	hvLogger.WithFields(logrus.Fields{
+	virtLog.WithFields(logrus.Fields{
 		"subsystem": logSubsystem,
 		"machine":   q.qemuMachine}).
 		Info("Enabling guest protection with Secure Execution")
@@ -334,7 +338,7 @@ func (q *qemuS390x) enableProtection() error {
 
 // appendProtectionDevice appends a QEMU object for Secure Execution.
 // Takes devices and returns updated version. Takes BIOS and returns it (no modification on s390x).
-func (q *qemuS390x) appendProtectionDevice(devices []govmmQemu.Device, firmware, firmwareVolume string) ([]govmmQemu.Device, string, error) {
+func (q *qemuS390x) appendProtectionDevice(devices []govmmQemu.Device, firmware string) ([]govmmQemu.Device, string, error) {
 	switch q.protection {
 	case seProtection:
 		return append(devices,

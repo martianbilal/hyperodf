@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // PutMachineConfigurationReader is a Reader for the PutMachineConfiguration structure.
@@ -23,18 +24,21 @@ type PutMachineConfigurationReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *PutMachineConfigurationReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewPutMachineConfigurationNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewPutMachineConfigurationBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewPutMachineConfigurationDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewPutMachineConfigurationNoContent() *PutMachineConfigurationNoContent {
 	return &PutMachineConfigurationNoContent{}
 }
 
-/* PutMachineConfigurationNoContent describes a response with status code 204, with default header values.
+/*PutMachineConfigurationNoContent handles this case with default header values.
 
 Machine Configuration created/updated
 */
@@ -73,7 +77,7 @@ func NewPutMachineConfigurationBadRequest() *PutMachineConfigurationBadRequest {
 	return &PutMachineConfigurationBadRequest{}
 }
 
-/* PutMachineConfigurationBadRequest describes a response with status code 400, with default header values.
+/*PutMachineConfigurationBadRequest handles this case with default header values.
 
 Machine Configuration cannot be updated due to bad input
 */
@@ -83,9 +87,6 @@ type PutMachineConfigurationBadRequest struct {
 
 func (o *PutMachineConfigurationBadRequest) Error() string {
 	return fmt.Sprintf("[PUT /machine-config][%d] putMachineConfigurationBadRequest  %+v", 400, o.Payload)
-}
-func (o *PutMachineConfigurationBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PutMachineConfigurationBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewPutMachineConfigurationDefault(code int) *PutMachineConfigurationDefault
 	}
 }
 
-/* PutMachineConfigurationDefault describes a response with status code -1, with default header values.
+/*PutMachineConfigurationDefault handles this case with default header values.
 
 Internal server error
 */
@@ -124,9 +125,6 @@ func (o *PutMachineConfigurationDefault) Code() int {
 
 func (o *PutMachineConfigurationDefault) Error() string {
 	return fmt.Sprintf("[PUT /machine-config][%d] putMachineConfiguration default  %+v", o._statusCode, o.Payload)
-}
-func (o *PutMachineConfigurationDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PutMachineConfigurationDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

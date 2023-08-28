@@ -1,4 +1,3 @@
-//go:build !windows
 // +build !windows
 
 /*
@@ -30,9 +29,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/sys"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -53,16 +53,16 @@ func AdjustOOMScore(pid int) error {
 	parent := os.Getppid()
 	score, err := sys.GetOOMScoreAdj(parent)
 	if err != nil {
-		return fmt.Errorf("get parent OOM score: %w", err)
+		return errors.Wrap(err, "get parent OOM score")
 	}
 	shimScore := score + 1
 	if err := sys.AdjustOOMScore(pid, shimScore); err != nil {
-		return fmt.Errorf("set shim OOM score: %w", err)
+		return errors.Wrap(err, "set shim OOM score")
 	}
 	return nil
 }
 
-const socketRoot = defaults.DefaultStateDir
+const socketRoot = "/run/containerd"
 
 // SocketAddress returns a socket address
 func SocketAddress(ctx context.Context, socketPath, id string) (string, error) {
@@ -76,7 +76,7 @@ func SocketAddress(ctx context.Context, socketPath, id string) (string, error) {
 
 // AnonDialer returns a dialer for a socket
 func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("unix", socket(address).path(), timeout)
+	return dialer.Dialer(socket(address).path(), timeout)
 }
 
 // AnonReconnectDialer returns a dialer for an existing socket on reconnection
@@ -90,25 +90,19 @@ func NewSocket(address string) (*net.UnixListener, error) {
 		sock = socket(address)
 		path = sock.path()
 	)
-
-	isAbstract := sock.isAbstract()
-
-	if !isAbstract {
+	if !sock.isAbstract() {
 		if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
+			return nil, errors.Wrapf(err, "%s", path)
 		}
 	}
 	l, err := net.Listen("unix", path)
 	if err != nil {
 		return nil, err
 	}
-
-	if !isAbstract {
-		if err := os.Chmod(path, 0600); err != nil {
-			os.Remove(sock.path())
-			l.Close()
-			return nil, err
-		}
+	if err := os.Chmod(path, 0600); err != nil {
+		os.Remove(sock.path())
+		l.Close()
+		return nil, err
 	}
 	return l.(*net.UnixListener), nil
 }

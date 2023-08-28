@@ -9,19 +9,19 @@ import (
 	"context"
 	"runtime"
 
-	deviceApi "github.com/kata-containers/kata-containers/src/runtime/pkg/device/api"
-	deviceConfig "github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
-	resCtrl "github.com/kata-containers/kata-containers/src/runtime/pkg/resourcecontrol"
+	deviceApi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/api"
+	deviceConfig "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/cgroups"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/compatoci"
-	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
 // apiTracingTags defines tags for the trace span
 var apiTracingTags = map[string]string{
 	"source":    "runtime",
-	"package":   "virtcontainers",
+	"packages":  "virtcontainers",
 	"subsystem": "api",
 }
 
@@ -35,11 +35,11 @@ var virtLog = logrus.WithField("source", "virtcontainers")
 func SetLogger(ctx context.Context, logger *logrus.Entry) {
 	fields := virtLog.Data
 	virtLog = logger.WithFields(fields)
-	SetHypervisorLogger(virtLog) // TODO: this will move to hypervisors pkg
+
 	deviceApi.SetLogger(virtLog)
 	compatoci.SetLogger(virtLog)
 	deviceConfig.SetLogger(virtLog)
-	resCtrl.SetLogger(virtLog)
+	cgroups.SetLogger(virtLog)
 }
 
 // CreateSandbox is the virtcontainers sandbox creation entry point.
@@ -63,7 +63,7 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 		return nil, err
 	}
 
-	// Cleanup sandbox resources in case of any failure
+	// cleanup sandbox resources in case of any failure
 	defer func() {
 		if err != nil {
 			s.Delete(ctx)
@@ -82,9 +82,15 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 		}
 	}()
 
-	// Set the sandbox host cgroups.
-	if err := s.setupResourceController(); err != nil {
-		return nil, err
+	// Move runtime to sandbox cgroup so all process are created there.
+	if s.config.SandboxCgroupOnly {
+		if err := s.createCgroupManager(); err != nil {
+			return nil, err
+		}
+
+		if err := s.setupSandboxCgroup(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Start the VM

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2018 Intel Corporation
 #
@@ -14,6 +14,7 @@ script_name="${0##*/}"
 script_dir="$(dirname $(readlink -f $0))"
 AGENT_VERSION=${AGENT_VERSION:-}
 RUST_VERSION="null"
+MUSL_VERSION=${MUSL_VERSION:-"null"}
 AGENT_BIN=${AGENT_BIN:-kata-agent}
 AGENT_INIT=${AGENT_INIT:-no}
 KERNEL_MODULES_DIR=${KERNEL_MODULES_DIR:-""}
@@ -22,9 +23,6 @@ DOCKER_RUNTIME=${DOCKER_RUNTIME:-runc}
 # this GOPATH is for installing yq from install_yq.sh
 export GOPATH=${GOPATH:-${HOME}/go}
 LIBC=${LIBC:-musl}
-# The kata agent enables seccomp feature.
-# However, it is not enforced by default: you need to enable that in the main configuration file.
-SECCOMP=${SECCOMP:-"yes"}
 
 lib_file="${script_dir}/../scripts/lib.sh"
 source "$lib_file"
@@ -39,14 +37,13 @@ handle_error() {
 trap 'handle_error $LINENO' ERR
 
 # Default architecture
-export ARCH=${ARCH:-$(uname -m)}
-if [ "$ARCH" == "ppc64le" ] || [ "$ARCH" == "s390x" ]; then
-	LIBC=gnu
-	echo "WARNING: Forcing LIBC=gnu because $ARCH has no musl Rust target"
-fi
+ARCH=$(uname -m)
 
 # distro-specific config file
 typeset -r CONFIG_SH="config.sh"
+
+# optional arch-specific config file
+typeset -r CONFIG_ARCH_SH="config_${ARCH}.sh"
 
 # Name of an optional distro-specific file which, if it exists, must implement the
 # build_rootfs() function.
@@ -66,7 +63,7 @@ typeset init=
 usage()
 {
 	error="${1:-0}"
-	cat <<EOF
+	cat <<EOT
 
 Usage: ${script_name} [options] [DISTRO]
 
@@ -107,11 +104,6 @@ AGENT_SOURCE_BIN    Path to the directory of agent binary.
 AGENT_VERSION       Version of the agent to include in the rootfs.
                     Default value: ${AGENT_VERSION:-<not set>}
 
-ARCH                Target architecture (according to \`uname -m\`).
-                    Foreign bootstraps are currently only supported for Ubuntu
-                    and glibc agents.
-                    Default value: $(uname -m)
-
 DISTRO_REPO         Use host repositories to install guest packages.
                     Default value: <not set>
 
@@ -133,14 +125,8 @@ KERNEL_MODULES_DIR  Path to a directory containing kernel modules to include in
                     the rootfs.
                     Default value: <empty>
 
-LIBC                libc the agent is built against (gnu or musl).
-                    Default value: ${LIBC} (varies with architecture)
-
 ROOTFS_DIR          Path to the directory that is populated with the rootfs.
                     Default value: <${script_name} path>/rootfs-<DISTRO-name>
-
-SECCOMP             When set to "no", the kata-agent is built without seccomp capability.
-                    Default value: "yes"
 
 USE_DOCKER          If set, build the rootfs inside a container (requires
                     Docker).
@@ -154,7 +140,7 @@ Refer to the Platform-OS Compatibility Matrix for more details on the supported
 architectures:
 https://github.com/kata-containers/kata-containers/tree/main/tools/osbuilder#platform-distro-compatibility-matrix
 
-EOF
+EOT
 exit "${error}"
 }
 
@@ -316,6 +302,12 @@ build_rootfs_distro()
 	rootfs_config="${distro_config_dir}/${CONFIG_SH}"
 	source "${rootfs_config}"
 
+	# Source arch-specific config file
+	rootfs_arch_config="${distro_config_dir}/${CONFIG_ARCH_SH}"
+	if [ -f "${rootfs_arch_config}" ]; then
+		source "${rootfs_arch_config}"
+	fi
+
 	if [ -z "$ROOTFS_DIR" ]; then
 		 ROOTFS_DIR="${script_dir}/rootfs-${OS_NAME}"
 	fi
@@ -334,11 +326,7 @@ build_rootfs_distro()
 		trap error_handler ERR
 	fi
 
-	if [ -d "${ROOTFS_DIR}" ] && [ "${ROOTFS_DIR}" != "/" ]; then
-		rm -rf "${ROOTFS_DIR}"/*
-	else
-		mkdir -p ${ROOTFS_DIR}
-	fi
+	mkdir -p ${ROOTFS_DIR}
 
 	# need to detect rustc's version too?
 	detect_rust_version ||
@@ -346,28 +334,32 @@ build_rootfs_distro()
 
 	echo "Required rust version: $RUST_VERSION"
 
+	detect_musl_version ||
+		die "Could not detect the required musl version for AGENT_VERSION='${AGENT_VERSION:-main}'."
+
+	echo "Required musl version: $MUSL_VERSION"
+
 	if [ -z "${USE_DOCKER}" ] && [ -z "${USE_PODMAN}" ]; then
 		info "build directly"
 		build_rootfs ${ROOTFS_DIR}
 	else
-		engine_build_args=""
 		if [ -n "${USE_DOCKER}" ]; then
 			container_engine="docker"
 		elif [ -n "${USE_PODMAN}" ]; then
 			container_engine="podman"
-			engine_build_args+=" --runtime ${DOCKER_RUNTIME}"
 		fi
 
 		image_name="${distro}-rootfs-osbuilder"
 
+		REGISTRY_ARG=""
 		if [ -n "${IMAGE_REGISTRY}" ]; then
-			engine_build_args+=" --build-arg IMAGE_REGISTRY=${IMAGE_REGISTRY}"
+			REGISTRY_ARG="--build-arg IMAGE_REGISTRY=${IMAGE_REGISTRY}"
 		fi
 
 		# setup to install rust here
 		generate_dockerfile "${distro_config_dir}"
 		"$container_engine" build  \
-			${engine_build_args} \
+			${REGISTRY_ARG} \
 			--build-arg http_proxy="${http_proxy}" \
 			--build-arg https_proxy="${https_proxy}" \
 			-t "${image_name}" "${distro_config_dir}"
@@ -375,21 +367,19 @@ build_rootfs_distro()
 		# fake mapping if KERNEL_MODULES_DIR is unset
 		kernel_mod_dir=${KERNEL_MODULES_DIR:-${ROOTFS_DIR}}
 
-		engine_run_args=""
-		engine_run_args+=" --rm"
-		# apt sync scans all possible fds in order to close them, incredibly slow on VMs
-		engine_run_args+=" --ulimit nofile=262144:262144"
-		engine_run_args+=" --runtime ${DOCKER_RUNTIME}"
+		docker_run_args=""
+		docker_run_args+=" --rm"
+		docker_run_args+=" --runtime ${DOCKER_RUNTIME}"
 
 		if [ -z "${AGENT_SOURCE_BIN}" ] ; then
-			engine_run_args+=" -v ${GOPATH_LOCAL}:${GOPATH_LOCAL} --env GOPATH=${GOPATH_LOCAL}"
+			docker_run_args+=" -v ${GOPATH_LOCAL}:${GOPATH_LOCAL} --env GOPATH=${GOPATH_LOCAL}"
 		else
-			engine_run_args+=" --env AGENT_SOURCE_BIN=${AGENT_SOURCE_BIN}"
-			engine_run_args+=" -v ${AGENT_SOURCE_BIN}:${AGENT_SOURCE_BIN}"
-			engine_run_args+=" -v ${GOPATH_LOCAL}:${GOPATH_LOCAL} --env GOPATH=${GOPATH_LOCAL}"
+			docker_run_args+=" --env AGENT_SOURCE_BIN=${AGENT_SOURCE_BIN}"
+			docker_run_args+=" -v ${AGENT_SOURCE_BIN}:${AGENT_SOURCE_BIN}"
+			docker_run_args+=" -v ${GOPATH_LOCAL}:${GOPATH_LOCAL} --env GOPATH=${GOPATH_LOCAL}"
 		fi
 
-		engine_run_args+=" $(docker_extra_args $distro)"
+		docker_run_args+=" $(docker_extra_args $distro)"
 
 		# Relabel volumes so SELinux allows access (see docker-run(1))
 		if command -v selinuxenabled > /dev/null && selinuxenabled ; then
@@ -417,30 +407,26 @@ build_rootfs_distro()
 			--env ROOTFS_DIR="/rootfs" \
 			--env AGENT_BIN="${AGENT_BIN}" \
 			--env AGENT_INIT="${AGENT_INIT}" \
-			--env ARCH="${ARCH}" \
-			--env CI="${CI}" \
 			--env KERNEL_MODULES_DIR="${KERNEL_MODULES_DIR}" \
-			--env LIBC="${LIBC}" \
 			--env EXTRA_PKGS="${EXTRA_PKGS}" \
 			--env OSBUILDER_VERSION="${OSBUILDER_VERSION}" \
 			--env OS_VERSION="${OS_VERSION}" \
 			--env INSIDE_CONTAINER=1 \
 			--env SECCOMP="${SECCOMP}" \
 			--env DEBUG="${DEBUG}" \
+			--env STAGE_PREPARE_ROOTFS=1 \
 			--env HOME="/root" \
 			-v "${repo_dir}":"/kata-containers" \
 			-v "${ROOTFS_DIR}":"/rootfs" \
 			-v "${script_dir}/../scripts":"/scripts" \
 			-v "${kernel_mod_dir}":"${kernel_mod_dir}" \
-			$engine_run_args \
+			$docker_run_args \
 			${image_name} \
 			bash /kata-containers/tools/osbuilder/rootfs-builder/rootfs.sh "${distro}"
-
-		exit $?
 	fi
 }
 
-# Used to create a minimal directory tree where the agent can be installed.
+# Used to create a minimal directory tree where the agent can be instaleld.
 # This is used when a distro is not specified.
 prepare_overlay()
 {
@@ -481,7 +467,7 @@ setup_rootfs()
 		local unitFile="./etc/systemd/system/tmp.mount"
 		info "Install tmp.mount in ./etc/systemd/system"
 		mkdir -p `dirname "$unitFile"`
-		cp ./usr/share/systemd/tmp.mount "$unitFile" || cat > "$unitFile" << EOF
+		cp ./usr/share/systemd/tmp.mount "$unitFile" || cat > "$unitFile" << EOT
 #  This file is part of systemd.
 #
 #  systemd is free software; you can redistribute it and/or modify it
@@ -504,7 +490,7 @@ What=tmpfs
 Where=/tmp
 Type=tmpfs
 Options=mode=1777,strictatime,nosuid,nodev
-EOF
+EOT
 	fi
 
 	popd  >> /dev/null
@@ -515,6 +501,10 @@ EOF
 	mkdir -p "${ROOTFS_DIR}/etc"
 
 	case "${distro}" in
+		"gentoo")
+			chrony_conf_file="${ROOTFS_DIR}/etc/chrony/chrony.conf"
+			chrony_systemd_service="${ROOTFS_DIR}/lib/systemd/system/chronyd.service"
+			;;
 		"ubuntu" | "debian")
 			echo "I am ubuntu or debian"
 			chrony_conf_file="${ROOTFS_DIR}/etc/chrony/chrony.conf"
@@ -527,12 +517,12 @@ EOF
 	esac
 
 	info "Configure chrony file ${chrony_conf_file}"
-	cat >> "${chrony_conf_file}" <<EOF
+	cat >> "${chrony_conf_file}" <<EOT
 refclock PHC /dev/ptp0 poll 3 dpoll -2 offset 0
 # Step the system clock instead of slewing it if the adjustment is larger than
 # one second, at any time
 makestep 1 -1
-EOF
+EOT
 
 	# Comment out ntp sources for chrony to be extra careful
 	# Reference:  https://chrony.tuxfamily.org/doc/3.4/chrony.conf.html
@@ -540,41 +530,27 @@ EOF
 
 	if [ -f "$chrony_systemd_service" ]; then
 		# Remove user option, user could not exist in the rootfs
-		# Set the /var/lib/chrony for ReadWritePaths to be ignored if
-		# its nonexistent, this broke the service on boot previously
-		# due to the directory not being present "(code=exited, status=226/NAMESPACE)"
 		sed -i -e 's/^\(ExecStart=.*\)-u [[:alnum:]]*/\1/g' \
-		       -e '/^\[Unit\]/a ConditionPathExists=\/dev\/ptp0' \
-		       -e 's/^ReadWritePaths=\(.\+\) \/var\/lib\/chrony \(.\+\)$/ReadWritePaths=\1 -\/var\/lib\/chrony \2/m' \
-		       ${chrony_systemd_service}
+		       -e '/^\[Unit\]/a ConditionPathExists=\/dev\/ptp0' ${chrony_systemd_service}
 	fi
 
 	AGENT_DIR="${ROOTFS_DIR}/usr/bin"
 	AGENT_DEST="${AGENT_DIR}/${AGENT_BIN}"
 
 	if [ -z "${AGENT_SOURCE_BIN}" ] ; then
-		test -r "${HOME}/.cargo/env" && source "${HOME}/.cargo/env"
-		# rust agent needs ${arch}-unknown-linux-${LIBC}
-		if ! (rustup show | grep -v linux-${LIBC} > /dev/null); then
-			if [ "$RUST_VERSION" == "null" ]; then
-				detect_rust_version || \
-					die "Could not detect the required rust version for AGENT_VERSION='${AGENT_VERSION:-main}'."
-			fi
-			bash ${script_dir}/../../../ci/install_rust.sh ${RUST_VERSION}
+		if [ "$ARCH" == "ppc64le" ] || [ "$ARCH" == "s390x" ]; then
+			LIBC=gnu
+			echo "WARNING: Forcing LIBC=gnu because $ARCH has no musl Rust target"
 		fi
+		[ "$LIBC" == "musl" ] && bash ${script_dir}/../../../ci/install_musl.sh
+		# rust agent needs ${arch}-unknown-linux-${LIBC}
+		rustup show | grep linux-${LIBC} > /dev/null || bash ${script_dir}/../../../ci/install_rust.sh
 		test -r "${HOME}/.cargo/env" && source "${HOME}/.cargo/env"
+		[ "$ARCH" == "aarch64" ] && OLD_PATH=$PATH && export PATH=$PATH:/usr/local/musl/bin
 
 		agent_dir="${script_dir}/../../../src/agent/"
-
-		if [ "${SECCOMP}" == "yes" ]; then
-			info "Set up libseccomp"
-			libseccomp_install_dir=$(mktemp -d -t libseccomp.XXXXXXXXXX)
-			gperf_install_dir=$(mktemp -d -t gperf.XXXXXXXXXX)
-			${script_dir}/../../../ci/install_libseccomp.sh "${libseccomp_install_dir}" "${gperf_install_dir}"
-			echo "Set environment variables for the libseccomp crate to link the libseccomp library statically"
-			export LIBSECCOMP_LINK_TYPE=static
-			export LIBSECCOMP_LIB_PATH="${libseccomp_install_dir}/lib"
-		fi
+		# For now, rust-agent doesn't support seccomp yet.
+		SECCOMP="no"
 
 		info "Build agent"
 		pushd "${agent_dir}"
@@ -582,11 +558,9 @@ EOF
 			git checkout "${AGENT_VERSION}" && OK "git checkout successful" || die "checkout agent ${AGENT_VERSION} failed!"
 		fi
 		make clean
-		make LIBC=${LIBC} INIT=${AGENT_INIT} SECCOMP=${SECCOMP}
-		make install DESTDIR="${ROOTFS_DIR}" LIBC=${LIBC} INIT=${AGENT_INIT}
-		if [ "${SECCOMP}" == "yes" ]; then
-			rm -rf "${libseccomp_install_dir}" "${gperf_install_dir}"
-		fi
+		make LIBC=${LIBC} INIT=${AGENT_INIT}
+		make install DESTDIR="${ROOTFS_DIR}" LIBC=${LIBC} INIT=${AGENT_INIT} SECCOMP=${SECCOMP}
+		[ "$ARCH" == "aarch64" ] && export PATH=$OLD_PATH && rm -rf /usr/local/musl
 		popd
 	else
 		mkdir -p ${AGENT_DIR}
@@ -618,8 +592,6 @@ EOF
 
 parse_arguments()
 {
-	[ "$#" -eq 0 ] && usage && return 0
-
 	while getopts a:hlo:r:t: opt
 	do
 		case $opt in
@@ -671,8 +643,10 @@ main()
 		prepare_overlay
 	fi
 
-	init="${ROOTFS_DIR}/sbin/init"
-	setup_rootfs
+	if [ "$STAGE_PREPARE_ROOTFS" == "" ]; then
+		init="${ROOTFS_DIR}/sbin/init"
+		setup_rootfs
+	fi
 }
 
 main $*

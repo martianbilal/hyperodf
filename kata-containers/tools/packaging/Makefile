@@ -29,6 +29,9 @@ snap: $(YQ)
 	@if [ "$$(cat $(VERSION_FILE))" != "$$($(YQ) r $(SNAPCRAFT_FILE) version)" ]; then \
 		>&2 echo "Warning: $(SNAPCRAFT_FILE) version is different to upstream $(VERSION_FILE) file"; \
 	fi
-	snapcraft -d --destructive-mode
+	snapcraft -d
 
-.PHONY: test-static-build snap
+cmd-kata-pkgsync:
+	@make -C $(MK_DIR)/cmd/kata-pkgsync
+
+.PHONY: test-static-build snap cmd-kata-pkgsync

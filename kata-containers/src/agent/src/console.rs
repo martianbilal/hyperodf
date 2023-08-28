@@ -149,8 +149,10 @@ fn run_in_child(slave_fd: libc::c_int, shell: String) -> Result<()> {
 
     // run shell
     let _ = unistd::execvp(cmd.as_c_str(), &args).map_err(|e| match e {
-        nix::Error::UnknownErrno => std::process::exit(-2),
-        _ => std::process::exit(e as i32),
+        nix::Error::Sys(errno) => {
+            std::process::exit(errno as i32);
+        }
+        _ => std::process::exit(-2),
     });
 
     Ok(())

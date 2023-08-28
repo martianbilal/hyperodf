@@ -1,4 +1,3 @@
-//go:build !windows
 // +build !windows
 
 /*
@@ -20,14 +19,12 @@
 package reaper
 
 import (
-	"errors"
-	"fmt"
+	"os/exec"
 	"sync"
-	"syscall"
 	"time"
 
 	runc "github.com/containerd/go-runc"
-	exec "golang.org/x/sys/execabs"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -116,38 +113,6 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 	// return no such process if the ec channel is closed and no more exit
 	// events will be sent
 	return -1, ErrNoSuchProcess
-}
-
-// WaitTimeout is used to skip the blocked command and kill the left process.
-func (m *Monitor) WaitTimeout(c *exec.Cmd, ec chan runc.Exit, timeout time.Duration) (int, error) {
-	type exitStatusWrapper struct {
-		status int
-		err    error
-	}
-
-	// capacity can make sure that the following goroutine will not be
-	// blocked if there is no receiver when timeout.
-	waitCh := make(chan *exitStatusWrapper, 1)
-	go func() {
-		defer close(waitCh)
-
-		status, err := m.Wait(c, ec)
-		waitCh <- &exitStatusWrapper{
-			status: status,
-			err:    err,
-		}
-	}()
-
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case <-timer.C:
-		syscall.Kill(c.Process.Pid, syscall.SIGKILL)
-		return 0, fmt.Errorf("timeout %v for cmd(pid=%d): %s, %s", timeout, c.Process.Pid, c.Path, c.Args)
-	case res := <-waitCh:
-		return res.status, res.err
-	}
 }
 
 // Subscribe to process exit changes

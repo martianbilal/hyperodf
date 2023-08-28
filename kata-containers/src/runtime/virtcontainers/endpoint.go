@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
-	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
+	vcTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/types"
 )
 
 // Endpoint represents a physical or virtual network interface.
@@ -26,8 +26,8 @@ type Endpoint interface {
 	SetPciPath(vcTypes.PciPath)
 	Attach(context.Context, *Sandbox) error
 	Detach(ctx context.Context, netNsCreated bool, netNsPath string) error
-	HotAttach(ctx context.Context, h Hypervisor) error
-	HotDetach(ctx context.Context, h Hypervisor, netNsCreated bool, netNsPath string) error
+	HotAttach(ctx context.Context, h hypervisor) error
+	HotDetach(ctx context.Context, h hypervisor, netNsCreated bool, netNsPath string) error
 
 	save() persistapi.NetworkEndpoint
 	load(persistapi.NetworkEndpoint)
@@ -51,8 +51,8 @@ const (
 	// VhostUserEndpointType is the vhostuser network interface.
 	VhostUserEndpointType EndpointType = "vhost-user"
 
-	// MacvlanEndpointType is macvlan network interface.
-	MacvlanEndpointType EndpointType = "macvlan"
+	// BridgedMacvlanEndpointType is macvlan network interface.
+	BridgedMacvlanEndpointType EndpointType = "macvlan"
 
 	// MacvtapEndpointType is macvtap network interface.
 	MacvtapEndpointType EndpointType = "macvtap"
@@ -80,7 +80,7 @@ func (endpointType *EndpointType) Set(value string) error {
 		*endpointType = VhostUserEndpointType
 		return nil
 	case "macvlan":
-		*endpointType = MacvlanEndpointType
+		*endpointType = BridgedMacvlanEndpointType
 		return nil
 	case "macvtap":
 		*endpointType = MacvtapEndpointType
@@ -108,8 +108,8 @@ func (endpointType *EndpointType) String() string {
 		return string(VethEndpointType)
 	case VhostUserEndpointType:
 		return string(VhostUserEndpointType)
-	case MacvlanEndpointType:
-		return string(MacvlanEndpointType)
+	case BridgedMacvlanEndpointType:
+		return string(BridgedMacvlanEndpointType)
 	case MacvtapEndpointType:
 		return string(MacvtapEndpointType)
 	case TapEndpointType:
@@ -227,14 +227,4 @@ func loadTuntapIf(tuntapif *persistapi.TuntapInterface) *TuntapInterface {
 			Addrs:    tuntapif.TAPIface.Addrs,
 		},
 	}
-}
-
-func findEndpoint(e Endpoint, endpoints []Endpoint) (Endpoint, int) {
-	for idx, ep := range endpoints {
-		if ep.HardwareAddr() == e.HardwareAddr() {
-			return ep, idx
-		}
-	}
-
-	return nil, 0
 }

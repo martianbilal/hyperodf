@@ -8,8 +8,11 @@ To properly load the driver modules, systemd init must be used. It is not adequa
 to use the agent as the init. Because of this, alpine is not a valid base OS image
 to use. The following rootfs OS's have been tested with this Dockerfile.
 
+* CentOS
 * Clear Linux
 * Debian
+* Fedora
+* SUSE
 * Ubuntu 
 
 The generated files will need to be copied and configured into your Kata Containers
@@ -72,7 +75,7 @@ latest stable version of Kata Containers.
 | `QAT_CONFIGURE_OPTIONS` | `configure` options for QAT driver | `--enable-icp-sriov=guest` |
 | `QAT_DRIVER_URL` | URL to curl QAT driver from | `https://01.org/sites/default/files/downloads/${QAT_DRIVER_VER}` |
 | `QAT_DRIVER_VER` | QAT driver version to use | `qat1.7.l.4.9.0-00008.tar.gz` |
-| `ROOTFS_OS` | Operating system to use for the rootfs | `ubuntu` |
+| `ROOTFS_OS` | Operating system to use for the rootfs | `debian` |
 
 Variables can be set on the `docker run` commandline, for example:
 

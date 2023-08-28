@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2020 Intel Corporation
 #
@@ -43,7 +43,7 @@ readonly link_dir=${link_dir:-/usr/bin}
 
 readonly tmpdir=$(mktemp -d)
 
-readonly warnings=$(cat <<EOF
+readonly warnings=$(cat <<EOT
 WARNINGS:
 
 - Use distro-packages where possible
@@ -63,7 +63,7 @@ WARNINGS:
   and $containerd_project from binary release packages. These versions may
   not have been tested with your distribution version.
 
-EOF
+EOT
 )
 
 die()
@@ -136,31 +136,17 @@ github_get_release_file_url()
 	local url="${1:-}"
 	local version="${2:-}"
 
-	local arch=$(uname -m)
-
-	local regex=""
-
-	case "$url" in
-		*kata*)
-			regex="kata-static-.*-${arch}.tar.xz"
-			;;
-
-		*containerd*)
-			[ "$arch" = "x86_64" ] && arch="amd64"
-			regex="containerd-.*-linux-${arch}.tar.gz"
-			;;
-
-		*) die "invalid url: '$url'" ;;
-	esac
-
-	local download_url
-
 	download_url=$(curl -sL "$url" |\
 		jq --arg version "$version" \
-		-r '.[] | select(.tag_name == $version) | .assets[].browser_download_url' |\
-		grep "/${regex}$")
+		-r '.[] | select(.tag_name == $version) | .assets[0].browser_download_url' || true)
 
+	[ "$download_url" = null ] && download_url=""
 	[ -z "$download_url" ] && die "Cannot determine download URL for version $version ($url)"
+
+	local arch=$(uname -m)
+
+	[ "$arch" = x86_64 ] && arch="($arch|amd64)"
+	echo "$download_url" | egrep -q "$arch" || die "No release for '$arch architecture ($url)"
 
 	echo "$download_url"
 }
@@ -199,23 +185,14 @@ github_download_release()
 
 usage()
 {
-	cat <<EOF
+	cat <<EOT
 Usage: $script_name [options] [<kata-version> [<containerd-version>]]
 
-Description: Install $kata_project [1] (and optionally $containerd_project [2])
-  from GitHub release binaries.
+Description: Install $kata_project [1] and $containerd_project [2] from GitHub release binaries.
 
 Options:
 
- -c <version> : Specify containerd version.
- -d           : Enable debug for all components.
- -f           : Force installation (use with care).
- -h           : Show this help statement.
- -k <version> : Specify Kata Containers version.
- -o           : Only install Kata Containers.
- -r           : Don't cleanup on failure (retain files).
- -t           : Disable self test (don't try to create a container after install).
- -T           : Only run self test (do not install anything).
+ -h : Show this help statement.
 
 Notes:
 
@@ -235,7 +212,7 @@ Advice:
 
   $ kata-runtime check --only-list-releases
 
-EOF
+EOT
 }
 
 # Determine if the system only supports cgroups v2.
@@ -255,18 +232,6 @@ only_supports_cgroups_v2()
 	return 0
 }
 
-# Return 0 if containerd is already installed, else return 1.
-containerd_installed()
-{
-	command -v containerd &>/dev/null && return 0
-
-	systemctl list-unit-files --type service |\
-		egrep -q "^${containerd_service_name}\>" \
-		&& return 0
-
-	return 1
-}
-
 pre_checks()
 {
 	info "Running pre-checks"
@@ -274,11 +239,12 @@ pre_checks()
 	command -v "${kata_shim_v2}" &>/dev/null \
 		&& die "Please remove existing $kata_project installation"
 
-	local ret
+	command -v containerd &>/dev/null \
+		&& die "$containerd_project already installed"
 
-	{ containerd_installed; ret=$?; } || true
-
-	[ "$ret" -eq 0 ] && die "$containerd_project already installed"
+	systemctl list-unit-files --type service |\
+		egrep -q "^${containerd_service_name}\>" \
+		&& die "$containerd_project already installed"
 
 	local cgroups_v2_only=$(only_supports_cgroups_v2 || true)
 
@@ -333,17 +299,8 @@ check_deps()
 
 setup()
 {
-	local cleanup="${1:-}"
-	[ -z "$cleanup" ] && die "no cleanup value"
-
-	local force="${2:-}"
-	[ -z "$force" ] && die "no force value"
-
-	[ "$cleanup" = "true" ] && trap cleanup EXIT
-
+	trap cleanup EXIT
 	source /etc/os-release || source /usr/lib/os-release
-
-	[ "$force" = "true" ] && return 0
 
 	pre_checks
 	check_deps
@@ -357,8 +314,6 @@ github_download_package()
 {
 	local releases_url="${1:-}"
 	local requested_version="${2:-}"
-
-	# Only used for error message
 	local project="${3:-}"
 
 	[ -z "$releases_url" ] && die "need releases URL"
@@ -366,7 +321,7 @@ github_download_package()
 
 	local version=$(github_resolve_version_to_download \
 		"$releases_url" \
-		"$requested_version" || true)
+		"$version" || true)
 
 	[ -z "$version" ] && die "Unable to determine $project version to download"
 
@@ -405,55 +360,44 @@ install_containerd()
 
 	sudo tar -C /usr/local -xvf "${file}"
 
-	for file in \
-		/usr/local/bin/containerd \
-		/usr/local/bin/ctr
-		do
-			sudo ln -sf "$file" "${link_dir}"
-		done
+	sudo ln -s /usr/local/bin/ctr "${link_dir}"
 
 	info "$project installed\n"
 }
 
 configure_containerd()
 {
-	local enable_debug="${1:-}"
-	[ -z "$enable_debug" ] && die "no enable debug value"
-
 	local project="$containerd_project"
 
 	info "Configuring $project"
 
 	local cfg="/etc/containerd/config.toml"
 
+	pushd "$tmpdir" >/dev/null
+
+	local service_url=$(printf "%s/%s/%s/%s" \
+		"https://raw.githubusercontent.com" \
+		"${containerd_slug}" \
+		"master" \
+		"${containerd_service_name}")
+
+	curl -LO "$service_url"
+
+	printf "# %s: Service installed for Kata Containers\n" \
+		"$(date -Iseconds)" |\
+		tee -a "$containerd_service_name"
+
 	local systemd_unit_dir="/etc/systemd/system"
 	sudo mkdir -p "$systemd_unit_dir"
 
 	local dest="${systemd_unit_dir}/${containerd_service_name}"
 
-	if [ ! -f "$dest" ]
-	then
-		pushd "$tmpdir" >/dev/null
+	sudo cp "${containerd_service_name}" "${dest}"
+	sudo systemctl daemon-reload
 
-		local service_url=$(printf "%s/%s/%s/%s" \
-			"https://raw.githubusercontent.com" \
-			"${containerd_slug}" \
-			"main" \
-			"${containerd_service_name}")
+	info "Installed ${dest}"
 
-		curl -LO "$service_url"
-
-		printf "# %s: Service installed for Kata Containers\n" \
-			"$(date -Iseconds)" |\
-			tee -a "$containerd_service_name"
-
-		sudo cp "${containerd_service_name}" "${dest}"
-		sudo systemctl daemon-reload
-
-		info "Installed ${dest}"
-
-		popd >/dev/null
-	fi
+	popd >/dev/null
 
 	# Backup the original containerd configuration:
 	sudo mkdir -p "$(dirname $cfg)"
@@ -470,55 +414,24 @@ configure_containerd()
 		info "Backed up $cfg to $original"
 	}
 
-	local modified="false"
-
 	# Add the Kata Containers configuration details:
 
-	local comment_text
-	comment_text=$(printf "%s: Added by %s\n" \
-		"$(date -Iseconds)" \
-		"$script_name")
-
 	sudo grep -q "$kata_runtime_type" "$cfg" || {
-		cat <<-EOF | sudo tee -a "$cfg"
-		# $comment_text
+		cat <<-EOT | sudo tee -a "$cfg"
 		[plugins]
-		  [plugins."io.containerd.grpc.v1.cri"]
-		    [plugins."io.containerd.grpc.v1.cri".containerd]
-		      default_runtime_name = "${kata_runtime_name}"
-		      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
-		        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.${kata_runtime_name}]
-		          runtime_type = "${kata_runtime_type}"
-		EOF
+		    [plugins.cri]
+		        [plugins.cri.containerd]
+		        default_runtime_name = "${kata_runtime_name}"
+		    [plugins.cri.containerd.runtimes.${kata_runtime_name}]
+		        runtime_type = "${kata_runtime_type}"
+EOT
 
-		modified="true"
+		info "Modified $cfg"
 	}
 
-	if [ "$enable_debug" = "true" ]
-	then
-		local debug_enabled
-		debug_enabled=$(awk -v RS='' '/\[debug\]/' "$cfg" |\
-			grep -E "^\s*\<level\>\s*=\s*.*\<debug\>" || true)
-
-		[ -n "$debug_enabled" ] || {
-			cat <<-EOF | sudo tee -a "$cfg"
-			# $comment_text
-			[debug]
-				level = "debug"
-			EOF
-		}
-
-		modified="true"
-	fi
-
-	[ "$modified" = "true" ] && info "Modified $cfg"
-	sudo systemctl enable containerd
 	sudo systemctl start containerd
 
-	local msg="disabled"
-	[ "$enable_debug" = "true" ] && msg="enabled"
-
-	info "Configured $project (debug $msg)\n"
+	info "Configured $project\n"
 }
 
 install_kata()
@@ -558,7 +471,7 @@ install_kata()
 	# Since we're unpacking to the root directory, perform a sanity check
 	# on the archive first.
 	local unexpected=$(tar -tf "${file}" |\
-		egrep -v "^(\./$|\./opt/$|\.${kata_install_dir}/)" || true)
+		egrep -v "^(\./opt/$|\.${kata_install_dir}/)" || true)
 
 	[ -n "$unexpected" ] && die "File '$file' contains unexpected paths: '$unexpected'"
 
@@ -579,48 +492,11 @@ install_kata()
 	info "$project installed\n"
 }
 
-configure_kata()
-{
-	local enable_debug="${1:-}"
-	[ -z "$enable_debug" ] && die "no enable debug value"
-
-	[ "$enable_debug" = "false" ] && \
-		info "Using default $kata_project configuration" && \
-		return 0
-
-	local config_file='configuration.toml'
-	local kata_dir='/etc/kata-containers'
-
-	sudo mkdir -p "$kata_dir"
-
-	local cfg_from
-	local cfg_to
-
-	cfg_from="${kata_install_dir}/share/defaults/kata-containers/${config_file}"
-	cfg_to="${kata_dir}/${config_file}"
-
-	[ -e "$cfg_from" ] || die "cannot find $kata_project configuration file"
-
-	sudo install -o root -g root -m 0644 "$cfg_from" "$cfg_to"
-
-	sudo sed -i \
-		-e 's/^# *\(enable_debug\).*=.*$/\1 = true/g' \
-		-e 's/^kernel_params = "\(.*\)"/kernel_params = "\1 agent.log=debug initcall_debug"/g' \
-		"$cfg_to"
-
-	info "Configured $kata_project for full debug (delete $cfg_to to use pristine $kata_project configuration)"
-}
-
 handle_kata()
 {
 	local version="${1:-}"
 
-	local enable_debug="${2:-}"
-	[ -z "$enable_debug" ] && die "no enable debug value"
-
-	install_kata "$version" "$enable_debug"
-
-	configure_kata "$enable_debug"
+	install_kata "$version"
 
 	kata-runtime --version
 }
@@ -629,29 +505,9 @@ handle_containerd()
 {
 	local version="${1:-}"
 
-	local force="${2:-}"
-	[ -z "$force" ] && die "need force value"
+	install_containerd "$version"
 
-	local enable_debug="${3:-}"
-	[ -z "$enable_debug" ] && die "no enable debug value"
-
-	local ret
-
-	if [ "$force" = "true" ]
-	then
-		install_containerd "$version"
-	else
-		{ containerd_installed; ret=$?; } || true
-
-		if [ "$ret" -eq 0 ]
-		then
-			info "Using existing containerd installation"
-		else
-			install_containerd "$version"
-		fi
-	fi
-
-	configure_containerd "$enable_debug"
+	configure_containerd
 
 	containerd --version
 }
@@ -687,93 +543,31 @@ test_installation()
 
 handle_installation()
 {
-	local cleanup="${1:-}"
-	[ -z "$cleanup" ] && die "no cleanup value"
+	local kata_version="${1:-}"
+	local containerd_version="${2:-}"
 
-	local force="${2:-}"
-	[ -z "$force" ] && die "no force value"
+	setup
 
-	local only_kata="${3:-}"
-	[ -z "$only_kata" ] && die "no only Kata value"
+	handle_kata "$kata_version"
+	handle_containerd "$containerd_version"
 
-	local enable_debug="${4:-}"
-	[ -z "$enable_debug" ] && die "no enable debug value"
+	test_installation
 
-	local disable_test="${5:-}"
-	[ -z "$disable_test" ] && die "no disable test value"
-
-	local only_run_test="${6:-}"
-	[ -z "$only_run_test" ] && die "no only run test value"
-
-	# These params can be blank
-	local kata_version="${7:-}"
-	local containerd_version="${8:-}"
-
-	[ "$only_run_test" = "true" ] && test_installation && return 0
-
-	setup "$cleanup" "$force"
-
-	handle_kata "$kata_version" "$enable_debug"
-
-	[ "$only_kata" = "false" ] && \
-		handle_containerd \
-		"$containerd_version" \
-		"$force" \
-		"$enable_debug"
-
-	[ "$disable_test" = "false" ] && test_installation
-
-	if [ "$only_kata" = "true" ]
-	then
-		info "$kata_project is now installed"
-	else
-		info "$kata_project and $containerd_project are now installed"
-	fi
+	info "$kata_project and $containerd_project are now installed"
 
 	echo -e "\n${warnings}\n"
 }
 
 handle_args()
 {
-	local cleanup="true"
-	local force="false"
-	local only_kata="false"
-	local disable_test="false"
-	local only_run_test="false"
-	local enable_debug="false"
+	case "${1:-}" in
+		-h|--help|help) usage; exit 0;;
+	esac
 
-	local opt
-
-	local kata_version=""
-	local containerd_version=""
-
-	while getopts "c:dfhk:ortT" opt "$@"
-	do
-		case "$opt" in
-			c) containerd_version="$OPTARG" ;;
-			d) enable_debug="true" ;;
-			f) force="true" ;;
-			h) usage; exit 0 ;;
-			k) kata_version="$OPTARG" ;;
-			o) only_kata="true" ;;
-			r) cleanup="false" ;;
-			t) disable_test="true" ;;
-			T) only_run_test="true" ;;
-		esac
-	done
-
-	shift $[$OPTIND-1]
-
-	[ -z "$kata_version" ] && kata_version="${1:-}" || true
-	[ -z "$containerd_version" ] && containerd_version="${2:-}" || true
+	local kata_version="${1:-}"
+	local containerd_version="${2:-}"
 
 	handle_installation \
-		"$cleanup" \
-		"$force" \
-		"$only_kata" \
-		"$enable_debug" \
-		"$disable_test" \
-		"$only_run_test" \
 		"$kata_version" \
 		"$containerd_version"
 }

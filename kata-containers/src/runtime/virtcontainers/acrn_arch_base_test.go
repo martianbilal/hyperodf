@@ -7,12 +7,13 @@ package virtcontainers
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/fs"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	"github.com/stretchr/testify/assert"
@@ -126,7 +127,7 @@ func TestAcrnArchBaseAppendImage(t *testing.T) {
 	assert := assert.New(t)
 	acrnArchBase := newAcrnArchBase()
 
-	image, err := os.CreateTemp("", "img")
+	image, err := ioutil.TempFile("", "img")
 	assert.NoError(err)
 	defer os.Remove(image.Name())
 	err = image.Close()

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2018-2021 Intel Corporation
 #
@@ -16,31 +16,29 @@ kata_deploy_create="${script_dir}/kata-deploy-binaries.sh"
 uid=$(id -u ${USER})
 gid=$(id -g ${USER})
 
+TTY_OPT="-i"
+NO_TTY="${NO_TTY:-false}"
+[ -t 1 ] &&  [ "${NO_TTY}"  == "false" ] && TTY_OPT="-it"
+
 if [ "${script_dir}" != "${PWD}" ]; then
 	ln -sf "${script_dir}/build" "${PWD}/build"
 fi
 
-# This is the gid of the "docker" group on host. In case of docker in docker builds
-# for some of the targets (clh builds from source), the nested container user needs to
-# be part of this group.
-docker_gid=$(getent group docker | cut -d: -f3 || { echo >&2 "Missing docker group, docker needs to be installed" && false; })
+install_yq_script_path="${script_dir}/../../../../ci/install_yq.sh"
 
-# If docker gid is the effective group id of the user, do not pass it as
-# an additional group.
-if [ ${docker_gid} == ${gid} ]; then
-	docker_gid=""
-fi
+cp "${install_yq_script_path}" "${script_dir}/dockerbuild/install_yq.sh"
 
 docker build -q -t build-kata-deploy \
 	--build-arg IMG_USER="${USER}" \
 	--build-arg UID=${uid} \
 	--build-arg GID=${gid} \
-	--build-arg HOST_DOCKER_GID=${docker_gid} \
 	"${script_dir}/dockerbuild/"
 
-docker run \
+docker run ${TTY_OPT} \
 	-v /var/run/docker.sock:/var/run/docker.sock \
+	--user ${uid}:${gid} \
 	--env USER=${USER} -v "${kata_dir}:${kata_dir}" \
 	--rm \
 	-w ${script_dir} \
 	build-kata-deploy "${kata_deploy_create}" $@
+

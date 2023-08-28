@@ -64,7 +64,7 @@ endef
 # $1 - name of tool
 
 define make_tool_rules
-$(eval $(call make_rules,src/tools,$(1)))
+$(eval $(call make_rules,tools,$(1)))
 endef
 
 # Create a "${target}-all" alias which will cause each component/tool
@@ -91,6 +91,8 @@ endef
 # $3 - List of standard targets.
 define create_all_rules
 
+default: all
+
 all: $(1) $(2)
 
 # Create rules for all components.
@@ -113,8 +115,7 @@ endef
 BUILD_TYPE = release
 
 ##VAR ARCH=arch target to build (format: uname -m)
-HOST_ARCH = $(shell uname -m)
-ARCH ?= $(HOST_ARCH)
+ARCH = $(shell uname -m)
 ##VAR LIBC=musl|gnu
 LIBC ?= musl
 ifneq ($(LIBC),musl)
@@ -143,20 +144,4 @@ ifeq ($(ARCH), aarch64)
     $(warning "WARNING: aarch64-musl needs extra symbols from libgcc")
 endif
 
-ifneq ($(HOST_ARCH),$(ARCH))
-    ifeq ($(CC),)
-         CC = gcc
-         $(warning "WARNING: A foreign ARCH was passed, but no CC alternative. Using gcc.")
-    endif
-    override EXTRA_RUSTFLAGS += -C linker=$(CC)
-endif
-
 TRIPLE = $(ARCH)-unknown-linux-$(LIBC)
-
-CWD := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-
-standard_rust_check:
-	cargo fmt -- --check
-	cargo clippy --all-targets --all-features --release \
-		-- \
-		-D warnings

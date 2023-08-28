@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use futures::StreamExt;
 use std::io;
 use std::io::ErrorKind;
@@ -64,12 +64,8 @@ pub fn get_vsock_incoming(fd: RawFd) -> Incoming {
 
 #[instrument]
 pub async fn get_vsock_stream(fd: RawFd) -> Result<VsockStream> {
-    let stream = get_vsock_incoming(fd)
-        .next()
-        .await
-        .ok_or_else(|| anyhow!("cannot handle incoming vsock connection"))?;
-
-    Ok(stream?)
+    let stream = get_vsock_incoming(fd).next().await.unwrap()?;
+    Ok(stream)
 }
 
 #[cfg(test)]
@@ -90,6 +86,7 @@ mod tests {
     #[derive(Debug, Default, Clone)]
     struct BufWriter {
         data: Arc<Mutex<Vec<u8>>>,
+        slow_write: bool,
         write_delay: Duration,
     }
 
@@ -97,6 +94,7 @@ mod tests {
         fn new() -> Self {
             BufWriter {
                 data: Arc::new(Mutex::new(Vec::<u8>::new())),
+                slow_write: false,
                 write_delay: Duration::new(0, 0),
             }
         }
@@ -126,9 +124,7 @@ mod tests {
 
             let mut vec_locked = vec_ref.lock();
 
-            let v = vec_locked
-                .as_deref_mut()
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            let v = vec_locked.as_deref_mut().unwrap();
 
             std::io::Write::flush(v)
         }
@@ -177,35 +173,45 @@ mod tests {
         #[derive(Debug)]
         struct TestData {
             reader_value: String,
+            result: io::Result<u64>,
         }
 
         let tests = &[
             TestData {
                 reader_value: "".into(),
+                result: Ok(0),
             },
             TestData {
                 reader_value: "a".into(),
+                result: Ok(1),
             },
             TestData {
                 reader_value: "foo".into(),
+                result: Ok(3),
             },
             TestData {
                 reader_value: "b".repeat(BUF_SIZE - 1),
+                result: Ok((BUF_SIZE - 1) as u64),
             },
             TestData {
                 reader_value: "c".repeat(BUF_SIZE),
+                result: Ok((BUF_SIZE) as u64),
             },
             TestData {
                 reader_value: "d".repeat(BUF_SIZE + 1),
+                result: Ok((BUF_SIZE + 1) as u64),
             },
             TestData {
                 reader_value: "e".repeat((2 * BUF_SIZE) - 1),
+                result: Ok(((2 * BUF_SIZE) - 1) as u64),
             },
             TestData {
                 reader_value: "f".repeat(2 * BUF_SIZE),
+                result: Ok((2 * BUF_SIZE) as u64),
             },
             TestData {
                 reader_value: "g".repeat((2 * BUF_SIZE) + 1),
+                result: Ok(((2 * BUF_SIZE) + 1) as u64),
             },
         ];
 
@@ -237,6 +243,8 @@ mod tests {
                 JoinError,
             >;
 
+            let result: std::result::Result<u64, std::io::Error>;
+
             select! {
                 res = handle => spawn_result = res,
                 _ = &mut timeout => panic!("timed out"),
@@ -244,7 +252,7 @@ mod tests {
 
             assert!(spawn_result.is_ok());
 
-            let result: std::result::Result<u64, std::io::Error> = spawn_result.unwrap();
+            result = spawn_result.unwrap();
 
             assert!(result.is_ok());
 
@@ -276,6 +284,8 @@ mod tests {
 
         let spawn_result: std::result::Result<std::result::Result<u64, std::io::Error>, JoinError>;
 
+        let result: std::result::Result<u64, std::io::Error>;
+
         select! {
             res = handle => spawn_result = res,
             _ = &mut timeout => panic!("timed out"),
@@ -283,7 +293,7 @@ mod tests {
 
         assert!(spawn_result.is_ok());
 
-        let result: std::result::Result<u64, std::io::Error> = spawn_result.unwrap();
+        result = spawn_result.unwrap();
 
         assert!(result.is_ok());
 
@@ -316,6 +326,8 @@ mod tests {
 
         let spawn_result: std::result::Result<std::result::Result<u64, std::io::Error>, JoinError>;
 
+        let result: std::result::Result<u64, std::io::Error>;
+
         select! {
             res = handle => spawn_result = res,
             _ = &mut timeout => panic!("timed out"),
@@ -323,7 +335,7 @@ mod tests {
 
         assert!(spawn_result.is_ok());
 
-        let result: std::result::Result<u64, std::io::Error> = spawn_result.unwrap();
+        result = spawn_result.unwrap();
 
         assert!(result.is_ok());
 

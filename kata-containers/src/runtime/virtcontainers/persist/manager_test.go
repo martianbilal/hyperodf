@@ -27,6 +27,12 @@ func TestGetDriverByName(t *testing.T) {
 
 func TestGetDriver(t *testing.T) {
 	assert := assert.New(t)
+	orgMockTesting := mockTesting
+	defer func() {
+		mockTesting = orgMockTesting
+	}()
+
+	mockTesting = false
 
 	fsd, err := GetDriver()
 	assert.NoError(err)
@@ -38,6 +44,14 @@ func TestGetDriver(t *testing.T) {
 		expectedFS, err = fs.Init()
 	}
 
+	assert.NoError(err)
+	assert.Equal(expectedFS, fsd)
+
+	// Testing mock driver
+	mockTesting = true
+	fsd, err = GetDriver()
+	assert.NoError(err)
+	expectedFS, err = fs.MockFSInit()
 	assert.NoError(err)
 	assert.Equal(expectedFS, fsd)
 }

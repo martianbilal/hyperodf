@@ -10,8 +10,8 @@ import (
 	"io"
 	"syscall"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/api"
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/api"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	pbTypes "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/agent/protocols"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -76,12 +76,6 @@ type VCSandbox interface {
 	UpdateRuntimeMetrics() error
 	GetAgentMetrics(ctx context.Context) (string, error)
 	GetAgentURL() (string, error)
-
-	GuestVolumeStats(ctx context.Context, volumePath string) ([]byte, error)
-	ResizeGuestVolume(ctx context.Context, volumePath string, size uint64) error
-
-	GetIPTables(ctx context.Context, isIPv6 bool) ([]byte, error)
-	SetIPTables(ctx context.Context, isIPv6 bool, data []byte) error
 }
 
 // VCContainer is the Container interface

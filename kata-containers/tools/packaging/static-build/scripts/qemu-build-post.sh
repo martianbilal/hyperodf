@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2020 Red Hat, Inc.
 #
@@ -26,9 +26,7 @@ done
 if [[ -n "${BUILD_SUFFIX}" ]]; then
 	echo "Rename binaries using $BUILD_SUFFIX"
 	find -name 'qemu-system-*' -exec mv {} {}-experimental \;
-	if [[ ${ARCH} != "x86_64" ]]; then
-		find -name 'virtiofsd' -exec mv {} {}-experimental \;
-	fi
+	find -name 'virtiofsd' -exec mv {} {}-experimental \;
 fi
 
 echo "INFO: create the tarball"

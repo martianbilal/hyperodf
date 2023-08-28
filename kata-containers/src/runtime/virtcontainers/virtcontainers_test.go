@@ -9,12 +9,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 	"testing"
 
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/fs"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 	"github.com/sirupsen/logrus"
@@ -43,7 +45,6 @@ var testQemuImagePath = ""
 var testQemuPath = ""
 var testClhKernelPath = ""
 var testClhImagePath = ""
-var testClhInitrdPath = ""
 var testClhPath = ""
 var testAcrnKernelPath = ""
 var testAcrnImagePath = ""
@@ -57,7 +58,9 @@ var testHyperstartTtySocket = ""
 // cleanUp Removes any stale sandbox/container state that can affect
 // the next test to run.
 func cleanUp() {
-	syscall.Unmount(GetSharePath(testSandboxID), syscall.MNT_DETACH|UmountNoFollow)
+	os.RemoveAll(fs.MockRunStoragePath())
+	os.RemoveAll(fs.MockRunVMStoragePath())
+	syscall.Unmount(getSharePath(testSandboxID), syscall.MNT_DETACH|UmountNoFollow)
 	os.RemoveAll(testDir)
 	os.MkdirAll(testDir, DirMode)
 
@@ -105,6 +108,8 @@ func setupClh() {
 func TestMain(m *testing.M) {
 	var err error
 
+	persist.EnableMockTesting()
+
 	flag.Parse()
 
 	logger := logrus.NewEntry(logrus.New())
@@ -116,12 +121,10 @@ func TestMain(m *testing.M) {
 	}
 	SetLogger(context.Background(), logger)
 
-	testDir, err = os.MkdirTemp("", "vc-tmp-")
+	testDir, err = ioutil.TempDir("", "vc-tmp-")
 	if err != nil {
 		panic(err)
 	}
-
-	fs.EnableMockTesting(filepath.Join(testDir, "mockfs"))
 
 	fmt.Printf("INFO: Creating virtcontainers test directory %s\n", testDir)
 	err = os.MkdirAll(testDir, DirMode)
@@ -131,7 +134,7 @@ func TestMain(m *testing.M) {
 	}
 
 	utils.StartCmd = func(c *exec.Cmd) error {
-		//StartVM will Check if the hypervisor is alive and
+		//startSandbox will check if the hypervisor is alive and
 		// checks for the PID is running, lets fake it using our
 		// own PID
 		c.Process = &os.Process{Pid: os.Getpid()}
@@ -155,7 +158,6 @@ func TestMain(m *testing.M) {
 	testVirtiofsdPath = filepath.Join(testDir, testBundle, testVirtiofsd)
 	testClhKernelPath = filepath.Join(testDir, testBundle, testKernel)
 	testClhImagePath = filepath.Join(testDir, testBundle, testImage)
-	testClhInitrdPath = filepath.Join(testDir, testBundle, testInitrd)
 	testClhPath = filepath.Join(testDir, testBundle, testHypervisor)
 
 	setupClh()

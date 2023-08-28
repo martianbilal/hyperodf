@@ -14,6 +14,10 @@ PROJECT_COMPONENT = kata-agent
 
 TARGET = $(PROJECT_COMPONENT)
 
+SOURCES := \
+  $(shell find . 2>&1 | grep -E '.*\.rs$$') \
+  Cargo.toml
+
 VERSION_FILE := ./VERSION
 VERSION := $(shell grep -v ^\# $(VERSION_FILE))
 COMMIT_NO := $(shell git rev-parse HEAD 2>/dev/null || true)
@@ -22,28 +26,6 @@ COMMIT_MSG = $(if $(COMMIT),$(COMMIT),unknown)
 
 # Exported to allow cargo to see it
 export VERSION_COMMIT := $(if $(COMMIT),$(VERSION)-$(COMMIT),$(VERSION))
-
-EXTRA_RUSTFEATURES :=
-
-##VAR SECCOMP=yes|no define if agent enables seccomp feature
-SECCOMP := yes
-
-# Enable seccomp feature of rust build
-ifeq ($(SECCOMP),yes)
-    override EXTRA_RUSTFEATURES += seccomp
-endif
-
-##VAR STANDARD_OCI_RUNTIME=yes|no define if agent enables standard oci runtime feature
-STANDARD_OCI_RUNTIME := no
-
-# Enable standard oci runtime feature of rust build
-ifeq ($(STANDARD_OCI_RUNTIME),yes)
-    override EXTRA_RUSTFEATURES += standard-oci-runtime
-endif
-
-ifneq ($(EXTRA_RUSTFEATURES),)
-    override EXTRA_RUSTFEATURES := --features "$(EXTRA_RUSTFEATURES)"
-endif
 
 include ../../utils.mk
 
@@ -102,25 +84,32 @@ define INSTALL_FILE
 	install -D -m 644 $1 $(DESTDIR)$2/$1 || exit 1;
 endef
 
-.DEFAULT_GOAL := default
-
 ##TARGET default: build code
 default: $(TARGET) show-header
 
-$(TARGET): $(GENERATED_CODE) logging-crate-tests $(TARGET_PATH)
+$(TARGET): $(GENERATED_CODE) $(TARGET_PATH)
 
-logging-crate-tests:
-	make -C $(CWD)/../libs/logging
-
-$(TARGET_PATH): show-summary
-	@RUSTFLAGS="$(EXTRA_RUSTFLAGS) --deny warnings" cargo build --target $(TRIPLE) $(if $(findstring release,$(BUILD_TYPE)),--release) $(EXTRA_RUSTFEATURES)
+$(TARGET_PATH): $(SOURCES) | show-summary
+	@RUSTFLAGS="$(EXTRA_RUSTFLAGS) --deny warnings" cargo build --target $(TRIPLE) --$(BUILD_TYPE)
 
 $(GENERATED_FILES): %: %.in
 	@sed $(foreach r,$(GENERATED_REPLACEMENTS),-e 's|@$r@|$($r)|g') "$<" > "$@"
 
 ##TARGET optimize: optimized  build
-optimize: show-summary show-header
-	@RUSTFLAGS="-C link-arg=-s $(EXTRA_RUSTFLAGS) --deny warnings" cargo build --target $(TRIPLE) $(if $(findstring release,$(BUILD_TYPE)),--release) $(EXTRA_RUSTFEATURES)
+optimize: $(SOURCES) | show-summary show-header
+	@RUSTFLAGS="-C link-arg=-s $(EXTRA_RUSTFLAGS) --deny-warnings" cargo build --target $(TRIPLE) --$(BUILD_TYPE)
+
+
+##TARGET clippy: run clippy linter
+clippy: $(GENERATED_CODE)
+	cargo clippy --all-targets --all-features --release \
+		-- \
+		-Aclippy::redundant_allocation \
+		-D warnings
+
+format:
+	cargo fmt -- --check
+
 
 ##TARGET install: install agent
 install: install-services
@@ -138,10 +127,10 @@ vendor:
 
 #TARGET test: run cargo tests
 test:
-	@cargo test --all --target $(TRIPLE) $(EXTRA_RUSTFEATURES) -- --nocapture
+	@cargo test --all --target $(TRIPLE)
 
 ##TARGET check: run test
-check: $(GENERATED_FILES) standard_rust_check
+check: clippy format
 
 ##TARGET run: build and run agent
 run:
@@ -203,12 +192,11 @@ codecov-html: check_tarpaulin
 
 .PHONY: \
 	help \
-	logging-crate-tests \
-	optimize \
 	show-header \
 	show-summary \
+	optimize \
 	vendor
 
 ##TARGET generate-protocols: generate/update grpc agent protocols
 generate-protocols:
-	../libs/protocols/hack/update-generated-proto.sh all
+	protocols/hack/update-generated-proto.sh all

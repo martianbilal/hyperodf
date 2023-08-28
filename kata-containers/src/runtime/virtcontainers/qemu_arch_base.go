@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 // Copyright (c) 2018 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -15,12 +12,12 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 
-	govmmQemu "github.com/kata-containers/kata-containers/src/runtime/pkg/govmm/qemu"
-	"gitlab.com/nvidia/cloud-native/go-nvlib/pkg/nvpci"
+	govmmQemu "github.com/kata-containers/govmm/qemu"
 
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 )
@@ -139,7 +136,7 @@ type qemuArch interface {
 	setIgnoreSharedMemoryMigrationCaps(context.Context, *govmmQemu.QMP) error
 
 	// appendPCIeRootPortDevice appends a pcie-root-port device to pcie.0 bus
-	appendPCIeRootPortDevice(devices []govmmQemu.Device, number uint32, memSize32bit uint64, memSize64bit uint64) []govmmQemu.Device
+	appendPCIeRootPortDevice(devices []govmmQemu.Device, number uint32) []govmmQemu.Device
 
 	// append vIOMMU device
 	appendIOMMU(devices []govmmQemu.Device) ([]govmmQemu.Device, error)
@@ -151,12 +148,31 @@ type qemuArch interface {
 	// This implementation is architecture specific, some archs may need
 	// a firmware, returns a string containing the path to the firmware that should
 	// be used with the -bios option, ommit -bios option if the path is empty.
-	appendProtectionDevice(devices []govmmQemu.Device, firmware, firmwareVolume string) ([]govmmQemu.Device, string, error)
-
-	// scans the PCIe space and returns the biggest BAR sizes for 32-bit
-	// and 64-bit addressable memory
-	getBARsMaxAddressableMemory() (uint64, uint64)
+	appendProtectionDevice(devices []govmmQemu.Device, firmware string) ([]govmmQemu.Device, string, error)
 }
+
+// Kind of guest protection
+type guestProtection uint8
+
+const (
+	noneProtection guestProtection = iota
+
+	//Intel Trust Domain Extensions
+	//https://software.intel.com/content/www/us/en/develop/articles/intel-trust-domain-extensions.html
+	tdxProtection
+
+	// AMD Secure Encrypted Virtualization
+	// https://developer.amd.com/sev/
+	sevProtection
+
+	// IBM POWER 9 Protected Execution Facility
+	// https://www.kernel.org/doc/html/latest/powerpc/ultravisor.html
+	pefProtection
+
+	// IBM Secure Execution (IBM Z & LinuxONE)
+	// https://www.kernel.org/doc/html/latest/virt/kvm/s390-pv.html
+	seProtection
+)
 
 type qemuArchBase struct {
 	qemuExePath          string
@@ -168,13 +184,11 @@ type qemuArchBase struct {
 	Bridges              []types.Bridge
 	memoryOffset         uint64
 	networkIndex         int
-	// Exclude from lint checking for it is ultimately only used in architecture-specific code
-	protection    guestProtection //nolint:structcheck
-	nestedRun     bool
-	vhost         bool
-	disableNvdimm bool
-	dax           bool
-	legacySerial  bool
+	protection           guestProtection
+	nestedRun            bool
+	vhost                bool
+	disableNvdimm        bool
+	dax                  bool
 }
 
 const (
@@ -184,6 +198,7 @@ const (
 	defaultBridgeBus          = "pcie.0"
 	defaultPCBridgeBus        = "pci.0"
 	maxDevIDSize              = 31
+	defaultMsize9p            = 8192
 	pcieRootPortPrefix        = "rp"
 )
 
@@ -324,50 +339,24 @@ func (q *qemuArchBase) memoryTopology(memoryMb, hostMemoryMb uint64, slots uint8
 }
 
 func (q *qemuArchBase) appendConsole(_ context.Context, devices []govmmQemu.Device, path string) ([]govmmQemu.Device, error) {
-	var serial, console govmmQemu.Device
-	var consoleKernelParams []Param
-
-	if q.legacySerial {
-		serial = govmmQemu.LegacySerialDevice{
-			Chardev: "charconsole0",
-		}
-
-		console = govmmQemu.CharDevice{
-			Driver:   govmmQemu.LegacySerial,
-			Backend:  govmmQemu.Socket,
-			DeviceID: "console0",
-			ID:       "charconsole0",
-			Path:     path,
-		}
-
-		consoleKernelParams = []Param{
-			{"console", "ttyS0"},
-		}
-	} else {
-		serial = govmmQemu.SerialDevice{
-			Driver:        govmmQemu.VirtioSerial,
-			ID:            "serial0",
-			DisableModern: q.nestedRun,
-			MaxPorts:      uint(2),
-		}
-
-		console = govmmQemu.CharDevice{
-			Driver:   govmmQemu.Console,
-			Backend:  govmmQemu.Socket,
-			DeviceID: "console0",
-			ID:       "charconsole0",
-			Path:     path,
-		}
-
-		consoleKernelParams = []Param{
-			{"console", "hvc0"},
-			{"console", "hvc1"},
-		}
+	serial := govmmQemu.SerialDevice{
+		Driver:        govmmQemu.VirtioSerial,
+		ID:            "serial0",
+		DisableModern: q.nestedRun,
+		MaxPorts:      uint(2),
 	}
 
 	devices = append(devices, serial)
+
+	console := govmmQemu.CharDevice{
+		Driver:   govmmQemu.Console,
+		Backend:  govmmQemu.Socket,
+		DeviceID: "console0",
+		ID:       "charconsole0",
+		Path:     path,
+	}
+
 	devices = append(devices, console)
-	q.kernelParams = append(q.kernelParams, consoleKernelParams...)
 
 	return devices, nil
 }
@@ -467,7 +456,31 @@ func (q *qemuArchBase) appendSCSIController(_ context.Context, devices []govmmQe
 
 // appendBridges appends to devices the given bridges
 func (q *qemuArchBase) appendBridges(devices []govmmQemu.Device) []govmmQemu.Device {
-	return genericAppendBridges(devices, q.Bridges, q.qemuMachine.Type)
+	for idx, b := range q.Bridges {
+		if b.Type == types.CCW {
+			continue
+		}
+		t := govmmQemu.PCIBridge
+		if b.Type == types.PCIE {
+			t = govmmQemu.PCIEBridge
+		}
+
+		q.Bridges[idx].Addr = bridgePCIStartAddr + idx
+
+		devices = append(devices,
+			govmmQemu.BridgeDevice{
+				Type: t,
+				Bus:  defaultBridgeBus,
+				ID:   b.ID,
+				// Each bridge is required to be assigned a unique chassis id > 0
+				Chassis: idx + 1,
+				SHPC:    true,
+				Addr:    strconv.FormatInt(int64(q.Bridges[idx].Addr), 10),
+			},
+		)
+	}
+
+	return devices
 }
 
 func generic9PVolume(volume types.Volume, nestedRun bool) govmmQemu.FSDevice {
@@ -554,7 +567,7 @@ func networkModelToQemuType(model NetInterworkingModel) govmmQemu.NetDeviceType 
 func genericNetwork(endpoint Endpoint, vhost, nestedRun bool, index int) (govmmQemu.NetDevice, error) {
 	var d govmmQemu.NetDevice
 	switch ep := endpoint.(type) {
-	case *VethEndpoint, *MacvlanEndpoint, *IPVlanEndpoint:
+	case *VethEndpoint, *BridgedMacvlanEndpoint, *IPVlanEndpoint:
 		netPair := ep.NetworkPair()
 		d = govmmQemu.NetDevice{
 			Type:          networkModelToQemuType(netPair.NetInterworkingModel),
@@ -722,7 +735,7 @@ func (q *qemuArchBase) handleImagePath(config HypervisorConfig) {
 }
 
 func (q *qemuArchBase) supportGuestMemoryHotplug() bool {
-	return q.protection == noneProtection
+	return true
 }
 
 func (q *qemuArchBase) setIgnoreSharedMemoryMigrationCaps(ctx context.Context, qmp *govmmQemu.QMP) error {
@@ -792,39 +805,8 @@ func (q *qemuArchBase) addBridge(b types.Bridge) {
 }
 
 // appendPCIeRootPortDevice appends to devices the given pcie-root-port
-func (q *qemuArchBase) appendPCIeRootPortDevice(devices []govmmQemu.Device, number uint32, memSize32bit uint64, memSize64bit uint64) []govmmQemu.Device {
-	return genericAppendPCIeRootPort(devices, number, q.qemuMachine.Type, memSize32bit, memSize64bit)
-}
-
-func (q *qemuArchBase) getBARsMaxAddressableMemory() (uint64, uint64) {
-
-	pci := nvpci.New()
-	devs, _ := pci.GetAllDevices()
-
-	// Since we do not know which devices are going to be hotplugged,
-	// we're going to use the GPU with the biggest BARs to initialize the
-	// root port, this should work for all other devices as well.
-	// defaults are 2MB for both, if no suitable devices found
-	max32bit := uint64(2 * 1024 * 1024)
-	max64bit := uint64(2 * 1024 * 1024)
-
-	for _, dev := range devs {
-		if !dev.IsGPU() {
-			continue
-		}
-		memSize32bit, memSize64bit := dev.Resources.GetTotalAddressableMemory(true)
-		if max32bit < memSize32bit {
-			max32bit = memSize32bit
-		}
-		if max64bit < memSize64bit {
-			max64bit = memSize64bit
-		}
-	}
-	// The actual 32bit is most of the time a power of 2 but we need some
-	// buffer so double that to leave space for other IO functions.
-	// The 64bit size is not a power of 2 and hence is already rounded up
-	// to the higher value.
-	return max32bit * 2, max64bit
+func (q *qemuArchBase) appendPCIeRootPortDevice(devices []govmmQemu.Device, number uint32) []govmmQemu.Device {
+	return genericAppendPCIeRootPort(devices, number, q.qemuMachine.Type)
 }
 
 // appendIOMMU appends a virtual IOMMU device
@@ -859,7 +841,7 @@ func (q *qemuArchBase) setPFlash(p []string) {
 }
 
 // append protection device
-func (q *qemuArchBase) appendProtectionDevice(devices []govmmQemu.Device, firmware, firmwareVolume string) ([]govmmQemu.Device, string, error) {
-	hvLogger.WithField("arch", runtime.GOARCH).Warnf("Confidential Computing has not been implemented for this architecture")
+func (q *qemuArchBase) appendProtectionDevice(devices []govmmQemu.Device, firmware string) ([]govmmQemu.Device, string, error) {
+	virtLog.WithField("arch", runtime.GOARCH).Warnf("Confidential Computing has not been implemented for this architecture")
 	return devices, firmware, nil
 }

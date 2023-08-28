@@ -8,7 +8,7 @@ package katautils
 
 import (
 	"fmt"
-	"io"
+	"io/ioutil"
 	"regexp"
 	"strings"
 	"testing"
@@ -29,7 +29,7 @@ func init() {
 	kataUtilsLogger.Logger.Level = logrus.DebugLevel
 
 	// Discard log output
-	kataUtilsLogger.Logger.Out = io.Discard
+	kataUtilsLogger.Logger.Out = ioutil.Discard
 }
 
 func TestHandleSystemLog(t *testing.T) {
@@ -71,7 +71,7 @@ func TestNewSystemLogHook(t *testing.T) {
 
 	// throw away all stdout so that the Format() call
 	// below returns the data in structured form.
-	logger.Out = io.Discard
+	logger.Out = ioutil.Discard
 
 	entry := &logrus.Entry{
 		Logger: logger,

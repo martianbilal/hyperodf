@@ -6,7 +6,6 @@
 use anyhow::{anyhow, Context, Result};
 use futures::{future, StreamExt, TryStreamExt};
 use ipnetwork::{IpNetwork, Ipv4Network, Ipv6Network};
-use nix::errno::Errno;
 use protobuf::RepeatedField;
 use protocols::types::{ARPNeighbor, IPAddress, IPFamily, Interface, Route};
 use rtnetlink::{new_connection, packet, IpVersion};
@@ -313,6 +312,7 @@ impl Handle {
 
         for route in list {
             let link = self.find_link(LinkFilter::Name(&route.device)).await?;
+            let is_v6 = is_ipv6(route.get_gateway()) || is_ipv6(route.get_dest());
 
             const MAIN_TABLE: u8 = packet::constants::RT_TABLE_MAIN;
             const UNICAST: u8 = packet::constants::RTN_UNICAST;
@@ -334,7 +334,7 @@ impl Handle {
 
             // `rtnetlink` offers a separate request builders for different IP versions (IP v4 and v6).
             // This if branch is a bit clumsy because it does almost the same.
-            if route.get_family() == IPFamily::v6 {
+            if is_v6 {
                 let dest_addr = if !route.dest.is_empty() {
                     Ipv6Network::from_str(&route.dest)?
                 } else {
@@ -364,17 +364,14 @@ impl Handle {
                     request = request.gateway(ip);
                 }
 
-                if let Err(rtnetlink::Error::NetlinkError(message)) = request.execute().await {
-                    if Errno::from_i32(message.code.abs()) != Errno::EEXIST {
-                        return Err(anyhow!(
-                            "Failed to add IP v6 route (src: {}, dst: {}, gtw: {},Err: {})",
-                            route.get_source(),
-                            route.get_dest(),
-                            route.get_gateway(),
-                            message
-                        ));
-                    }
-                }
+                request.execute().await.with_context(|| {
+                    format!(
+                        "Failed to add IP v6 route (src: {}, dst: {}, gtw: {})",
+                        route.get_source(),
+                        route.get_dest(),
+                        route.get_gateway()
+                    )
+                })?;
             } else {
                 let dest_addr = if !route.dest.is_empty() {
                     Ipv4Network::from_str(&route.dest)?
@@ -405,17 +402,7 @@ impl Handle {
                     request = request.gateway(ip);
                 }
 
-                if let Err(rtnetlink::Error::NetlinkError(message)) = request.execute().await {
-                    if Errno::from_i32(message.code.abs()) != Errno::EEXIST {
-                        return Err(anyhow!(
-                            "Failed to add IP v4 route (src: {}, dst: {}, gtw: {},Err: {})",
-                            route.get_source(),
-                            route.get_dest(),
-                            route.get_gateway(),
-                            message
-                        ));
-                    }
-                }
+                request.execute().await?;
             }
         }
 
@@ -523,7 +510,7 @@ impl Handle {
             .as_ref()
             .map(|to| to.address.as_str()) // Extract address field
             .and_then(|addr| if addr.is_empty() { None } else { Some(addr) }) // Make sure it's not empty
-            .ok_or_else(|| anyhow!(nix::Error::EINVAL))?;
+            .ok_or(nix::Error::Sys(nix::errno::Errno::EINVAL))?;
 
         let ip = IpAddr::from_str(ip_address)
             .map_err(|e| anyhow!("Failed to parse IP {}: {:?}", ip_address, e))?;
@@ -607,12 +594,21 @@ fn format_address(data: &[u8]) -> Result<String> {
     }
 }
 
+fn is_ipv6(str: &str) -> bool {
+    Ipv6Addr::from_str(str).is_ok()
+}
+
 fn parse_mac_address(addr: &str) -> Result<[u8; 6]> {
     let mut split = addr.splitn(6, ':');
 
     // Parse single Mac address block
     let mut parse_next = || -> Result<u8> {
-        let v = u8::from_str_radix(split.next().ok_or_else(|| anyhow!(nix::Error::EINVAL))?, 16)?;
+        let v = u8::from_str_radix(
+            split
+                .next()
+                .ok_or(nix::Error::Sys(nix::errno::Errno::EINVAL))?,
+            16,
+        )?;
         Ok(v)
     };
 
@@ -934,6 +930,16 @@ mod tests {
     fn parse_mac() {
         let bytes = parse_mac_address("AB:0C:DE:12:34:56").expect("Failed to parse mac address");
         assert_eq!(bytes, [0xAB, 0x0C, 0xDE, 0x12, 0x34, 0x56]);
+    }
+
+    #[test]
+    fn check_ipv6() {
+        assert!(is_ipv6("::1"));
+        assert!(is_ipv6("2001:0:3238:DFE1:63::FEFB"));
+
+        assert!(!is_ipv6(""));
+        assert!(!is_ipv6("127.0.0.1"));
+        assert!(!is_ipv6("10.10.10.10"));
     }
 
     fn clean_env_for_test_add_one_arp_neighbor(dummy_name: &str, ip: &str) {

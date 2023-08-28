@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // PatchMmdsReader is a Reader for the PatchMmds structure.
@@ -23,18 +24,21 @@ type PatchMmdsReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *PatchMmdsReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewPatchMmdsNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewPatchMmdsBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewPatchMmdsDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewPatchMmdsNoContent() *PatchMmdsNoContent {
 	return &PatchMmdsNoContent{}
 }
 
-/* PatchMmdsNoContent describes a response with status code 204, with default header values.
+/*PatchMmdsNoContent handles this case with default header values.
 
 MMDS data store updated.
 */
@@ -73,7 +77,7 @@ func NewPatchMmdsBadRequest() *PatchMmdsBadRequest {
 	return &PatchMmdsBadRequest{}
 }
 
-/* PatchMmdsBadRequest describes a response with status code 400, with default header values.
+/*PatchMmdsBadRequest handles this case with default header values.
 
 MMDS data store cannot be updated due to bad input.
 */
@@ -83,9 +87,6 @@ type PatchMmdsBadRequest struct {
 
 func (o *PatchMmdsBadRequest) Error() string {
 	return fmt.Sprintf("[PATCH /mmds][%d] patchMmdsBadRequest  %+v", 400, o.Payload)
-}
-func (o *PatchMmdsBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *PatchMmdsBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewPatchMmdsDefault(code int) *PatchMmdsDefault {
 	}
 }
 
-/* PatchMmdsDefault describes a response with status code -1, with default header values.
+/*PatchMmdsDefault handles this case with default header values.
 
 Internal server error
 */
@@ -123,10 +124,7 @@ func (o *PatchMmdsDefault) Code() int {
 }
 
 func (o *PatchMmdsDefault) Error() string {
-	return fmt.Sprintf("[PATCH /mmds][%d] patchMmds default  %+v", o._statusCode, o.Payload)
-}
-func (o *PatchMmdsDefault) GetPayload() *models.Error {
-	return o.Payload
+	return fmt.Sprintf("[PATCH /mmds][%d] PatchMmds default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *PatchMmdsDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

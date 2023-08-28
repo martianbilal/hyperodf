@@ -9,7 +9,7 @@ ROOTFS_BUILDER := $(MK_DIR)/rootfs-builder/rootfs.sh
 INITRD_BUILDER := $(MK_DIR)/initrd-builder/initrd_builder.sh
 IMAGE_BUILDER  := $(MK_DIR)/image-builder/image_builder.sh
 
-DISTRO                ?= ubuntu
+DISTRO                := centos
 BUILD_METHOD          := distro
 BUILD_METHOD_LIST     := distro dracut
 AGENT_INIT            ?= no
@@ -182,6 +182,7 @@ SCRIPTS += image-builder/image_builder.sh
 SCRIPTS += initrd-builder/initrd_builder.sh
 
 HELPER_FILES :=
+HELPER_FILES += rootfs-builder/versions.txt
 HELPER_FILES += scripts/lib.sh
 HELPER_FILES += image-builder/nsdax.gpl.c
 
@@ -201,7 +202,7 @@ install-scripts:
 	@$(foreach f,$(SCRIPTS),$(call INSTALL_SCRIPT,$f,$(INSTALL_DIR)))
 	@echo "Installing helper files"
 	@$(foreach f,$(HELPER_FILES),$(call INSTALL_FILE,$f,$(INSTALL_DIR)))
-	@echo "Installing config files"
+	@echo "Installing installing config files"
 	@$(foreach f,$(DIST_CONFIGS),$(call INSTALL_FILE,$f,$(INSTALL_DIR)))
 
 .PHONY: clean

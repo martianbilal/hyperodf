@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # Copyright (c) 2020 Red Hat, Inc.
 #
@@ -12,7 +12,7 @@ script_dir="$(realpath $(dirname $0))"
 patches_dir="$1"
 
 if [ -z "$patches_dir" ]; then
-	cat <<-EOF
+	cat <<-EOT
 	Apply patches to the sources at the current directory.
 
 	Patches are expected to be named in the standard git-format-patch(1) format where
@@ -30,21 +30,21 @@ if [ -z "$patches_dir" ]; then
 	    $0 PATCHES_DIR
 	Where:
 	    PATCHES_DIR is the directory containing the patches
-	EOF
+	EOT
 	exit 1
 fi
 
 echo "INFO: Apply patches from $patches_dir"
 if [ -d "$patches_dir" ]; then
-	patches=($(find "$patches_dir" -maxdepth 1 -name '*.patch'|sort -t- -k1,1n))
+	patches=($(find "$patches_dir" -name '*.patch'|sort -t- -k1,1n))
 	echo "INFO: Found ${#patches[@]} patches"
 	for patch in ${patches[@]}; do
 		echo "INFO: Apply $patch"
-		patch -p1 < "$patch" || \
+		git apply "$patch" || \
 			{ echo >&2 "ERROR: Not applied. Exiting..."; exit 1; }
 	done
 else
 	echo "INFO: Patches directory does not exist: ${patches_dir}"
-	echo "INFO: Create a ${patches_dir}/no_patches.txt file if the current version has no patches"
+	echo "INFO: Create a ${patches_dir}/no_patches file if the current version has no patches"
 	exit 1;
 fi

@@ -8,14 +8,15 @@ Name | Type | Description | Notes
 **Socket** | **string** |  | 
 **NumQueues** | **int32** |  | [default to 1]
 **QueueSize** | **int32** |  | [default to 1024]
-**PciSegment** | Pointer to **int32** |  | [optional] 
+**Dax** | **bool** |  | [default to true]
+**CacheSize** | **int64** |  | 
 **Id** | Pointer to **string** |  | [optional] 
 
 ## Methods
 
 ### NewFsConfig
 
-`func NewFsConfig(tag string, socket string, numQueues int32, queueSize int32, ) *FsConfig`
+`func NewFsConfig(tag string, socket string, numQueues int32, queueSize int32, dax bool, cacheSize int64, ) *FsConfig`
 
 NewFsConfig instantiates a new FsConfig object
 This constructor will assign default values to properties that have it defined,
@@ -110,30 +111,45 @@ and a boolean to check if the value has been set.
 SetQueueSize sets QueueSize field to given value.
 
 
-### GetPciSegment
+### GetDax
 
-`func (o *FsConfig) GetPciSegment() int32`
+`func (o *FsConfig) GetDax() bool`
 
-GetPciSegment returns the PciSegment field if non-nil, zero value otherwise.
+GetDax returns the Dax field if non-nil, zero value otherwise.
 
-### GetPciSegmentOk
+### GetDaxOk
 
-`func (o *FsConfig) GetPciSegmentOk() (*int32, bool)`
+`func (o *FsConfig) GetDaxOk() (*bool, bool)`
 
-GetPciSegmentOk returns a tuple with the PciSegment field if it's non-nil, zero value otherwise
+GetDaxOk returns a tuple with the Dax field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetPciSegment
+### SetDax
 
-`func (o *FsConfig) SetPciSegment(v int32)`
+`func (o *FsConfig) SetDax(v bool)`
 
-SetPciSegment sets PciSegment field to given value.
+SetDax sets Dax field to given value.
 
-### HasPciSegment
 
-`func (o *FsConfig) HasPciSegment() bool`
+### GetCacheSize
 
-HasPciSegment returns a boolean if a field has been set.
+`func (o *FsConfig) GetCacheSize() int64`
+
+GetCacheSize returns the CacheSize field if non-nil, zero value otherwise.
+
+### GetCacheSizeOk
+
+`func (o *FsConfig) GetCacheSizeOk() (*int64, bool)`
+
+GetCacheSizeOk returns a tuple with the CacheSize field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCacheSize
+
+`func (o *FsConfig) SetCacheSize(v int64)`
+
+SetCacheSize sets CacheSize field to given value.
+
 
 ### GetId
 

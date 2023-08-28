@@ -4,7 +4,7 @@
 
 This document describes how to import Kata Containers logs into [Fluentd](https://www.fluentd.org/),
 typically for importing into an
-Elastic/Fluentd/Kibana([EFK](https://github.com/kubernetes-sigs/instrumentation-addons/tree/master/fluentd-elasticsearch#running-efk-stack-in-production))
+Elastic/Fluentd/Kibana([EFK](https://github.com/kubernetes/kubernetes/tree/master/cluster/addons/fluentd-elasticsearch#running-efk-stack-in-production))
 or Elastic/Logstash/Kibana([ELK](https://www.elastic.co/elastic-stack)) stack.
 
 The majority of this document focusses on CRI-O based (classic) Kata runtime. Much of that information
@@ -68,7 +68,7 @@ the Kata logs import to the EFK stack.
 > stack they are able to utilise in order to modify and test as necessary.
 
 Minikube by default
-[configures](https://github.com/kubernetes/minikube/blob/master/deploy/iso/minikube-iso/board/minikube/x86_64/rootfs-overlay/etc/systemd/journald.conf)
+[configures](https://github.com/kubernetes/minikube/blob/master/deploy/iso/minikube-iso/board/coreos/minikube/rootfs-overlay/etc/systemd/journald.conf)
  the `systemd-journald` with the
 [`Storage=volatile`](https://www.freedesktop.org/software/systemd/man/journald.conf.html) option,
 which results in the journal being stored in `/run/log/journal`. Unfortunately, the Minikube EFK
@@ -163,7 +163,7 @@ sub-filter on, for instance, the `SYSLOG_IDENTIFIER` to differentiate the Kata c
 on the `PRIORITY` to filter out critical issues etc.
 
 Kata generates a significant amount of Kata specific information, which can be seen as
-[`logfmt`](../../src/tools/log-parser/README.md#logfile-requirements).
+[`logfmt`](https://github.com/kata-containers/tests/tree/main/cmd/log-parser#logfile-requirements).
 data contained in the `MESSAGE` field. Imported as-is, there is no easy way to filter on that data
 in Kibana:
 
@@ -257,14 +257,14 @@ go directly to a full Kata specific JSON format logfile test.
 
 Kata runtime has the ability to generate JSON logs directly, rather than its default `logfmt` format. Passing
 the `--log-format=json` argument to the Kata runtime enables this. The easiest way to pass in this extra
-parameter from a [Kata deploy](../../tools/packaging/kata-deploy) installation
+parameter from a [Kata deploy](https://github.com/kata-containers/kata-containers/tree/main/tools/packaging/kata-deploy) installation
 is to edit the `/opt/kata/bin/kata-qemu` shell script.
 
 At the same time, we will add the `--log=/var/log/kata-runtime.log` argument to store the Kata logs in their
 own file (rather than into the system journal).
 
 ```bash
-#!/usr/bin/env bash
+#!/bin/bash
 /opt/kata/bin/kata-runtime --config "/opt/kata/share/defaults/kata-containers/configuration-qemu.toml" --log-format=json --log=/var/log/kata-runtime.log $@
 ```
 

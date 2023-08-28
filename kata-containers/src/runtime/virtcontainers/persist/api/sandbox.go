@@ -6,11 +6,6 @@
 
 package persistapi
 
-import (
-	dev "github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
-	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
-)
-
 // ============= sandbox level resources =============
 
 // AgentState save agent state data
@@ -27,7 +22,7 @@ type SandboxState struct {
 	CgroupPaths map[string]string
 
 	// Devices plugged to sandbox(hypervisor)
-	Devices []dev.DeviceState
+	Devices []DeviceState
 
 	// State is sandbox running status
 	State string
@@ -35,15 +30,12 @@ type SandboxState struct {
 	// SandboxContainer specifies which container is used to start the sandbox/vm
 	SandboxContainer string
 
-	// SandboxCgroupPath is the sandbox cgroup path
-	SandboxCgroupPath string
-
-	// OverheadCgroupPath is the sandbox overhead cgroup path.
-	// It can be an empty string if sandbox_cgroup_only is set.
-	OverheadCgroupPath string
+	// CgroupPath is the cgroup hierarchy where sandbox's processes
+	// including the hypervisor are placed.
+	CgroupPath string
 
 	// HypervisorState saves hypervisor specific data
-	HypervisorState hv.HypervisorState
+	HypervisorState HypervisorState
 
 	// AgentState saves state data of agent
 	AgentState AgentState

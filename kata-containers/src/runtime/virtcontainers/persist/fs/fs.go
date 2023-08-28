@@ -9,12 +9,10 @@ package fs
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
-
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 
 	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
 	"github.com/sirupsen/logrus"
@@ -29,11 +27,11 @@ const dirMode = os.FileMode(0700) | os.ModeDir
 // fileMode is the permission bits used for creating a file
 const fileMode = os.FileMode(0600)
 
-// StoragePathSuffix is the suffix used for all storage paths
+// storagePathSuffix is the suffix used for all storage paths
 //
 // Note: this very brief path represents "virtcontainers". It is as
 // terse as possible to minimise path length.
-const StoragePathSuffix = "vc"
+const storagePathSuffix = "vc"
 
 // sandboxPathSuffix is the suffix used for sandbox storage
 const sandboxPathSuffix = "sbs"
@@ -64,7 +62,7 @@ func Init() (persistapi.PersistDriver, error) {
 	return &FS{
 		sandboxState:    &persistapi.SandboxState{},
 		containerState:  make(map[string]persistapi.ContainerState),
-		storageRootPath: filepath.Join("/run", StoragePathSuffix),
+		storageRootPath: filepath.Join("/run", storagePathSuffix),
 		driverName:      "fs",
 	}, nil
 }
@@ -88,7 +86,7 @@ func (fs *FS) ToDisk(ss persistapi.SandboxState, cs map[string]persistapi.Contai
 		return err
 	}
 
-	if err := utils.MkdirAllWithInheritedOwner(sandboxDir, dirMode); err != nil {
+	if err := os.MkdirAll(sandboxDir, dirMode); err != nil {
 		return err
 	}
 
@@ -125,7 +123,7 @@ func (fs *FS) ToDisk(ss persistapi.SandboxState, cs map[string]persistapi.Contai
 	// persist container configuration data
 	for cid, cstate := range fs.containerState {
 		cdir := filepath.Join(sandboxDir, cid)
-		if dirCreationErr = utils.MkdirAllWithInheritedOwner(cdir, dirMode); dirCreationErr != nil {
+		if dirCreationErr = os.MkdirAll(cdir, dirMode); dirCreationErr != nil {
 			return dirCreationErr
 		}
 		createdDirs = append(createdDirs, cdir)
@@ -143,7 +141,7 @@ func (fs *FS) ToDisk(ss persistapi.SandboxState, cs map[string]persistapi.Contai
 	}
 
 	// Walk sandbox dir and find container.
-	files, err := os.ReadDir(sandboxDir)
+	files, err := ioutil.ReadDir(sandboxDir)
 	if err != nil {
 		return err
 	}
@@ -191,7 +189,7 @@ func (fs *FS) FromDisk(sid string) (persistapi.SandboxState, map[string]persista
 	}
 
 	// walk sandbox dir and find container
-	files, err := os.ReadDir(sandboxDir)
+	files, err := ioutil.ReadDir(sandboxDir)
 	if err != nil {
 		return ss, nil, err
 	}
@@ -290,7 +288,7 @@ func (fs *FS) GlobalWrite(relativePath string, data []byte) error {
 
 	_, err = os.Stat(dir)
 	if os.IsNotExist(err) {
-		if err := utils.MkdirAllWithInheritedOwner(dir, dirMode); err != nil {
+		if err := os.MkdirAll(dir, dirMode); err != nil {
 			fs.Logger().WithError(err).WithField("directory", dir).Error("failed to create dir")
 			return err
 		}
@@ -326,7 +324,7 @@ func (fs *FS) GlobalRead(relativePath string) ([]byte, error) {
 	}
 	defer f.Close()
 
-	data, err := io.ReadAll(f)
+	data, err := ioutil.ReadAll(f)
 	if err != nil {
 		fs.Logger().WithError(err).WithField("file", path).Error("failed to read file")
 		return nil, err

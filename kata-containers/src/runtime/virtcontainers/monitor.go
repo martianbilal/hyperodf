@@ -14,11 +14,9 @@ import (
 )
 
 const (
-	defaultCheckInterval = 5 * time.Second
+	defaultCheckInterval = 1 * time.Second
 	watcherChannelSize   = 128
 )
-
-var monitorLog = virtLog.WithField("subsystem", "virtcontainers/monitor")
 
 // nolint: govet
 type monitor struct {
@@ -35,9 +33,6 @@ type monitor struct {
 }
 
 func newMonitor(s *Sandbox) *monitor {
-	// there should only be one monitor for one sandbox,
-	// so it's safe to let monitorLog as a global variable.
-	monitorLog = monitorLog.WithField("sandbox", s.ID())
 	return &monitor{
 		sandbox:       s,
 		checkInterval: defaultCheckInterval,
@@ -77,7 +72,6 @@ func (m *monitor) newWatcher(ctx context.Context) (chan error, error) {
 }
 
 func (m *monitor) notify(ctx context.Context, err error) {
-	monitorLog.WithError(err).Warn("notify on errors")
 	m.sandbox.agent.markDead(ctx)
 
 	m.Lock()
@@ -91,19 +85,18 @@ func (m *monitor) notify(ctx context.Context, err error) {
 	// but just in case...
 	defer func() {
 		if x := recover(); x != nil {
-			monitorLog.Warnf("watcher closed channel: %v", x)
+			virtLog.Warnf("watcher closed channel: %v", x)
 		}
 	}()
 
 	for _, c := range m.watchers {
-		monitorLog.WithError(err).Warn("write error to watcher")
 		// throw away message can not write to channel
 		// make it not stuck, the first error is useful.
 		select {
 		case c <- err:
 
 		default:
-			monitorLog.WithField("channel-size", watcherChannelSize).Warnf("watcher channel is full, throw notify message")
+			virtLog.WithField("channel-size", watcherChannelSize).Warnf("watcher channel is full, throw notify message")
 		}
 	}
 }
@@ -111,7 +104,6 @@ func (m *monitor) notify(ctx context.Context, err error) {
 func (m *monitor) stop() {
 	// wait outside of monitor lock for the watcher channel to exit.
 	defer m.wg.Wait()
-	monitorLog.Info("stopping monitor")
 
 	m.Lock()
 	defer m.Unlock()
@@ -130,7 +122,7 @@ func (m *monitor) stop() {
 	// but just in case...
 	defer func() {
 		if x := recover(); x != nil {
-			monitorLog.Warnf("watcher closed channel: %v", x)
+			virtLog.Warnf("watcher closed channel: %v", x)
 		}
 	}()
 
@@ -148,7 +140,7 @@ func (m *monitor) watchAgent(ctx context.Context) {
 }
 
 func (m *monitor) watchHypervisor(ctx context.Context) error {
-	if err := m.sandbox.hypervisor.Check(); err != nil {
+	if err := m.sandbox.hypervisor.check(); err != nil {
 		m.notify(ctx, errors.Wrapf(err, "failed to ping hypervisor process"))
 		return err
 	}

@@ -24,7 +24,6 @@ type MemoryConfig struct {
 	Shared         *bool               `json:"shared,omitempty"`
 	Hugepages      *bool               `json:"hugepages,omitempty"`
 	HugepageSize   *int64              `json:"hugepage_size,omitempty"`
-	Prefault       *bool               `json:"prefault,omitempty"`
 	Zones          *[]MemoryZoneConfig `json:"zones,omitempty"`
 }
 
@@ -37,14 +36,12 @@ func NewMemoryConfig(size int64) *MemoryConfig {
 	this.Size = size
 	var mergeable bool = false
 	this.Mergeable = &mergeable
-	var hotplugMethod string = "Acpi"
+	var hotplugMethod string = "acpi"
 	this.HotplugMethod = &hotplugMethod
 	var shared bool = false
 	this.Shared = &shared
 	var hugepages bool = false
 	this.Hugepages = &hugepages
-	var prefault bool = false
-	this.Prefault = &prefault
 	return &this
 }
 
@@ -55,14 +52,12 @@ func NewMemoryConfigWithDefaults() *MemoryConfig {
 	this := MemoryConfig{}
 	var mergeable bool = false
 	this.Mergeable = &mergeable
-	var hotplugMethod string = "Acpi"
+	var hotplugMethod string = "acpi"
 	this.HotplugMethod = &hotplugMethod
 	var shared bool = false
 	this.Shared = &shared
 	var hugepages bool = false
 	this.Hugepages = &hugepages
-	var prefault bool = false
-	this.Prefault = &prefault
 	return &this
 }
 
@@ -314,38 +309,6 @@ func (o *MemoryConfig) SetHugepageSize(v int64) {
 	o.HugepageSize = &v
 }
 
-// GetPrefault returns the Prefault field value if set, zero value otherwise.
-func (o *MemoryConfig) GetPrefault() bool {
-	if o == nil || o.Prefault == nil {
-		var ret bool
-		return ret
-	}
-	return *o.Prefault
-}
-
-// GetPrefaultOk returns a tuple with the Prefault field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *MemoryConfig) GetPrefaultOk() (*bool, bool) {
-	if o == nil || o.Prefault == nil {
-		return nil, false
-	}
-	return o.Prefault, true
-}
-
-// HasPrefault returns a boolean if a field has been set.
-func (o *MemoryConfig) HasPrefault() bool {
-	if o != nil && o.Prefault != nil {
-		return true
-	}
-
-	return false
-}
-
-// SetPrefault gets a reference to the given bool and assigns it to the Prefault field.
-func (o *MemoryConfig) SetPrefault(v bool) {
-	o.Prefault = &v
-}
-
 // GetZones returns the Zones field value if set, zero value otherwise.
 func (o *MemoryConfig) GetZones() []MemoryZoneConfig {
 	if o == nil || o.Zones == nil {
@@ -403,9 +366,6 @@ func (o MemoryConfig) MarshalJSON() ([]byte, error) {
 	}
 	if o.HugepageSize != nil {
 		toSerialize["hugepage_size"] = o.HugepageSize
-	}
-	if o.Prefault != nil {
-		toSerialize["prefault"] = o.Prefault
 	}
 	if o.Zones != nil {
 		toSerialize["zones"] = o.Zones

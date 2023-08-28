@@ -19,7 +19,7 @@ type DeviceNode struct {
 	Id        *string                   `json:"id,omitempty"`
 	Resources *[]map[string]interface{} `json:"resources,omitempty"`
 	Children  *[]string                 `json:"children,omitempty"`
-	PciBdf    *string                   `json:"pci_bdf,omitempty"`
+	PciBdf    *int32                    `json:"pci_bdf,omitempty"`
 }
 
 // NewDeviceNode instantiates a new DeviceNode object
@@ -136,9 +136,9 @@ func (o *DeviceNode) SetChildren(v []string) {
 }
 
 // GetPciBdf returns the PciBdf field value if set, zero value otherwise.
-func (o *DeviceNode) GetPciBdf() string {
+func (o *DeviceNode) GetPciBdf() int32 {
 	if o == nil || o.PciBdf == nil {
-		var ret string
+		var ret int32
 		return ret
 	}
 	return *o.PciBdf
@@ -146,7 +146,7 @@ func (o *DeviceNode) GetPciBdf() string {
 
 // GetPciBdfOk returns a tuple with the PciBdf field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *DeviceNode) GetPciBdfOk() (*string, bool) {
+func (o *DeviceNode) GetPciBdfOk() (*int32, bool) {
 	if o == nil || o.PciBdf == nil {
 		return nil, false
 	}
@@ -162,8 +162,8 @@ func (o *DeviceNode) HasPciBdf() bool {
 	return false
 }
 
-// SetPciBdf gets a reference to the given string and assigns it to the PciBdf field.
-func (o *DeviceNode) SetPciBdf(v string) {
+// SetPciBdf gets a reference to the given int32 and assigns it to the PciBdf field.
+func (o *DeviceNode) SetPciBdf(v int32) {
 	o.PciBdf = &v
 }
 

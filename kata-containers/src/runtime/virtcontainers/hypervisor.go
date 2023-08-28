@@ -11,26 +11,24 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
-
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/device/config"
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/govmm"
-	hv "github.com/kata-containers/kata-containers/src/runtime/pkg/hypervisors"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist"
+	persistapi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/persist/api"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/types"
-
-	"github.com/sirupsen/logrus"
+	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/utils"
 )
 
 // HypervisorType describes an hypervisor type.
 type HypervisorType string
 
-type Operation int
+type operation int
 
 const (
-	AddDevice Operation = iota
-	RemoveDevice
+	addDevice operation = iota
+	removeDevice
 )
 
 const (
@@ -48,9 +46,14 @@ const (
 
 	// MockHypervisor is a mock hypervisor for testing purposes
 	MockHypervisor HypervisorType = "mock"
+)
 
+const (
+	procMemInfo = "/proc/meminfo"
 	procCPUInfo = "/proc/cpuinfo"
+)
 
+const (
 	defaultVCPUs = 1
 	// 2 GiB
 	defaultMemSzMiB = 2048
@@ -69,17 +72,10 @@ const (
 
 	// MinHypervisorMemory is the minimum memory required for a VM.
 	MinHypervisorMemory = 256
-
-	defaultMsize9p = 8192
-)
-
-var (
-	hvLogger                   = logrus.WithField("source", "virtcontainers/hypervisor")
-	noGuestMemHotplugErr error = errors.New("guest memory hotplug not supported")
 )
 
 // In some architectures the maximum number of vCPUs depends on the number of physical cores.
-var defaultMaxVCPUs = govmm.MaxVCPUs()
+var defaultMaxQemuVCPUs = MaxQemuVCPUs()
 
 // agnostic list of kernel root parameters for NVDIMM
 var commonNvdimmKernelRootParams = []Param{ //nolint: unused, deadcode, varcheck
@@ -102,56 +98,50 @@ var commonVirtioblkKernelRootParams = []Param{ //nolint: unused, deadcode, varch
 	{"rootfstype", "ext4"},
 }
 
-// DeviceType describes a virtualized device type.
-type DeviceType int
+// deviceType describes a virtualized device type.
+type deviceType int
 
 const (
 	// ImgDev is the image device type.
-	ImgDev DeviceType = iota
+	imgDev deviceType = iota
 
 	// FsDev is the filesystem device type.
-	FsDev
+	fsDev
 
 	// NetDev is the network device type.
-	NetDev
+	netDev
 
 	// BlockDev is the block device type.
-	BlockDev
+	blockDev
 
 	// SerialPortDev is the serial port device type.
-	SerialPortDev
+	serialPortDev
 
-	// VSockPCIDev is the vhost vsock PCI device type.
-	VSockPCIDev
+	// vSockPCIDev is the vhost vsock PCI device type.
+	vSockPCIDev
 
 	// VFIODevice is VFIO device type
-	VfioDev
+	vfioDev
 
-	// VhostuserDev is a Vhost-user device type
-	VhostuserDev
+	// vhostuserDev is a Vhost-user device type
+	vhostuserDev
 
 	// CPUDevice is CPU device type
-	CpuDev
+	cpuDev
 
-	// MemoryDev is memory device type
-	MemoryDev
+	// memoryDevice is memory device type
+	memoryDev
 
-	// HybridVirtioVsockDev is a hybrid virtio-vsock device supported
+	// hybridVirtioVsockDev is a hybrid virtio-vsock device supported
 	// only on certain hypervisors, like firecracker.
-	HybridVirtioVsockDev
+	hybridVirtioVsockDev
 )
 
-type MemoryDevice struct {
-	Slot   int
-	SizeMB int
-	Addr   uint64
-	Probe  bool
-}
-
-// SetHypervisorLogger sets up a logger for the hypervisor part of this pkg
-func SetHypervisorLogger(logger *logrus.Entry) {
-	fields := hvLogger.Data
-	hvLogger = logger.WithFields(fields)
+type memoryDevice struct {
+	slot   int
+	sizeMB int
+	addr   uint64
+	probe  bool
 }
 
 // Set sets an hypervisor type based on the input string.
@@ -195,39 +185,33 @@ func (hType *HypervisorType) String() string {
 	}
 }
 
-// GetHypervisorSocketTemplate returns the full "template" path to the
-// hypervisor socket. If the specified hypervisor doesn't use a socket,
-// an empty string is returned.
-//
-// The returned value is not the actual socket path since this function
-// does not create a sandbox. Instead a path is returned with a special
-// template value "{ID}" which would be replaced with the real sandbox
-// name sandbox creation time.
-func GetHypervisorSocketTemplate(hType HypervisorType, config *HypervisorConfig) (string, error) {
-	hypervisor, err := NewHypervisor(hType)
+// newHypervisor returns an hypervisor from and hypervisor type.
+func newHypervisor(hType HypervisorType) (hypervisor, error) {
+	store, err := persist.GetDriver()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if err := hypervisor.setConfig(config); err != nil {
-		return "", err
+	switch hType {
+	case QemuHypervisor:
+		return &qemu{
+			store: store,
+		}, nil
+	case FirecrackerHypervisor:
+		return &firecracker{}, nil
+	case AcrnHypervisor:
+		return &Acrn{
+			store: store,
+		}, nil
+	case ClhHypervisor:
+		return &cloudHypervisor{
+			store: store,
+		}, nil
+	case MockHypervisor:
+		return &mockHypervisor{}, nil
+	default:
+		return nil, fmt.Errorf("Unknown hypervisor type %s", hType)
 	}
-
-	// Tag that is used to represent the name of a sandbox
-	const sandboxID = "{ID}"
-
-	socket, err := hypervisor.GenerateSocket(sandboxID)
-	if err != nil {
-		return "", err
-	}
-
-	var socketPath string
-
-	if hybridVsock, ok := socket.(types.HybridVSock); ok {
-		socketPath = hybridVsock.UdsPath
-	}
-
-	return socketPath, nil
 }
 
 // Param is a key/value representation for hypervisor and kernel parameters.
@@ -244,9 +228,6 @@ type HypervisorConfig struct {
 	// it will be used for the sandbox's kernel path instead of KernelPath.
 	customAssets map[types.AssetType]*types.Asset
 
-	// Supplementary group IDs.
-	Groups []uint32
-
 	// KernelPath is the guest kernel host path.
 	KernelPath string
 
@@ -259,9 +240,6 @@ type HypervisorConfig struct {
 
 	// FirmwarePath is the bios host path
 	FirmwarePath string
-
-	// FirmwareVolumePath is the configuration volume path for the firmware
-	FirmwareVolumePath string
 
 	// MachineAccelerators are machine specific accelerators
 	MachineAccelerators string
@@ -299,18 +277,12 @@ type HypervisorConfig struct {
 	EntropySource string
 
 	// Shared file system type:
-	//   - virtio-9p
-	//   - virtio-fs (default)
+	//   - virtio-9p (default)
+	//   - virtio-fs
 	SharedFS string
-
-	// Path for filesystem sharing
-	SharedPath string
 
 	// VirtioFSDaemon is the virtio-fs vhost-user daemon path
 	VirtioFSDaemon string
-
-	// VirtioFSCache cache mode for fs version cache or "none"
-	VirtioFSCache string
 
 	// File based memory backend root directory
 	FileBackedMemRootDir string
@@ -329,14 +301,11 @@ type HypervisorConfig struct {
 	// VMid is "" if the hypervisor is not created by the factory.
 	VMid string
 
-	// VMStorePath is the location on disk where VM information will persist
-	VMStorePath string
-
-	// VMStorePath is the location on disk where runtime information will persist
-	RunStorePath string
-
 	// SELinux label for the VM
 	SELinuxProcessLabel string
+
+	// VirtioFSCache cache mode for fs version cache or "none"
+	VirtioFSCache string
 
 	// HypervisorPathList is the list of hypervisor paths names allowed in annotations
 	HypervisorPathList []string
@@ -368,12 +337,6 @@ type HypervisorConfig struct {
 	// VhostUserStorePathList is the list of valid values for vhost-user paths
 	VhostUserStorePathList []string
 
-	// SeccompSandbox is the qemu function which enables the seccomp feature
-	SeccompSandbox string
-
-	// The user maps to the uid.
-	User string
-
 	// KernelParams are additional guest kernel parameters.
 	KernelParams []Param
 
@@ -384,47 +347,11 @@ type HypervisorConfig struct {
 	// Enable SGX. Hardware-based isolation and memory encryption.
 	SGXEPCSize int64
 
-	// DiskRateLimiterBwRate is used to control disk I/O bandwidth on VM level.
-	// The same value, defined in bits per second, is used for inbound and outbound bandwidth.
-	DiskRateLimiterBwMaxRate int64
-
-	// DiskRateLimiterBwOneTimeBurst is used to control disk I/O bandwidth on VM level.
-	// This increases the initial max rate and this initial extra credit does *NOT* replenish
-	// and can be used for an *initial* burst of data.
-	DiskRateLimiterBwOneTimeBurst int64
-
-	// DiskRateLimiterOpsRate is used to control disk I/O operations on VM level.
-	// The same value, defined in operations per second, is used for inbound and outbound bandwidth.
-	DiskRateLimiterOpsMaxRate int64
-
-	// DiskRateLimiterOpsOneTimeBurst is used to control disk I/O operations on VM level.
-	// This increases the initial max rate and this initial extra credit does *NOT* replenish
-	// and can be used for an *initial* burst of data.
-	DiskRateLimiterOpsOneTimeBurst int64
-
 	// RxRateLimiterMaxRate is used to control network I/O inbound bandwidth on VM level.
 	RxRateLimiterMaxRate uint64
 
 	// TxRateLimiterMaxRate is used to control network I/O outbound bandwidth on VM level.
 	TxRateLimiterMaxRate uint64
-
-	// NetRateLimiterBwRate is used to control network I/O bandwidth on VM level.
-	// The same value, defined in bits per second, is used for inbound and outbound bandwidth.
-	NetRateLimiterBwMaxRate int64
-
-	// NetRateLimiterBwOneTimeBurst is used to control network I/O bandwidth on VM level.
-	// This increases the initial max rate and this initial extra credit does *NOT* replenish
-	// and can be used for an *initial* burst of data.
-	NetRateLimiterBwOneTimeBurst int64
-
-	// NetRateLimiterOpsRate is used to control network I/O operations on VM level.
-	// The same value, defined in operations per second, is used for inbound and outbound bandwidth.
-	NetRateLimiterOpsMaxRate int64
-
-	// NetRateLimiterOpsOneTimeBurst is used to control network I/O operations on VM level.
-	// This increases the initial max rate and this initial extra credit does *NOT* replenish
-	// and can be used for an *initial* burst of data.
-	NetRateLimiterOpsOneTimeBurst int64
 
 	// MemOffset specifies memory space for nvdimm device
 	MemOffset uint64
@@ -442,9 +369,6 @@ type HypervisorConfig struct {
 	// DefaultMem specifies default memory size in MiB for the VM.
 	MemorySize uint32
 
-	// DefaultMaxMemorySize specifies the maximum amount of RAM in MiB for the VM.
-	DefaultMaxMemorySize uint64
-
 	// DefaultBridges specifies default number of bridges for the VM.
 	// Bridges can be used to hot plug devices
 	DefaultBridges uint32
@@ -457,12 +381,6 @@ type HypervisorConfig struct {
 
 	// VirtioFSCacheSize is the DAX cache size in MiB
 	VirtioFSCacheSize uint32
-
-	// User ID.
-	Uid uint32
-
-	// Group ID.
-	Gid uint32
 
 	// BlockDeviceCacheSet specifies cache-related options will be set to block devices or not.
 	BlockDeviceCacheSet bool
@@ -501,6 +419,14 @@ type HypervisorConfig struct {
 	// IOMMUPlatform is used to indicate if IOMMU_PLATFORM is enabled for supported devices
 	IOMMUPlatform bool
 
+	// Realtime Used to enable/disable realtime
+	Realtime bool
+
+	// Mlock is used to control memory locking when Realtime is enabled
+	// Realtime=true and Mlock=false, allows for swapping out of VM memory
+	// enabling higher density
+	Mlock bool
+
 	// DisableNestingChecks is used to override customizations performed
 	// when running on top of another VMM.
 	DisableNestingChecks bool
@@ -535,26 +461,14 @@ type HypervisorConfig struct {
 
 	// GuestSwap Used to enable/disable swap in the guest
 	GuestSwap bool
-
-	// Rootless is used to enable rootless VMM process
-	Rootless bool
-
-	// Disable seccomp from the hypervisor process
-	DisableSeccomp bool
-
-	// Disable selinux from the hypervisor process
-	DisableSeLinux bool
-
-	// Use legacy serial for the guest console
-	LegacySerial bool
 }
 
 // vcpu mapping from vcpu number to thread number
-type VcpuThreadIDs struct {
+type vcpuThreadIDs struct {
 	vcpus map[int]int
 }
 
-func (conf *HypervisorConfig) CheckTemplateConfig() error {
+func (conf *HypervisorConfig) checkTemplateConfig() error {
 	if conf.BootToBeTemplate && conf.BootFromTemplate {
 		return fmt.Errorf("Cannot set both 'to be' and 'from' vm tempate")
 	}
@@ -565,8 +479,50 @@ func (conf *HypervisorConfig) CheckTemplateConfig() error {
 		}
 
 		if conf.BootFromTemplate && conf.DevicesStatePath == "" {
-			return fmt.Errorf("Missing DevicesStatePath to Load from vm template")
+			return fmt.Errorf("Missing DevicesStatePath to load from vm template")
 		}
+	}
+
+	return nil
+}
+
+func (conf *HypervisorConfig) valid() error {
+	if conf.KernelPath == "" {
+		return fmt.Errorf("Missing kernel path")
+	}
+
+	if conf.ImagePath == "" && conf.InitrdPath == "" {
+		return fmt.Errorf("Missing image and initrd path")
+	}
+
+	if err := conf.checkTemplateConfig(); err != nil {
+		return err
+	}
+
+	if conf.NumVCPUs == 0 {
+		conf.NumVCPUs = defaultVCPUs
+	}
+
+	if conf.MemorySize == 0 {
+		conf.MemorySize = defaultMemSzMiB
+	}
+
+	if conf.DefaultBridges == 0 {
+		conf.DefaultBridges = defaultBridges
+	}
+
+	if conf.BlockDeviceDriver == "" {
+		conf.BlockDeviceDriver = defaultBlockDriver
+	} else if conf.BlockDeviceDriver == config.VirtioBlock && conf.HypervisorMachineType == "s390-ccw-virtio" {
+		conf.BlockDeviceDriver = config.VirtioBlockCCW
+	}
+
+	if conf.DefaultMaxVCPUs == 0 {
+		conf.DefaultMaxVCPUs = defaultMaxQemuVCPUs
+	}
+
+	if conf.Msize9p == 0 && conf.SharedFS != config.VirtioFS {
+		conf.Msize9p = defaultMsize9p
 	}
 
 	return nil
@@ -584,7 +540,7 @@ func (conf *HypervisorConfig) AddKernelParam(p Param) error {
 	return nil
 }
 
-func (conf *HypervisorConfig) AddCustomAsset(a *types.Asset) error {
+func (conf *HypervisorConfig) addCustomAsset(a *types.Asset) error {
 	if a == nil || a.Path() == "" {
 		// We did not get a custom asset, we will use the default one.
 		return nil
@@ -594,7 +550,7 @@ func (conf *HypervisorConfig) AddCustomAsset(a *types.Asset) error {
 		return fmt.Errorf("Invalid %s at %s", a.Type(), a.Path())
 	}
 
-	hvLogger.Debugf("Using custom %v asset %s", a.Type(), a.Path())
+	virtLog.Debugf("Using custom %v asset %s", a.Type(), a.Path())
 
 	if conf.customAssets == nil {
 		conf.customAssets = make(map[types.AssetType]*types.Asset)
@@ -629,8 +585,6 @@ func (conf *HypervisorConfig) assetPath(t types.AssetType) (string, error) {
 		return conf.JailerPath, nil
 	case types.FirmwareAsset:
 		return conf.FirmwarePath, nil
-	case types.FirmwareVolumeAsset:
-		return conf.FirmwareVolumePath, nil
 	default:
 		return "", fmt.Errorf("Unknown asset type %v", t)
 	}
@@ -695,11 +649,6 @@ func (conf *HypervisorConfig) FirmwareAssetPath() (string, error) {
 	return conf.assetPath(types.FirmwareAsset)
 }
 
-// FirmwareVolumeAssetPath returns the guest firmware volume path
-func (conf *HypervisorConfig) FirmwareVolumeAssetPath() (string, error) {
-	return conf.assetPath(types.FirmwareVolumeAsset)
-}
-
 func appendParam(params []Param, parameter string, value string) []Param {
 	return append(params, Param{parameter, value})
 }
@@ -745,10 +694,43 @@ func DeserializeParams(parameters []string) []Param {
 	return params
 }
 
+func getHostMemorySizeKb(memInfoPath string) (uint64, error) {
+	f, err := os.Open(memInfoPath)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		// Expected format: ["MemTotal:", "1234", "kB"]
+		parts := strings.Fields(scanner.Text())
+
+		// Sanity checks: Skip malformed entries.
+		if len(parts) < 3 || parts[0] != "MemTotal:" || parts[2] != "kB" {
+			continue
+		}
+
+		sizeKb, err := strconv.ParseUint(parts[1], 0, 64)
+		if err != nil {
+			continue
+		}
+
+		return sizeKb, nil
+	}
+
+	// Handle errors that may have occurred during the reading of the file.
+	if err := scanner.Err(); err != nil {
+		return 0, err
+	}
+
+	return 0, fmt.Errorf("unable get MemTotal from %s", memInfoPath)
+}
+
 // CheckCmdline checks whether an option or parameter is present in the kernel command line.
 // Search is case-insensitive.
 // Takes path to file that contains the kernel command line, desired option, and permitted values
-// (empty values to Check for options).
+// (empty values to check for options).
 func CheckCmdline(kernelCmdlinePath, searchParam string, searchValues []string) (bool, error) {
 	f, err := os.Open(kernelCmdlinePath)
 	if err != nil {
@@ -756,8 +738,8 @@ func CheckCmdline(kernelCmdlinePath, searchParam string, searchValues []string) 
 	}
 	defer f.Close()
 
-	// Create Check function -- either Check for verbatim option
-	// or Check for parameter and permitted values
+	// Create check function -- either check for verbatim option
+	// or check for parameter and permitted values
 	var check func(string, string, []string) bool
 	if len(searchValues) == 0 {
 		check = func(option, searchParam string, _ []string) bool {
@@ -836,108 +818,69 @@ func RunningOnVMM(cpuInfoPath string) (bool, error) {
 		return flags["hypervisor"], nil
 	}
 
-	hvLogger.WithField("arch", runtime.GOARCH).Info("Unable to know if the system is running inside a VM")
+	virtLog.WithField("arch", runtime.GOARCH).Info("Unable to know if the system is running inside a VM")
 	return false, nil
 }
 
-func GetHypervisorPid(h Hypervisor) int {
-	pids := h.GetPids()
+func getHypervisorPid(h hypervisor) int {
+	pids := h.getPids()
 	if len(pids) == 0 {
 		return 0
 	}
 	return pids[0]
 }
 
-// Kind of guest protection
-type guestProtection uint8
-
-const (
-	noneProtection guestProtection = iota
-
-	//Intel Trust Domain Extensions
-	//https://software.intel.com/content/www/us/en/develop/articles/intel-trust-domain-extensions.html
-	// Exclude from lint checking for it won't be used on arm64 code
-	tdxProtection
-
-	// AMD Secure Encrypted Virtualization
-	// https://developer.amd.com/sev/
-	// Exclude from lint checking for it won't be used on arm64 code
-	sevProtection
-
-	// IBM POWER 9 Protected Execution Facility
-	// https://www.kernel.org/doc/html/latest/powerpc/ultravisor.html
-	// Exclude from lint checking for it won't be used on arm64 code
-	pefProtection
-
-	// IBM Secure Execution (IBM Z & LinuxONE)
-	// https://www.kernel.org/doc/html/latest/virt/kvm/s390-pv.html
-	// Exclude from lint checking for it won't be used on arm64 code
-	seProtection
-)
-
-var guestProtectionStr = [...]string{
-	noneProtection: "none",
-	pefProtection:  "pef",
-	seProtection:   "se",
-	sevProtection:  "sev",
-	tdxProtection:  "tdx",
-}
-
-func (gp guestProtection) String() string {
-	return guestProtectionStr[gp]
-}
-
-func genericAvailableGuestProtections() (protections []string) {
-	return
-}
-
-func AvailableGuestProtections() (protections []string) {
-	gp, err := availableGuestProtection()
-	if err != nil || gp == noneProtection {
-		return genericAvailableGuestProtections()
+func generateVMSocket(id string, vmStogarePath string) (interface{}, error) {
+	vhostFd, contextID, err := utils.FindContextID()
+	if err != nil {
+		return nil, err
 	}
-	return []string{gp.String()}
+
+	return types.VSock{
+		VhostFd:   vhostFd,
+		ContextID: contextID,
+		Port:      uint32(vSockPort),
+	}, nil
 }
 
 // hypervisor is the virtcontainers hypervisor interface.
 // The default hypervisor implementation is Qemu.
-type Hypervisor interface {
-	CreateVM(ctx context.Context, id string, network Network, hypervisorConfig *HypervisorConfig) error
-	StartVM(ctx context.Context, timeout int) error
-
+type hypervisor interface {
+	createSandbox(ctx context.Context, id string, networkNS NetworkNamespace, hypervisorConfig *HypervisorConfig) error
+	startSandbox(ctx context.Context, timeout int) error
 	// If wait is set, don't actively stop the sandbox:
 	// just perform cleanup.
-	StopVM(ctx context.Context, waitOnly bool) error
-	PauseVM(ctx context.Context) error
-	SaveVM() error
-	ResumeVM(ctx context.Context) error
-	AddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) error
-	HotplugAddDevice(ctx context.Context, devInfo interface{}, devType DeviceType) (interface{}, error)
-	HotplugRemoveDevice(ctx context.Context, devInfo interface{}, devType DeviceType) (interface{}, error)
-	ResizeMemory(ctx context.Context, memMB uint32, memoryBlockSizeMB uint32, probe bool) (uint32, MemoryDevice, error)
-	ResizeVCPUs(ctx context.Context, vcpus uint32) (uint32, uint32, error)
-	GetTotalMemoryMB(ctx context.Context) uint32
-	GetVMConsole(ctx context.Context, sandboxID string) (string, string, error)
-	Disconnect(ctx context.Context)
-	Capabilities(ctx context.Context) types.Capabilities
-	HypervisorConfig() HypervisorConfig
-	GetThreadIDs(ctx context.Context) (VcpuThreadIDs, error)
-	Cleanup(ctx context.Context) error
+	stopSandbox(ctx context.Context, waitOnly bool) error
+	pauseSandbox(ctx context.Context) error
+	saveSandbox() error
+	resumeSandbox(ctx context.Context) error
+	addDevice(ctx context.Context, devInfo interface{}, devType deviceType) error
+	hotplugAddDevice(ctx context.Context, devInfo interface{}, devType deviceType) (interface{}, error)
+	hotplugRemoveDevice(ctx context.Context, devInfo interface{}, devType deviceType) (interface{}, error)
+	resizeMemory(ctx context.Context, memMB uint32, memoryBlockSizeMB uint32, probe bool) (uint32, memoryDevice, error)
+	resizeVCPUs(ctx context.Context, vcpus uint32) (uint32, uint32, error)
+	getSandboxConsole(ctx context.Context, sandboxID string) (string, string, error)
+	disconnect(ctx context.Context)
+	capabilities(ctx context.Context) types.Capabilities
+	hypervisorConfig() HypervisorConfig
+	getThreadIDs(ctx context.Context) (vcpuThreadIDs, error)
+	cleanup(ctx context.Context) error
 	// getPids returns a slice of hypervisor related process ids.
 	// The hypervisor pid must be put at index 0.
-	setConfig(config *HypervisorConfig) error
-	GetPids() []int
-	GetVirtioFsPid() *int
+	getPids() []int
+	getVirtioFsPid() *int
 	fromGrpc(ctx context.Context, hypervisorConfig *HypervisorConfig, j []byte) error
 	toGrpc(ctx context.Context) ([]byte, error)
-	Check() error
+	check() error
 
-	Save() hv.HypervisorState
-	Load(hv.HypervisorState)
+	save() persistapi.HypervisorState
+	load(persistapi.HypervisorState)
 
 	// generate the socket to communicate the host and guest
-	GenerateSocket(id string) (interface{}, error)
+	generateSocket(id string) (interface{}, error)
 
 	// check if hypervisor supports built-in rate limiter.
-	IsRateLimiterBuiltin() bool
+	isRateLimiterBuiltin() bool
+
+	setSandbox(sandbox *Sandbox)
 }

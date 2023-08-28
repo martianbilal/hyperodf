@@ -16,26 +16,31 @@ func TestSandboxCache(t *testing.T) {
 	assert := assert.New(t)
 	sc := &sandboxCache{
 		Mutex:     &sync.Mutex{},
-		sandboxes: map[string]sandboxCRIMetadata{"111": {"1-2-3", "test-name", "test-namespace"}},
+		sandboxes: make(map[string]struct{}),
 	}
 
-	assert.Equal(1, len(sc.getSandboxList()))
+	scMap := map[string]struct{}{"111": {}}
+
+	sc.set(scMap)
+
+	scMap = sc.getAllSandboxes()
+	assert.Equal(1, len(scMap))
 
 	// put new item
 	id := "new-id"
-	b := sc.putIfNotExists(id, sandboxCRIMetadata{})
+	b := sc.putIfNotExists(id)
 	assert.Equal(true, b)
-	assert.Equal(2, len(sc.getSandboxList()))
+	assert.Equal(2, len(scMap))
 
 	// put key that alreay exists
-	b = sc.putIfNotExists(id, sandboxCRIMetadata{})
+	b = sc.putIfNotExists(id)
 	assert.Equal(false, b)
 
 	b = sc.deleteIfExists(id)
 	assert.Equal(true, b)
-	assert.Equal(1, len(sc.getSandboxList()))
+	assert.Equal(1, len(scMap))
 
 	b = sc.deleteIfExists(id)
 	assert.Equal(false, b)
-	assert.Equal(1, len(sc.getSandboxList()))
+	assert.Equal(1, len(scMap))
 }

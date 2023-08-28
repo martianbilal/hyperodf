@@ -16,24 +16,27 @@ import (
 
 // FsConfig struct for FsConfig
 type FsConfig struct {
-	Tag        string  `json:"tag"`
-	Socket     string  `json:"socket"`
-	NumQueues  int32   `json:"num_queues"`
-	QueueSize  int32   `json:"queue_size"`
-	PciSegment *int32  `json:"pci_segment,omitempty"`
-	Id         *string `json:"id,omitempty"`
+	Tag       string  `json:"tag"`
+	Socket    string  `json:"socket"`
+	NumQueues int32   `json:"num_queues"`
+	QueueSize int32   `json:"queue_size"`
+	Dax       bool    `json:"dax"`
+	CacheSize int64   `json:"cache_size"`
+	Id        *string `json:"id,omitempty"`
 }
 
 // NewFsConfig instantiates a new FsConfig object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewFsConfig(tag string, socket string, numQueues int32, queueSize int32) *FsConfig {
+func NewFsConfig(tag string, socket string, numQueues int32, queueSize int32, dax bool, cacheSize int64) *FsConfig {
 	this := FsConfig{}
 	this.Tag = tag
 	this.Socket = socket
 	this.NumQueues = numQueues
 	this.QueueSize = queueSize
+	this.Dax = dax
+	this.CacheSize = cacheSize
 	return &this
 }
 
@@ -46,6 +49,8 @@ func NewFsConfigWithDefaults() *FsConfig {
 	this.NumQueues = numQueues
 	var queueSize int32 = 1024
 	this.QueueSize = queueSize
+	var dax bool = true
+	this.Dax = dax
 	return &this
 }
 
@@ -145,36 +150,52 @@ func (o *FsConfig) SetQueueSize(v int32) {
 	o.QueueSize = v
 }
 
-// GetPciSegment returns the PciSegment field value if set, zero value otherwise.
-func (o *FsConfig) GetPciSegment() int32 {
-	if o == nil || o.PciSegment == nil {
-		var ret int32
+// GetDax returns the Dax field value
+func (o *FsConfig) GetDax() bool {
+	if o == nil {
+		var ret bool
 		return ret
 	}
-	return *o.PciSegment
+
+	return o.Dax
 }
 
-// GetPciSegmentOk returns a tuple with the PciSegment field value if set, nil otherwise
+// GetDaxOk returns a tuple with the Dax field value
 // and a boolean to check if the value has been set.
-func (o *FsConfig) GetPciSegmentOk() (*int32, bool) {
-	if o == nil || o.PciSegment == nil {
+func (o *FsConfig) GetDaxOk() (*bool, bool) {
+	if o == nil {
 		return nil, false
 	}
-	return o.PciSegment, true
+	return &o.Dax, true
 }
 
-// HasPciSegment returns a boolean if a field has been set.
-func (o *FsConfig) HasPciSegment() bool {
-	if o != nil && o.PciSegment != nil {
-		return true
+// SetDax sets field value
+func (o *FsConfig) SetDax(v bool) {
+	o.Dax = v
+}
+
+// GetCacheSize returns the CacheSize field value
+func (o *FsConfig) GetCacheSize() int64 {
+	if o == nil {
+		var ret int64
+		return ret
 	}
 
-	return false
+	return o.CacheSize
 }
 
-// SetPciSegment gets a reference to the given int32 and assigns it to the PciSegment field.
-func (o *FsConfig) SetPciSegment(v int32) {
-	o.PciSegment = &v
+// GetCacheSizeOk returns a tuple with the CacheSize field value
+// and a boolean to check if the value has been set.
+func (o *FsConfig) GetCacheSizeOk() (*int64, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.CacheSize, true
+}
+
+// SetCacheSize sets field value
+func (o *FsConfig) SetCacheSize(v int64) {
+	o.CacheSize = v
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
@@ -223,8 +244,11 @@ func (o FsConfig) MarshalJSON() ([]byte, error) {
 	if true {
 		toSerialize["queue_size"] = o.QueueSize
 	}
-	if o.PciSegment != nil {
-		toSerialize["pci_segment"] = o.PciSegment
+	if true {
+		toSerialize["dax"] = o.Dax
+	}
+	if true {
+		toSerialize["cache_size"] = o.CacheSize
 	}
 	if o.Id != nil {
 		toSerialize["id"] = o.Id

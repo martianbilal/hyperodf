@@ -23,12 +23,8 @@ use crate::cgroups::fs::Manager as FsManager;
 #[cfg(test)]
 use crate::cgroups::mock::Manager as FsManager;
 use crate::cgroups::Manager;
-#[cfg(feature = "standard-oci-runtime")]
-use crate::console;
 use crate::log_child;
 use crate::process::Process;
-#[cfg(feature = "seccomp")]
-use crate::seccomp;
 use crate::specconv::CreateOpts;
 use crate::{mount, validator};
 
@@ -42,7 +38,7 @@ use nix::pty;
 use nix::sched::{self, CloneFlags};
 use nix::sys::signal::{self, Signal};
 use nix::sys::stat::{self, Mode};
-use nix::unistd::{self, fork, ForkResult, Gid, Pid, Uid, User};
+use nix::unistd::{self, fork, ForkResult, Gid, Pid, Uid};
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 
@@ -64,7 +60,9 @@ use rlimit::{setrlimit, Resource, Rlim};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::Mutex;
 
-pub const EXEC_FIFO_FILENAME: &str = "exec.fifo";
+use crate::utils;
+
+const EXEC_FIFO_FILENAME: &str = "exec.fifo";
 
 const INIT: &str = "INIT";
 const NO_PIVOT: &str = "NO_PIVOT";
@@ -74,7 +72,6 @@ const CLOG_FD: &str = "CLOG_FD";
 const FIFO_FD: &str = "FIFO_FD";
 const HOME_ENV_KEY: &str = "HOME";
 const PIDNS_FD: &str = "PIDNS_FD";
-const CONSOLE_SOCKET_FD: &str = "CONSOLE_SOCKET_FD";
 
 #[derive(Debug)]
 pub struct ContainerStatus {
@@ -83,7 +80,7 @@ pub struct ContainerStatus {
 }
 
 impl ContainerStatus {
-    pub fn new() -> Self {
+    fn new() -> Self {
         ContainerStatus {
             pre_status: ContainerState::Created,
             cur_status: ContainerState::Created,
@@ -100,12 +97,6 @@ impl ContainerStatus {
     }
 }
 
-impl Default for ContainerStatus {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 pub type Config = CreateOpts;
 type NamespaceType = String;
 
@@ -113,7 +104,7 @@ lazy_static! {
     // This locker ensures the child exit signal will be received by the right receiver.
     pub static ref WAIT_PID_LOCKER: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 
-    pub static ref NAMESPACES: HashMap<&'static str, CloneFlags> = {
+    static ref NAMESPACES: HashMap<&'static str, CloneFlags> = {
         let mut m = HashMap::new();
         m.insert("user", CloneFlags::CLONE_NEWUSER);
         m.insert("ipc", CloneFlags::CLONE_NEWIPC);
@@ -126,7 +117,7 @@ lazy_static! {
     };
 
 // type to name hashmap, better to be in NAMESPACES
-    pub static ref TYPETONAME: HashMap<&'static str, &'static str> = {
+    static ref TYPETONAME: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
         m.insert("ipc", "ipc");
         m.insert("user", "user");
@@ -160,7 +151,7 @@ lazy_static! {
             },
             LinuxDevice {
                 path: "/dev/full".to_string(),
-                r#type: "c".to_string(),
+                r#type: String::from("c"),
                 major: 1,
                 minor: 7,
                 file_mode: Some(0o666),
@@ -222,7 +213,8 @@ pub trait BaseContainer {
     async fn start(&mut self, p: Process) -> Result<()>;
     async fn run(&mut self, p: Process) -> Result<()>;
     async fn destroy(&mut self) -> Result<()>;
-    async fn exec(&mut self) -> Result<()>;
+    fn signal(&self, sig: Signal, all: bool) -> Result<()>;
+    fn exec(&mut self) -> Result<()>;
 }
 
 // LinuxContainer protected by Mutex
@@ -243,8 +235,6 @@ pub struct LinuxContainer {
     pub status: ContainerStatus,
     pub created: SystemTime,
     pub logger: Logger,
-    #[cfg(feature = "standard-oci-runtime")]
-    pub console_socket: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -368,6 +358,7 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
             )));
         }
     }
+
     log_child!(cfd_log, "child process start run");
     let buf = read_sync(crfd)?;
     let spec_str = std::str::from_utf8(&buf)?;
@@ -386,9 +377,6 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
     let cm_str = std::str::from_utf8(&buf)?;
 
     let cm: FsManager = serde_json::from_str(cm_str)?;
-
-    #[cfg(feature = "standard-oci-runtime")]
-    let csocket_fd = console::setup_console_socket(&std::env::var(CONSOLE_SOCKET_FD)?)?;
 
     let p = if spec.process.is_some() {
         spec.process.as_ref().unwrap()
@@ -429,7 +417,7 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
                         ns.r#type.clone(),
                         ns.path.clone()
                     );
-                    log_child!(cfd_log, "error is : {:?}", e);
+                    log_child!(cfd_log, "error is : {:?}", e.as_errno());
                     e
                 })?;
 
@@ -506,7 +494,7 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
         log_child!(cfd_log, "join namespace {:?}", s);
         sched::setns(fd, s).or_else(|e| {
             if s == CloneFlags::CLONE_NEWUSER {
-                if e != Errno::EINVAL {
+                if e.as_errno().unwrap() != Errno::EINVAL {
                     let _ = write_sync(cwfd, SYNC_FAILED, format!("{:?}", e).as_str());
                     return Err(e);
                 }
@@ -587,20 +575,14 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
 
     // only change stdio devices owner when user
     // isn't root.
-    if !uid.is_root() {
-        set_stdio_permissions(uid)?;
+    if guser.uid != 0 {
+        set_stdio_permissions(guser.uid)?;
     }
 
     setid(uid, gid)?;
 
     if !guser.additional_gids.is_empty() {
-        let gids: Vec<Gid> = guser
-            .additional_gids
-            .iter()
-            .map(|gid| Gid::from_raw(*gid))
-            .collect();
-
-        unistd::setgroups(&gids).map_err(|e| {
+        setgroups(guser.additional_gids.as_slice()).map_err(|e| {
             let _ = write_sync(
                 cwfd,
                 SYNC_FAILED,
@@ -611,33 +593,19 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
         })?;
     }
 
-    // NoNewPrivileges
+    // NoNewPeiviledges, Drop capabilities
     if oci_process.no_new_privileges {
         capctl::prctl::set_no_new_privs().map_err(|_| anyhow!("cannot set no new privileges"))?;
     }
 
-    // Log unknown seccomp system calls in advance before the log file descriptor closes.
-    #[cfg(feature = "seccomp")]
-    if let Some(ref scmp) = linux.seccomp {
-        if let Some(syscalls) = seccomp::get_unknown_syscalls(scmp) {
-            log_child!(cfd_log, "unknown seccomp system calls: {:?}", syscalls);
-        }
-    }
-
-    // Without NoNewPrivileges, we need to set seccomp
-    // before dropping capabilities because the calling thread
-    // must have the CAP_SYS_ADMIN.
-    #[cfg(feature = "seccomp")]
-    if !oci_process.no_new_privileges {
-        if let Some(ref scmp) = linux.seccomp {
-            seccomp::init_seccomp(scmp)?;
-        }
-    }
-
-    // Drop capabilities
     if oci_process.capabilities.is_some() {
         let c = oci_process.capabilities.as_ref().unwrap();
         capabilities::drop_privileges(cfd_log, c)?;
+    }
+
+    if init {
+        // notify parent to run poststart hooks
+        write_sync(cwfd, SYNC_SUCCESS, "")?;
     }
 
     let args = oci_process.args.to_vec();
@@ -655,29 +623,25 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
 
     // setup the envs
     for e in env.iter() {
-        match valid_env(e) {
-            Some((key, value)) => env::set_var(key, value),
-            None => log_child!(cfd_log, "invalid env key-value: {:?}", e),
+        let v: Vec<&str> = e.splitn(2, '=').collect();
+        if v.len() != 2 {
+            continue;
         }
+        env::set_var(v[0], v[1]);
     }
 
+    // set the "HOME" env getting from "/etc/passwd", if
+    // there's no uid entry in /etc/passwd, set "/" as the
+    // home env.
     if env::var_os(HOME_ENV_KEY).is_none() {
-        // try to set "HOME" env by uid
-        if let Ok(Some(user)) = User::from_uid(Uid::from_raw(guser.uid)) {
-            if let Ok(user_home_dir) = user.dir.into_os_string().into_string() {
-                env::set_var(HOME_ENV_KEY, user_home_dir);
-            }
-        }
-        // set default home dir as "/" if "HOME" env is still empty
-        if env::var_os(HOME_ENV_KEY).is_none() {
-            env::set_var(HOME_ENV_KEY, String::from("/"));
-        }
+        let home_dir = utils::home_dir(guser.uid).unwrap_or_else(|_| String::from("/"));
+        env::set_var(HOME_ENV_KEY, home_dir);
     }
 
     let exec_file = Path::new(&args[0]);
     log_child!(cfd_log, "process command: {:?}", &args);
     if !exec_file.exists() {
-        find_file(exec_file).ok_or_else(|| anyhow!("the file {} was not found", &args[0]))?;
+        find_file(exec_file).ok_or_else(|| anyhow!("the file {} is not exist", &args[0]))?;
     }
 
     // notify parent that the child's ready to start
@@ -688,18 +652,9 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
     let _ = unistd::close(cwfd);
 
     if oci_process.terminal {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "standard-oci-runtime")] {
-                if let Some(csocket_fd) = csocket_fd {
-                    console::setup_master_console(csocket_fd)?;
-                } else {
-                    return Err(anyhow!("failed to get console master socket fd"));
-                }
-            }
-            else {
-                unistd::setsid().context("create a new session")?;
-                unsafe { libc::ioctl(0, libc::TIOCSCTTY) };
-            }
+        unistd::setsid()?;
+        unsafe {
+            libc::ioctl(0, libc::TIOCSCTTY);
         }
     }
 
@@ -710,18 +665,8 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
             Mode::from_bits_truncate(0),
         )?;
         unistd::close(fifofd)?;
-        let buf: &mut [u8] = &mut [0];
-        unistd::read(fd, buf)?;
-    }
-
-    // With NoNewPrivileges, we should set seccomp as close to
-    // do_exec as possible in order to reduce the amount of
-    // system calls in the seccomp profiles.
-    #[cfg(feature = "seccomp")]
-    if oci_process.no_new_privileges {
-        if let Some(ref scmp) = linux.seccomp {
-            seccomp::init_seccomp(scmp)?;
-        }
+        let mut buf: &mut [u8] = &mut [0];
+        unistd::read(fd, &mut buf)?;
     }
 
     do_exec(&args);
@@ -731,7 +676,7 @@ fn do_init_child(cwfd: RawFd) -> Result<()> {
 // within the container to the specified user.
 // The ownership needs to match because it is created outside of
 // the container and needs to be localized.
-fn set_stdio_permissions(uid: Uid) -> Result<()> {
+fn set_stdio_permissions(uid: libc::uid_t) -> Result<()> {
     let meta = fs::metadata("/dev/null")?;
     let fds = [
         std::io::stdin().as_raw_fd(),
@@ -746,13 +691,19 @@ fn set_stdio_permissions(uid: Uid) -> Result<()> {
             continue;
         }
 
+        // According to the POSIX specification, -1 is used to indicate that owner and group
+        // are not to be changed.  Since uid_t and gid_t are unsigned types, we have to wrap
+        // around to get -1.
+        let gid = 0u32.wrapping_sub(1);
+
         // We only change the uid owner (as it is possible for the mount to
         // prefer a different gid, and there's no reason for us to change it).
         // The reason why we don't just leave the default uid=X mount setup is
         // that users expect to be able to actually use their console. Without
         // this code, you couldn't effectively run as a non-root user inside a
         // container and also have a console set up.
-        unistd::fchown(*fd, Some(uid), None).with_context(|| "set stdio permissions failed")?;
+        let res = unsafe { libc::fchown(*fd, uid, gid) };
+        Errno::result(res).map_err(|e| anyhow!(e).context("set stdio permissions failed"))?;
     }
 
     Ok(())
@@ -882,20 +833,6 @@ impl BaseContainer for LinuxContainer {
         }
         let linux = spec.linux.as_ref().unwrap();
 
-        if p.oci.capabilities.is_none() {
-            // No capabilities, inherit from container process
-            let process = spec
-                .process
-                .as_ref()
-                .ok_or_else(|| anyhow!("no process config"))?;
-            p.oci.capabilities = Some(
-                process
-                    .capabilities
-                    .clone()
-                    .ok_or_else(|| anyhow!("missing process capabilities"))?,
-            );
-        }
-
         let (pfd_log, cfd_log) = unistd::pipe().context("failed to create pipe")?;
 
         let _ = fcntl::fcntl(pfd_log, FcntlArg::F_SETFD(FdFlag::FD_CLOEXEC))
@@ -948,14 +885,6 @@ impl BaseContainer for LinuxContainer {
 
         let exec_path = std::env::current_exe()?;
         let mut child = std::process::Command::new(exec_path);
-
-        #[allow(unused_mut)]
-        let mut console_name = PathBuf::from("");
-        #[cfg(feature = "standard-oci-runtime")]
-        if !self.console_socket.as_os_str().is_empty() {
-            console_name = self.console_socket.clone();
-        }
-
         let mut child = child
             .arg("init")
             .stdin(child_stdin)
@@ -965,8 +894,7 @@ impl BaseContainer for LinuxContainer {
             .env(NO_PIVOT, format!("{}", self.config.no_pivot_root))
             .env(CRFD_FD, format!("{}", crfd))
             .env(CWFD_FD, format!("{}", cwfd))
-            .env(CLOG_FD, format!("{}", cfd_log))
-            .env(CONSOLE_SOCKET_FD, console_name);
+            .env(CLOG_FD, format!("{}", cfd_log));
 
         if p.init {
             child = child.env(FIFO_FD, format!("{}", fifofd));
@@ -1030,6 +958,8 @@ impl BaseContainer for LinuxContainer {
 
         info!(logger, "entered namespaces!");
 
+        self.created = SystemTime::now();
+
         if p.init {
             let spec = self.config.spec.as_mut().unwrap();
             update_namespaces(&self.logger, spec, p.pid)?;
@@ -1049,7 +979,7 @@ impl BaseContainer for LinuxContainer {
         self.start(p).await?;
 
         if init {
-            self.exec().await?;
+            self.exec()?;
             self.status.transition(ContainerState::Running);
         }
 
@@ -1061,19 +991,7 @@ impl BaseContainer for LinuxContainer {
         let st = self.oci_state()?;
 
         for pid in self.processes.keys() {
-            match signal::kill(Pid::from_raw(*pid), Some(Signal::SIGKILL)) {
-                Err(Errno::ESRCH) => {
-                    info!(
-                        self.logger,
-                        "kill encounters ESRCH, pid: {}, container: {}",
-                        pid,
-                        self.id.clone()
-                    );
-                    continue;
-                }
-                Err(err) => return Err(anyhow!(err)),
-                Ok(_) => continue,
-            }
+            signal::kill(Pid::from_raw(*pid), Some(Signal::SIGKILL))?;
         }
 
         if spec.hooks.is_some() {
@@ -1092,22 +1010,24 @@ impl BaseContainer for LinuxContainer {
         fs::remove_dir_all(&self.root)?;
 
         if let Some(cgm) = self.cgroup_manager.as_mut() {
-            // Kill all of the processes created in this container to prevent
-            // the leak of some daemon process when this container shared pidns
-            // with the sandbox.
-            let pids = cgm.get_pids().context("get cgroup pids")?;
-            for i in pids {
-                if let Err(e) = signal::kill(Pid::from_raw(i), Signal::SIGKILL) {
-                    warn!(self.logger, "kill the process {} error: {:?}", i, e);
-                }
-            }
-
             cgm.destroy().context("destroy cgroups")?;
         }
         Ok(())
     }
 
-    async fn exec(&mut self) -> Result<()> {
+    fn signal(&self, sig: Signal, all: bool) -> Result<()> {
+        if all {
+            for pid in self.processes.keys() {
+                signal::kill(Pid::from_raw(*pid), Some(sig))?;
+            }
+        }
+
+        signal::kill(Pid::from_raw(self.init_process_pid), Some(sig))?;
+
+        Ok(())
+    }
+
+    fn exec(&mut self) -> Result<()> {
         let fifo = format!("{}/{}", &self.root, EXEC_FIFO_FILENAME);
         let fd = fcntl::open(fifo.as_str(), OFlag::O_WRONLY, Mode::from_bits_truncate(0))?;
         let data: &[u8] = &[0];
@@ -1119,26 +1039,6 @@ impl BaseContainer for LinuxContainer {
             .as_secs();
 
         self.status.transition(ContainerState::Running);
-
-        let spec = self
-            .config
-            .spec
-            .as_ref()
-            .ok_or_else(|| anyhow!("OCI spec was not found"))?;
-        let st = self.oci_state()?;
-
-        // run poststart hook
-        if spec.hooks.is_some() {
-            info!(self.logger, "poststart hook");
-            let hooks = spec
-                .hooks
-                .as_ref()
-                .ok_or_else(|| anyhow!("OCI hooks were not found"))?;
-            for h in hooks.poststart.iter() {
-                execute_hook(&self.logger, h, &st).await?;
-            }
-        }
-
         unistd::close(fd)?;
 
         Ok(())
@@ -1174,8 +1074,10 @@ fn do_exec(args: &[String]) -> ! {
         .collect();
 
     let _ = unistd::execvp(p.as_c_str(), &sa).map_err(|e| match e {
-        nix::Error::UnknownErrno => std::process::exit(-2),
-        _ => std::process::exit(e as i32),
+        nix::Error::Sys(errno) => {
+            std::process::exit(errno as i32);
+        }
+        _ => std::process::exit(-2),
     });
 
     unreachable!()
@@ -1221,7 +1123,7 @@ fn get_pid_namespace(logger: &Logger, linux: &Linux) -> Result<Option<RawFd>> {
                         ns.r#type.clone(),
                         ns.path.clone()
                     );
-                    error!(logger, "error is : {:?}", e);
+                    error!(logger, "error is : {:?}", e.as_errno());
 
                     e
                 })?;
@@ -1360,6 +1262,20 @@ async fn join_namespaces(
         // notify child run prestart hooks completed
         info!(logger, "notify child run prestart hook completed!");
         write_async(pipe_w, SYNC_SUCCESS, "").await?;
+
+        info!(logger, "notify child parent ready to run poststart hook!");
+        // wait to run poststart hook
+        read_async(pipe_r).await?;
+        info!(logger, "get ready to run poststart hook!");
+
+        // run poststart hook
+        if spec.hooks.is_some() {
+            info!(logger, "poststart hook");
+            let hooks = spec.hooks.as_ref().unwrap();
+            for h in hooks.poststart.iter() {
+                execute_hook(&logger, h, st).await?;
+            }
+        }
     }
 
     info!(logger, "wait for child process ready to run exec");
@@ -1440,13 +1356,13 @@ impl LinuxContainer {
         .context(format!("cannot change onwer of container {} root", id))?;
 
         if config.spec.is_none() {
-            return Err(anyhow!(nix::Error::EINVAL));
+            return Err(nix::Error::Sys(Errno::EINVAL).into());
         }
 
         let spec = config.spec.as_ref().unwrap();
 
         if spec.linux.is_none() {
-            return Err(anyhow!(nix::Error::EINVAL));
+            return Err(nix::Error::Sys(Errno::EINVAL).into());
         }
 
         let linux = spec.linux.as_ref().unwrap();
@@ -1476,16 +1392,14 @@ impl LinuxContainer {
                 .unwrap()
                 .as_secs(),
             logger: logger.new(o!("module" => "rustjail", "subsystem" => "container", "cid" => id)),
-            #[cfg(feature = "standard-oci-runtime")]
-            console_socket: Path::new("").to_path_buf(),
         })
     }
+}
 
-    #[cfg(feature = "standard-oci-runtime")]
-    pub fn set_console_socket(&mut self, console_socket: &Path) -> Result<()> {
-        self.console_socket = console_socket.to_path_buf();
-        Ok(())
-    }
+fn setgroups(grps: &[libc::gid_t]) -> Result<()> {
+    let ret = unsafe { libc::setgroups(grps.len(), grps.as_ptr() as *const libc::gid_t) };
+    Errno::result(ret).map(drop)?;
+    Ok(())
 }
 
 use std::fs::OpenOptions;
@@ -1519,24 +1433,24 @@ use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()> {
+async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()> {
     let logger = logger.new(o!("action" => "execute-hook"));
 
     let binary = PathBuf::from(h.path.as_str());
     let path = binary.canonicalize()?;
     if !path.exists() {
-        return Err(anyhow!(nix::Error::EINVAL));
+        return Err(anyhow!(nix::Error::from_errno(Errno::EINVAL)));
     }
 
-    let mut args = h.args.clone();
-    // the hook.args[0] is the hook binary name which shouldn't be included
-    // in the Command.args
-    if args.len() > 1 {
-        args.remove(0);
-    }
-
-    // all invalid envs will be omitted, only valid envs will be passed to hook.
-    let env: HashMap<&str, &str> = h.env.iter().filter_map(|e| valid_env(e)).collect();
+    let args = h.args.clone();
+    let env: HashMap<String, String> = h
+        .env
+        .iter()
+        .map(|e| {
+            let v: Vec<&str> = e.split('=').collect();
+            (v[0].to_string(), v[1].to_string())
+        })
+        .collect();
 
     // Avoid the exit signal to be reaped by the global reaper.
     let _wait_locker = WAIT_PID_LOCKER.lock().await;
@@ -1547,7 +1461,8 @@ pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()?;
+        .spawn()
+        .unwrap();
 
     // default timeout 10s
     let mut timeout: u64 = 10;
@@ -1563,39 +1478,27 @@ pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()
     let path = h.path.clone();
 
     let join_handle = tokio::spawn(async move {
-        if let Some(mut stdin) = child.stdin.take() {
-            match stdin.write_all(state.as_bytes()).await {
-                Ok(_) => {}
-                Err(e) => {
-                    info!(logger, "write to child stdin failed: {:?}", e);
-                }
-            }
-        }
+        child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(state.as_bytes())
+            .await
+            .unwrap();
 
-        // read something from stdout and stderr for debug
-        if let Some(stdout) = child.stdout.as_mut() {
-            let mut out = String::new();
-            match stdout.read_to_string(&mut out).await {
-                Ok(_) => {
-                    info!(logger, "child stdout: {}", out.as_str());
-                }
-                Err(e) => {
-                    info!(logger, "read from child stdout failed: {:?}", e);
-                }
-            }
-        }
+        // Close stdin so that hook program could receive EOF
+        child.stdin.take();
 
-        let mut err = String::new();
-        if let Some(stderr) = child.stderr.as_mut() {
-            match stderr.read_to_string(&mut err).await {
-                Ok(_) => {
-                    info!(logger, "child stderr: {}", err.as_str());
-                }
-                Err(e) => {
-                    info!(logger, "read from child stderr failed: {:?}", e);
-                }
-            }
-        }
+        // read something from stdout for debug
+        let mut out = String::new();
+        child
+            .stdout
+            .as_mut()
+            .unwrap()
+            .read_to_string(&mut out)
+            .await
+            .unwrap();
+        info!(logger, "child stdout: {}", out.as_str());
 
         match child.wait().await {
             Ok(exit) => {
@@ -1604,11 +1507,8 @@ pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()
                     .ok_or_else(|| anyhow!("hook exit status has no status code"))?;
 
                 if code != 0 {
-                    error!(
-                        logger,
-                        "hook {} exit status is {}, error message is {}", &path, code, err
-                    );
-                    return Err(anyhow!(nix::Error::UnknownErrno));
+                    error!(logger, "hook {} exit status is {}", &path, code);
+                    return Err(anyhow!(nix::Error::from_errno(Errno::UnknownErrno)));
                 }
 
                 debug!(logger, "hook {} exit status is 0", &path);
@@ -1624,32 +1524,8 @@ pub async fn execute_hook(logger: &Logger, h: &Hook, st: &OCIState) -> Result<()
 
     match tokio::time::timeout(Duration::new(timeout, 0), join_handle).await {
         Ok(r) => r.unwrap(),
-        Err(_) => Err(anyhow!(nix::Error::ETIMEDOUT)),
+        Err(_) => Err(anyhow!(nix::Error::from_errno(Errno::ETIMEDOUT))),
     }
-}
-
-// valid environment variables according to https://doc.rust-lang.org/std/env/fn.set_var.html#panics
-fn valid_env(e: &str) -> Option<(&str, &str)> {
-    // wherther key or value will contain NULL char.
-    if e.as_bytes().contains(&b'\0') {
-        return None;
-    }
-
-    let v: Vec<&str> = e.splitn(2, '=').collect();
-
-    // key can't hold an `equal` sign, but value can
-    if v.len() != 2 {
-        return None;
-    }
-
-    let (key, value) = (v[0].trim(), v[1].trim());
-
-    // key can't be empty
-    if key.is_empty() {
-        return None;
-    }
-
-    Some((key, value))
 }
 
 #[cfg(test)]
@@ -1657,7 +1533,6 @@ mod tests {
     use super::*;
     use crate::process::Process;
     use crate::skip_if_not_root;
-    use nix::unistd::Uid;
     use std::fs;
     use std::os::unix::fs::MetadataExt;
     use std::os::unix::io::AsRawFd;
@@ -1685,47 +1560,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_hook() {
-        let temp_file = "/tmp/test_execute_hook";
-
-        let touch = which("touch").await;
-
-        defer!(fs::remove_file(temp_file).unwrap(););
-        let invalid_str = vec![97, b'\0', 98];
-        let invalid_string = std::str::from_utf8(&invalid_str).unwrap();
-        let invalid_env = format!("{}=value", invalid_string);
+        let xargs = which("xargs").await;
 
         execute_hook(
             &slog_scope::logger(),
             &Hook {
-                path: touch,
-                args: vec!["touch".to_string(), temp_file.to_string()],
-                env: vec![invalid_env],
-                timeout: Some(10),
-            },
-            &OCIState {
-                version: "1.2.3".to_string(),
-                id: "321".to_string(),
-                status: ContainerState::Running,
-                pid: 2,
-                bundle: "".to_string(),
-                annotations: Default::default(),
-            },
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(Path::new(&temp_file).exists(), true);
-    }
-
-    #[tokio::test]
-    async fn test_execute_hook_with_error() {
-        let ls = which("ls").await;
-
-        let res = execute_hook(
-            &slog_scope::logger(),
-            &Hook {
-                path: ls,
-                args: vec!["ls".to_string(), "/tmp/not-exist".to_string()],
+                path: xargs,
+                args: vec![],
                 env: vec![],
                 timeout: None,
             },
@@ -1738,13 +1579,8 @@ mod tests {
                 annotations: Default::default(),
             },
         )
-        .await;
-
-        let expected_err = nix::Error::UnknownErrno;
-        assert_eq!(
-            res.unwrap_err().downcast::<nix::Error>().unwrap(),
-            expected_err
-        );
+        .await
+        .unwrap()
     }
 
     #[tokio::test]
@@ -1755,7 +1591,7 @@ mod tests {
             &slog_scope::logger(),
             &Hook {
                 path: sleep,
-                args: vec!["sleep".to_string(), "2".to_string()],
+                args: vec!["2".to_string()],
                 env: vec![],
                 timeout: Some(1),
             },
@@ -1770,7 +1606,7 @@ mod tests {
         )
         .await;
 
-        let expected_err = nix::Error::ETIMEDOUT;
+        let expected_err = nix::Error::from_errno(Errno::ETIMEDOUT);
         assert_eq!(
             res.unwrap_err().downcast::<nix::Error>().unwrap(),
             expected_err
@@ -1803,7 +1639,7 @@ mod tests {
         let old_uid = meta.uid();
 
         let uid = 1000;
-        set_stdio_permissions(Uid::from_raw(uid)).unwrap();
+        set_stdio_permissions(uid).unwrap();
 
         let meta = fs::metadata("/dev/stdin").unwrap();
         assert_eq!(meta.uid(), uid);
@@ -1815,7 +1651,7 @@ mod tests {
         assert_eq!(meta.uid(), uid);
 
         // restore the uid
-        set_stdio_permissions(Uid::from_raw(old_uid)).unwrap();
+        set_stdio_permissions(old_uid).unwrap();
     }
 
     #[test]
@@ -2096,10 +1932,17 @@ mod tests {
         assert!(ret.is_ok(), "Expecting Ok, Got {:?}", ret);
     }
 
-    #[tokio::test]
-    async fn test_linuxcontainer_exec() {
-        let (c, _dir) = new_linux_container();
-        let ret = c.unwrap().exec().await;
+    #[test]
+    fn test_linuxcontainer_signal() {
+        let ret = new_linux_container_and_then(|c: LinuxContainer| {
+            c.signal(nix::sys::signal::SIGCONT, true)
+        });
+        assert!(ret.is_ok(), "Expecting Ok, Got {:?}", ret);
+    }
+
+    #[test]
+    fn test_linuxcontainer_exec() {
+        let ret = new_linux_container_and_then(|mut c: LinuxContainer| c.exec());
         assert!(ret.is_err(), "Expecting Err, Got {:?}", ret);
     }
 
@@ -2107,50 +1950,5 @@ mod tests {
     fn test_linuxcontainer_do_init_child() {
         let ret = do_init_child(std::io::stdin().as_raw_fd());
         assert!(ret.is_err(), "Expecting Err, Got {:?}", ret);
-    }
-
-    #[test]
-    fn test_valid_env() {
-        let env = valid_env("a=b=c");
-        assert_eq!(Some(("a", "b=c")), env);
-
-        let env = valid_env("a=b");
-        assert_eq!(Some(("a", "b")), env);
-        let env = valid_env("a =b");
-        assert_eq!(Some(("a", "b")), env);
-
-        let env = valid_env(" a =b");
-        assert_eq!(Some(("a", "b")), env);
-
-        let env = valid_env("a= b");
-        assert_eq!(Some(("a", "b")), env);
-
-        let env = valid_env("a=b ");
-        assert_eq!(Some(("a", "b")), env);
-        let env = valid_env("a=b c ");
-        assert_eq!(Some(("a", "b c")), env);
-
-        let env = valid_env("=b");
-        assert_eq!(None, env);
-
-        let env = valid_env("a=");
-        assert_eq!(Some(("a", "")), env);
-
-        let env = valid_env("a==");
-        assert_eq!(Some(("a", "=")), env);
-
-        let env = valid_env("a");
-        assert_eq!(None, env);
-
-        let invalid_str = vec![97, b'\0', 98];
-        let invalid_string = std::str::from_utf8(&invalid_str).unwrap();
-
-        let invalid_env = format!("{}=value", invalid_string);
-        let env = valid_env(&invalid_env);
-        assert_eq!(None, env);
-
-        let invalid_env = format!("key={}", invalid_string);
-        let env = valid_env(&invalid_env);
-        assert_eq!(None, env);
     }
 }

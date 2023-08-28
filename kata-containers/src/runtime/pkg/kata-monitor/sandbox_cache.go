@@ -9,25 +9,15 @@ import (
 	"sync"
 )
 
-type sandboxCRIMetadata struct {
-	uid       string
-	name      string
-	namespace string
-}
 type sandboxCache struct {
 	*sync.Mutex
-	// the sandboxCRIMetadata links the sandbox id from the container manager to the pod metadata of kubernetes
-	sandboxes map[string]sandboxCRIMetadata
+	sandboxes map[string]struct{}
 }
 
-func (sc *sandboxCache) getSandboxList() []string {
+func (sc *sandboxCache) getAllSandboxes() map[string]struct{} {
 	sc.Lock()
 	defer sc.Unlock()
-	var sandboxList []string
-	for id := range sc.sandboxes {
-		sandboxList = append(sandboxList, id)
-	}
-	return sandboxList
+	return sc.sandboxes
 }
 
 func (sc *sandboxCache) deleteIfExists(id string) bool {
@@ -43,12 +33,12 @@ func (sc *sandboxCache) deleteIfExists(id string) bool {
 	return false
 }
 
-func (sc *sandboxCache) putIfNotExists(id string, value sandboxCRIMetadata) bool {
+func (sc *sandboxCache) putIfNotExists(id string) bool {
 	sc.Lock()
 	defer sc.Unlock()
 
 	if _, found := sc.sandboxes[id]; !found {
-		sc.sandboxes[id] = value
+		sc.sandboxes[id] = struct{}{}
 		return true
 	}
 
@@ -56,17 +46,8 @@ func (sc *sandboxCache) putIfNotExists(id string, value sandboxCRIMetadata) bool
 	return false
 }
 
-func (sc *sandboxCache) setCRIMetadata(id string, value sandboxCRIMetadata) {
+func (sc *sandboxCache) set(sandboxes map[string]struct{}) {
 	sc.Lock()
 	defer sc.Unlock()
-
-	sc.sandboxes[id] = value
-}
-
-func (sc *sandboxCache) getCRIMetadata(id string) (sandboxCRIMetadata, bool) {
-	sc.Lock()
-	defer sc.Unlock()
-
-	metadata, ok := sc.sandboxes[id]
-	return metadata, ok
+	sc.sandboxes = sandboxes
 }

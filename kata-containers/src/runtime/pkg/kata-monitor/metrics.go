@@ -15,9 +15,8 @@ import (
 	"sync"
 	"time"
 
-	containerdshim "github.com/kata-containers/kata-containers/src/runtime/pkg/containerd-shim-v2"
 	mutils "github.com/kata-containers/kata-containers/src/runtime/pkg/utils"
-	"github.com/kata-containers/kata-containers/src/runtime/pkg/utils/shimclient"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
 
@@ -78,21 +77,6 @@ func (km *KataMonitor) ProcessMetricsRequest(w http.ResponseWriter, r *http.Requ
 	defer func() {
 		scrapeDurationsHistogram.Observe(float64(time.Since(start).Nanoseconds() / int64(time.Millisecond)))
 	}()
-
-	// this is likely the same as `kata-runtime metrics <SANDBOX>`.
-	sandboxID, err := getSandboxIDFromReq(r)
-	if err == nil && sandboxID != "" {
-		metrics, err := GetSandboxMetrics(sandboxID)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
-		}
-		w.Write([]byte(metrics))
-		return
-	}
-
-	// if no sandbox provided, will get all sandbox's metrics.
 
 	// prepare writer for writing response.
 	contentType := expfmt.Negotiate(r.Header)
@@ -156,8 +140,8 @@ func encodeMetricFamily(mfs []*dto.MetricFamily, encoder expfmt.Encoder) error {
 
 // aggregateSandboxMetrics will get metrics from one sandbox and do some process
 func (km *KataMonitor) aggregateSandboxMetrics(encoder expfmt.Encoder) error {
-	// get all kata sandboxes from cache
-	sandboxes := km.sandboxCache.getSandboxList()
+	// get all sandboxes from cache
+	sandboxes := km.sandboxCache.getAllSandboxes()
 	// save running kata pods as a metrics.
 	runningShimCount.Set(float64(len(sandboxes)))
 
@@ -172,17 +156,13 @@ func (km *KataMonitor) aggregateSandboxMetrics(encoder expfmt.Encoder) error {
 	// used to receive response
 	results := make(chan []*dto.MetricFamily, len(sandboxes))
 
-	monitorLog.WithField("sandboxes count", len(sandboxes)).Debugf("aggregate sandbox metrics")
+	monitorLog.WithField("sandbox_count", len(sandboxes)).Debugf("sandboxes count")
 
 	// get metrics from sandbox's shim
-	for _, sandboxID := range sandboxes {
-		sandboxMetadata, ok := km.sandboxCache.getCRIMetadata(sandboxID)
-		if !ok { // likely the sandbox has been just removed
-			continue
-		}
+	for sandboxID := range sandboxes {
 		wg.Add(1)
-		go func(sandboxID string, sandboxMetadata sandboxCRIMetadata, results chan<- []*dto.MetricFamily) {
-			sandboxMetrics, err := getParsedMetrics(sandboxID, sandboxMetadata)
+		go func(sandboxID string, results chan<- []*dto.MetricFamily) {
+			sandboxMetrics, err := getParsedMetrics(sandboxID)
 			if err != nil {
 				monitorLog.WithError(err).WithField("sandbox_id", sandboxID).Errorf("failed to get metrics for sandbox")
 			}
@@ -190,7 +170,7 @@ func (km *KataMonitor) aggregateSandboxMetrics(encoder expfmt.Encoder) error {
 			results <- sandboxMetrics
 			wg.Done()
 			monitorLog.WithField("sandbox_id", sandboxID).Debug("job finished")
-		}(sandboxID, sandboxMetadata, results)
+		}(sandboxID, results)
 
 		monitorLog.WithField("sandbox_id", sandboxID).Debug("job started")
 	}
@@ -239,18 +219,18 @@ func (km *KataMonitor) aggregateSandboxMetrics(encoder expfmt.Encoder) error {
 
 }
 
-func getParsedMetrics(sandboxID string, sandboxMetadata sandboxCRIMetadata) ([]*dto.MetricFamily, error) {
-	body, err := shimclient.DoGet(sandboxID, defaultTimeout, containerdshim.MetricsUrl)
+func getParsedMetrics(sandboxID string) ([]*dto.MetricFamily, error) {
+	body, err := doGet(sandboxID, defaultTimeout, "metrics")
 	if err != nil {
 		return nil, err
 	}
 
-	return parsePrometheusMetrics(sandboxID, sandboxMetadata, body)
+	return parsePrometheusMetrics(sandboxID, body)
 }
 
 // GetSandboxMetrics will get sandbox's metrics from shim
 func GetSandboxMetrics(sandboxID string) (string, error) {
-	body, err := shimclient.DoGet(sandboxID, defaultTimeout, containerdshim.MetricsUrl)
+	body, err := doGet(sandboxID, defaultTimeout, "metrics")
 	if err != nil {
 		return "", err
 	}
@@ -260,7 +240,7 @@ func GetSandboxMetrics(sandboxID string) (string, error) {
 
 // parsePrometheusMetrics will decode metrics from Prometheus text format
 // and return array of *dto.MetricFamily with an ASC order
-func parsePrometheusMetrics(sandboxID string, sandboxMetadata sandboxCRIMetadata, body []byte) ([]*dto.MetricFamily, error) {
+func parsePrometheusMetrics(sandboxID string, body []byte) ([]*dto.MetricFamily, error) {
 	reader := bytes.NewReader(body)
 	decoder := expfmt.NewDecoder(reader, expfmt.FmtText)
 
@@ -278,24 +258,10 @@ func parsePrometheusMetrics(sandboxID string, sandboxMetadata sandboxCRIMetadata
 		metricList := mf.Metric
 		for j := range metricList {
 			metric := metricList[j]
-			metric.Label = append(metric.Label,
-				&dto.LabelPair{
-					Name:  mutils.String2Pointer("sandbox_id"),
-					Value: mutils.String2Pointer(sandboxID),
-				},
-				&dto.LabelPair{
-					Name:  mutils.String2Pointer("cri_uid"),
-					Value: mutils.String2Pointer(sandboxMetadata.uid),
-				},
-				&dto.LabelPair{
-					Name:  mutils.String2Pointer("cri_name"),
-					Value: mutils.String2Pointer(sandboxMetadata.name),
-				},
-				&dto.LabelPair{
-					Name:  mutils.String2Pointer("cri_namespace"),
-					Value: mutils.String2Pointer(sandboxMetadata.namespace),
-				},
-			)
+			metric.Label = append(metric.Label, &dto.LabelPair{
+				Name:  mutils.String2Pointer("sandbox_id"),
+				Value: mutils.String2Pointer(sandboxID),
+			})
 		}
 
 		// Kata shim are using prometheus go client, add a prefix for metric name to avoid confusing

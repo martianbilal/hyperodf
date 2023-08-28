@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 
-	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
+	strfmt "github.com/go-openapi/strfmt"
+
+	models "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/pkg/firecracker/client/models"
 )
 
 // CreateSyncActionReader is a Reader for the CreateSyncAction structure.
@@ -23,18 +24,21 @@ type CreateSyncActionReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *CreateSyncActionReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
+
 	case 204:
 		result := NewCreateSyncActionNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
+
 	case 400:
 		result := NewCreateSyncActionBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
+
 	default:
 		result := NewCreateSyncActionDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,7 +56,7 @@ func NewCreateSyncActionNoContent() *CreateSyncActionNoContent {
 	return &CreateSyncActionNoContent{}
 }
 
-/* CreateSyncActionNoContent describes a response with status code 204, with default header values.
+/*CreateSyncActionNoContent handles this case with default header values.
 
 The update was successful
 */
@@ -73,7 +77,7 @@ func NewCreateSyncActionBadRequest() *CreateSyncActionBadRequest {
 	return &CreateSyncActionBadRequest{}
 }
 
-/* CreateSyncActionBadRequest describes a response with status code 400, with default header values.
+/*CreateSyncActionBadRequest handles this case with default header values.
 
 The action cannot be executed due to bad input
 */
@@ -83,9 +87,6 @@ type CreateSyncActionBadRequest struct {
 
 func (o *CreateSyncActionBadRequest) Error() string {
 	return fmt.Sprintf("[PUT /actions][%d] createSyncActionBadRequest  %+v", 400, o.Payload)
-}
-func (o *CreateSyncActionBadRequest) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *CreateSyncActionBadRequest) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -107,7 +108,7 @@ func NewCreateSyncActionDefault(code int) *CreateSyncActionDefault {
 	}
 }
 
-/* CreateSyncActionDefault describes a response with status code -1, with default header values.
+/*CreateSyncActionDefault handles this case with default header values.
 
 Internal Server Error
 */
@@ -124,9 +125,6 @@ func (o *CreateSyncActionDefault) Code() int {
 
 func (o *CreateSyncActionDefault) Error() string {
 	return fmt.Sprintf("[PUT /actions][%d] createSyncAction default  %+v", o._statusCode, o.Payload)
-}
-func (o *CreateSyncActionDefault) GetPayload() *models.Error {
-	return o.Payload
 }
 
 func (o *CreateSyncActionDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
