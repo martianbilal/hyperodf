@@ -27,6 +27,9 @@ var createTracingTags = map[string]string{
 	"subsystem": "sandbox",
 }
 
+// global file for logging
+var debugLogFile = "/tmp/kata-debug.log"
+
 // GetKernelParamsFunc use a variable to allow tests to modify its value
 var GetKernelParamsFunc = getKernelParams
 
