@@ -17,17 +17,23 @@ import (
 
 // Default our log level to 'Warn', rather than the logrus default
 // of 'Info', which is rather noisy.
-var originalLoggerLevel = logrus.WarnLevel
+// var originalLoggerLevel = logrus.WarnLevel
+var originalLoggerLevel = logrus.DebugLevel
 var kataUtilsLogger = logrus.NewEntry(logrus.New())
 
 // SetLogger sets the logger for the factory.
 func SetLogger(ctx context.Context, logger *logrus.Entry, level logrus.Level) {
+
+	// wrt := io.MultiWriter(os.Stdout, log_out_file)
+	// logrus.SetOutput(wrt)
 	fields := logrus.Fields{
 		"source": "katautils",
 	}
 
 	originalLoggerLevel = level
 	kataUtilsLogger = logger.WithFields(fields)
+	// kataUtilsLogger.Logger.SetLevel(logrus.DebugLevel)
+	// kataUtilsLogger.Logger.SetOutput(wrt)
 }
 
 // sysLogHook wraps a syslog logrus hook and a formatter to be used for all

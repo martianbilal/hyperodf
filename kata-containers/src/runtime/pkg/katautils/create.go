@@ -28,7 +28,17 @@ var createTracingTags = map[string]string{
 }
 
 // global file for logging
-var debugLogFile = "/tmp/kata-debug.log"
+// var debugLogFile = "/tmp/kata-debug.log"
+// var log_out_file io.Writer
+
+// func init() {
+// 	log_out_file, err := os.OpenFile(debugLogFile, os.O_CREATE|os.O_WRONLY, 0666)
+// 	if err == nil {
+// 		// log.SetOutput(file)
+// 		print("log_out_file: ", log_out_file)
+// 	}
+
+// }
 
 // GetKernelParamsFunc use a variable to allow tests to modify its value
 var GetKernelParamsFunc = getKernelParams

@@ -28,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
+	hodf "github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	pkgUtils "github.com/kata-containers/kata-containers/src/runtime/pkg/utils"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
@@ -755,6 +756,7 @@ func (q *qemu) setupVirtioMem(ctx context.Context) error {
 func (q *qemu) startSandbox(ctx context.Context, timeout int) error {
 	span, ctx := katatrace.Trace(ctx, q.Logger(), "startSandbox", q.tracingTags())
 	defer span.End()
+	hodf.H_hello()
 
 	if q.config.Debug {
 		params := q.arch.kernelParameters(q.config.Debug)
@@ -766,6 +768,8 @@ func (q *qemu) startSandbox(ctx context.Context, timeout int) error {
 		// are set here, which come from the runtime and which are set
 		// by the user.
 		q.Logger().WithField("default-kernel-parameters", formatted).Debug()
+		q.Logger().Logger.SetOutput(os.Stdout)
+
 	}
 
 	defer func() {
