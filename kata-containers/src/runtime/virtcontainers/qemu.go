@@ -757,6 +757,7 @@ func (q *qemu) startSandbox(ctx context.Context, timeout int) error {
 	span, ctx := katatrace.Trace(ctx, q.Logger(), "startSandbox", q.tracingTags())
 	defer span.End()
 	hodf.H_hello()
+	hodf.H_log("startSandbox")
 
 	if q.config.Debug {
 		params := q.arch.kernelParameters(q.config.Debug)

@@ -22,6 +22,11 @@ QEMU_LOG_FILE="/tmp/qemu_log.txt"
 echo "============================LOG STARTING============================" > $LOG_FILE
 
 
+# build the runtime 
+make -j "$(nproc)" && sudo -E "PATH=$PATH" make install
+
+
+echo "Starting Pod"
 # create the pod and get the pod id
 POD_ID=$(sudo crictl --debug runp -r kata podsandbox-config.yaml |& tee -a $LOG_FILE | grep -oP 'PodSandboxId:\K[^,]*')
 echo "Pod ID: $POD_ID"
