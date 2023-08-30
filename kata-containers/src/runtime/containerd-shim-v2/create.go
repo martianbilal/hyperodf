@@ -26,6 +26,7 @@ import (
 	_ "github.com/containerd/containerd/runtime/v2/runc/options"
 	oldcrioption "github.com/containerd/cri-containerd/pkg/api/runtimeoptions/v1"
 
+	hodf "github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	vc "github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
@@ -34,6 +35,7 @@ import (
 )
 
 func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*container, error) {
+	hodf.H_log("create called")
 	rootFs := vc.RootFs{}
 	if len(r.Rootfs) == 1 {
 		m := r.Rootfs[0]
@@ -52,6 +54,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 	if err != nil {
 		return nil, err
 	}
+	hodf.H_log("container type: " + string(containerType))
 
 	disableOutput := noNeedForOutput(detach, ociSpec.Process.Terminal)
 	rootfs := filepath.Join(r.Bundle, "rootfs")
@@ -61,6 +64,8 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		if s.sandbox != nil {
 			return nil, fmt.Errorf("cannot create another sandbox in sandbox: %s", s.sandbox.ID())
 		}
+
+		hodf.H_log("create calling loadRuntimeConfig - sandbox not nil in service")
 
 		s.config, err = loadRuntimeConfig(s, r, ociSpec.Annotations)
 		if err != nil {
@@ -80,19 +85,25 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 			return nil, err
 		}
 
+		hodf.H_log("kata created jaeger tracer")
+
 		// create root span
 		rootSpan, newCtx := katatrace.Trace(s.ctx, shimLog, "root span", shimTracingTags)
 		s.rootCtx = newCtx
 		defer rootSpan.End()
 
+		hodf.H_log("created root span")
+
 		// create span
 		span, newCtx := katatrace.Trace(s.rootCtx, shimLog, "create", shimTracingTags)
 		s.ctx = newCtx
 		defer span.End()
+		hodf.H_log("created span")
 
 		if rootFs.Mounted, err = checkAndMount(s, r); err != nil {
 			return nil, err
 		}
+		hodf.H_log("checked and mounted")
 
 		defer func() {
 			if err != nil && rootFs.Mounted {
@@ -103,6 +114,7 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		}()
 
 		katautils.HandleFactory(ctx, vci, s.config)
+		hodf.H_log("handled factory")
 
 		// Pass service's context instead of local ctx to CreateSandbox(), since local
 		// ctx will be canceled after this rpc service call, but the sandbox will live
@@ -112,14 +124,18 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		if err != nil {
 			return nil, err
 		}
+		hodf.H_log("sandbox created")
 		s.sandbox = sandbox
 		pid, err := s.sandbox.GetHypervisorPid()
 		if err != nil {
 			return nil, err
 		}
+
+		hodf.H_log("sandbox pid: " + string(rune(pid)))
 		s.hpid = uint32(pid)
 
 		go s.startManagementServer(ctx, ociSpec)
+		hodf.H_log("started the managament server routine")
 
 	case vc.PodContainer:
 		span, ctx := katatrace.Trace(s.ctx, shimLog, "create", shimTracingTags)
@@ -147,10 +163,15 @@ func create(ctx context.Context, s *service, r *taskAPI.CreateTaskRequest) (*con
 		}
 	}
 
+	hodf.H_log("create calling newContainer")
 	container, err := newContainer(s, r, containerType, ociSpec, rootFs.Mounted)
 	if err != nil {
 		return nil, err
 	}
+	hodf.H_log("create done")
+	// format a string containing the container struct
+	// and print it to the log file
+	hodf.H_log(fmt.Sprintf("%+v", container))
 
 	return container, nil
 }

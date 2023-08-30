@@ -9,6 +9,7 @@ import (
 	"context"
 	"runtime"
 
+	hodf "github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	deviceApi "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/api"
 	deviceConfig "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
@@ -54,9 +55,12 @@ func CreateSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Fac
 }
 
 func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, factory Factory) (_ *Sandbox, err error) {
+	hodf.H_log("createSandboxFromConfig called")
+
 	span, ctx := katatrace.Trace(ctx, virtLog, "createSandboxFromConfig", apiTracingTags)
 	defer span.End()
 
+	hodf.H_log("Creating sandbox")
 	// Create the sandbox.
 	s, err := createSandbox(ctx, sandboxConfig, factory)
 	if err != nil {
@@ -66,10 +70,12 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 	// cleanup sandbox resources in case of any failure
 	defer func() {
 		if err != nil {
+			hodf.H_log("Error occurred, deleting sandbox")
 			s.Delete(ctx)
 		}
 	}()
 
+	hodf.H_log("Creating sandbox network")
 	// Create the sandbox network
 	if err = s.createNetwork(ctx); err != nil {
 		return nil, err
@@ -78,21 +84,25 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 	// network rollback
 	defer func() {
 		if err != nil {
+			hodf.H_log("Error occurred, removing sandbox network")
 			s.removeNetwork(ctx)
 		}
 	}()
 
 	// Move runtime to sandbox cgroup so all process are created there.
 	if s.config.SandboxCgroupOnly {
+		hodf.H_log("Creating cgroup manager for sandbox")
 		if err := s.createCgroupManager(); err != nil {
 			return nil, err
 		}
 
+		hodf.H_log("Setting up sandbox cgroup")
 		if err := s.setupSandboxCgroup(); err != nil {
 			return nil, err
 		}
 	}
 
+	hodf.H_log("Starting VM")
 	// Start the VM
 	if err = s.startVM(ctx); err != nil {
 		return nil, err
@@ -101,21 +111,26 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 	// rollback to stop VM if error occurs
 	defer func() {
 		if err != nil {
+			hodf.H_log("Error occurred, stopping VM")
 			s.stopVM(ctx)
 		}
 	}()
 
+	hodf.H_log("Post creating network")
 	s.postCreatedNetwork(ctx)
 
+	hodf.H_log("Getting and storing guest details")
 	if err = s.getAndStoreGuestDetails(ctx); err != nil {
 		return nil, err
 	}
 
+	hodf.H_log("Creating containers")
 	// Create Containers
 	if err = s.createContainers(ctx); err != nil {
 		return nil, err
 	}
 
+	hodf.H_log("createSandboxFromConfig done")
 	return s, nil
 }
 

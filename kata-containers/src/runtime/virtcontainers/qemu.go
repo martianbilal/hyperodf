@@ -758,6 +758,7 @@ func (q *qemu) startSandbox(ctx context.Context, timeout int) error {
 	defer span.End()
 	hodf.H_hello()
 	hodf.H_log("startSandbox")
+	hodf.H_dump_stack_trace("/tmp/kata-stack-trace.txt")
 
 	if q.config.Debug {
 		params := q.arch.kernelParameters(q.config.Debug)

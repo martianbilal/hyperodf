@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	hodf "github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	vc "github.com/kata-containers/kata-containers/src/runtime/virtcontainers"
 	vf "github.com/kata-containers/kata-containers/src/runtime/virtcontainers/factory"
@@ -124,20 +125,25 @@ func SetEphemeralStorageType(ociSpec specs.Spec) specs.Spec {
 // CreateSandbox create a sandbox container
 func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeConfig oci.RuntimeConfig, rootFs vc.RootFs,
 	containerID, bundlePath, console string, disableOutput, systemdCgroup bool) (_ vc.VCSandbox, _ vc.Process, err error) {
+	hodf.H_log("CreateSandbox called")
+
 	span, ctx := katatrace.Trace(ctx, nil, "CreateSandbox", createTracingTags)
 	katatrace.AddTag(span, "container_id", containerID)
 	defer span.End()
 
+	hodf.H_log("Creating sandbox config")
 	sandboxConfig, err := oci.SandboxConfig(ociSpec, runtimeConfig, bundlePath, containerID, console, disableOutput, systemdCgroup)
 	if err != nil {
 		return nil, vc.Process{}, err
 	}
 
+	hodf.H_log("Checking for FIPS")
 	if err := checkForFIPS(&sandboxConfig); err != nil {
 		return nil, vc.Process{}, err
 	}
 
 	if !rootFs.Mounted && len(sandboxConfig.Containers) == 1 {
+		hodf.H_log("Resolving rootFs source path")
 		if rootFs.Source != "" {
 			realPath, err := ResolvePath(rootFs.Source)
 			if err != nil {
@@ -148,6 +154,7 @@ func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeCo
 		sandboxConfig.Containers[0].RootFs = rootFs
 	}
 
+	hodf.H_log("Setting up network namespace")
 	// Important to create the network namespace before the sandbox is
 	// created, because it is not responsible for the creation of the
 	// netns if it does not exist.
@@ -159,12 +166,14 @@ func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeCo
 		// cleanup netns if kata creates it
 		ns := sandboxConfig.NetworkConfig
 		if err != nil && ns.NetNsCreated {
+			hodf.H_log("Cleaning up netns")
 			if ex := cleanupNetNS(ns.NetNSPath); ex != nil {
 				kataUtilsLogger.WithField("path", ns.NetNSPath).WithError(ex).Warn("failed to cleanup netns")
 			}
 		}
 	}()
 
+	hodf.H_log("Running pre-start OCI hooks")
 	// Run pre-start OCI hooks.
 	err = EnterNetNS(sandboxConfig.NetworkConfig.NetNSPath, func() error {
 		return PreStartHooks(ctx, ociSpec, containerID, bundlePath)
@@ -173,20 +182,24 @@ func CreateSandbox(ctx context.Context, vci vc.VC, ociSpec specs.Spec, runtimeCo
 		return nil, vc.Process{}, err
 	}
 
+	hodf.H_log("Creating sandbox using vci")
 	sandbox, err := vci.CreateSandbox(ctx, sandboxConfig)
 	if err != nil {
 		return nil, vc.Process{}, err
 	}
+	hodf.H_log("Created sandbox using vci")
 
 	sid := sandbox.ID()
 	kataUtilsLogger = kataUtilsLogger.WithField("sandbox", sid)
 	katatrace.AddTag(span, "sandbox_id", sid)
 
 	containers := sandbox.GetAllContainers()
+	hodf.H_log(fmt.Sprintf("Checking containers from sandbox, found %d containers", len(containers)))
 	if len(containers) != 1 {
 		return nil, vc.Process{}, fmt.Errorf("BUG: Container list from sandbox is wrong, expecting only one container, found %d containers", len(containers))
 	}
 
+	hodf.H_log("CreateSandbox done")
 	return sandbox, containers[0].Process(), nil
 }
 

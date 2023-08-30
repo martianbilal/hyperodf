@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	hodf "github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/manager"
@@ -887,6 +888,8 @@ func (c *Container) checkBlockDeviceSupport(ctx context.Context) bool {
 // create creates and starts a container inside a Sandbox. It has to be
 // called only when a new container, not known by the sandbox, has to be created.
 func (c *Container) create(ctx context.Context) (err error) {
+	hodf.H_log("Container create called")
+
 	// In case the container creation fails, the following takes care
 	// of rolling back all the actions previously performed.
 	defer func() {
@@ -896,7 +899,9 @@ func (c *Container) create(ctx context.Context) (err error) {
 		}
 	}()
 
+	hodf.H_log("Checking block device support for container")
 	if c.checkBlockDeviceSupport(ctx) {
+		hodf.H_log("Hotplugging drive for container")
 		// If the rootfs is backed by a block device, go ahead and hotplug it to the guest
 		if err = c.hotplugDrive(ctx); err != nil {
 			return
@@ -908,6 +913,7 @@ func (c *Container) create(ctx context.Context) (err error) {
 		normalAttachedDevs []ContainerDevice //for q35: normally attached devices
 		delayAttachedDevs  []ContainerDevice //for q35: delay attached devices, for example, large bar space device
 	)
+	hodf.H_log("Checking machine type for device attachment")
 	// Fix: https://github.com/kata-containers/runtime/issues/2460
 	if machineType == QemuQ35 {
 		// add Large Bar space device to delayAttachedDevs
@@ -931,21 +937,25 @@ func (c *Container) create(ctx context.Context) (err error) {
 		"machine_type": machineType,
 		"devices":      normalAttachedDevs,
 	}).Info("normal attach devices")
+	hodf.H_log("Attaching normal devices to container")
 	if len(normalAttachedDevs) > 0 {
 		if err = c.attachDevices(ctx, normalAttachedDevs); err != nil {
 			return
 		}
 	}
 
+	hodf.H_log("Getting system mount info for container")
 	// Deduce additional system mount info that should be handled by the agent
 	// inside the VM
 	c.getSystemMountInfo()
 
+	hodf.H_log("Creating container through agent")
 	process, err := c.sandbox.agent.createContainer(ctx, c.sandbox, c)
 	if err != nil {
 		return err
 	}
 	c.process = *process
+	hodf.H_log("Container created through agent")
 
 	// lazy attach device after createContainer for q35
 	if machineType == QemuQ35 && len(delayAttachedDevs) > 0 {
@@ -953,21 +963,26 @@ func (c *Container) create(ctx context.Context) (err error) {
 			"machine_type": machineType,
 			"devices":      delayAttachedDevs,
 		}).Info("lazy attach devices")
+		hodf.H_log("Lazy attaching devices to container")
 		if err = c.attachDevices(ctx, delayAttachedDevs); err != nil {
 			return
 		}
 	}
 
+	hodf.H_log("Checking rootless state and sandbox cgroup settings")
 	if !rootless.IsRootless() && !c.sandbox.config.SandboxCgroupOnly {
+		hodf.H_log("Creating cgroups for container")
 		if err = c.cgroupsCreate(); err != nil {
 			return
 		}
 	}
 
+	hodf.H_log("Setting container state to ready")
 	if err = c.setContainerState(types.StateReady); err != nil {
 		return
 	}
 
+	hodf.H_log("Container create done")
 	return nil
 }
 

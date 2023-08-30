@@ -29,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 
+	hodf "github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/api"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
@@ -1558,37 +1559,48 @@ func (s *Sandbox) ResumeContainer(ctx context.Context, containerID string) error
 // createContainers registers all containers, create the
 // containers in the guest and starts one shim per container.
 func (s *Sandbox) createContainers(ctx context.Context) error {
+	hodf.H_log("Sandbox createContainers called")
+
 	span, ctx := katatrace.Trace(ctx, s.Logger(), "createContainers", s.tracingTags())
 	defer span.End()
 
 	for i := range s.config.Containers {
+		hodf.H_log(fmt.Sprintf("Creating container %d", i))
 
 		c, err := newContainer(ctx, s, &s.config.Containers[i])
 		if err != nil {
 			return err
 		}
+
+		hodf.H_log(fmt.Sprintf("Creating container with ID: %s", c.id))
 		if err := c.create(ctx); err != nil {
 			return err
 		}
 
+		hodf.H_log(fmt.Sprintf("Adding container with ID: %s to sandbox", c.id))
 		if err := s.addContainer(c); err != nil {
 			return err
 		}
 	}
 
+	hodf.H_log("Updating sandbox resources after adding containers")
 	// Update resources after having added containers to the sandbox, since
-	// container status is requiered to know if more resources should be added.
+	// container status is required to know if more resources should be added.
 	if err := s.updateResources(ctx); err != nil {
 		return err
 	}
 
+	hodf.H_log("Updating sandbox cgroups")
 	if err := s.cgroupsUpdate(ctx); err != nil {
 		return err
 	}
+
+	hodf.H_log("Storing sandbox")
 	if err := s.storeSandbox(ctx); err != nil {
 		return err
 	}
 
+	hodf.H_log("Sandbox createContainers done")
 	return nil
 }
 

@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 	"github.com/kata-containers/kata-containers/src/runtime/pkg/katautils/katatrace"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/api"
 	"github.com/kata-containers/kata-containers/src/runtime/virtcontainers/device/config"
@@ -1313,117 +1314,100 @@ func (k *kataAgent) buildContainerRootfs(ctx context.Context, sandbox *Sandbox, 
 }
 
 func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Container) (p *Process, err error) {
+	hodf.H_log("kataAgent createContainer called")
+
 	span, ctx := katatrace.Trace(ctx, k.Logger(), "createContainer", kataAgentTracingTags)
 	defer span.End()
-
-	var ctrStorages []*grpc.Storage
-	var ctrDevices []*grpc.Device
-	var rootfs *grpc.Storage
-
-	// This is the guest absolute root path for that container.
-	rootPathParent := filepath.Join(kataGuestSharedDir(), c.id)
-	rootPath := filepath.Join(rootPathParent, c.rootfsSuffix)
 
 	// In case the container creation fails, the following defer statement
 	// takes care of rolling back actions previously performed.
 	defer func() {
 		if err != nil {
-			k.Logger().WithError(err).Error("createContainer failed")
+			k.Logger().WithError(err).Error("container create failed")
 			k.rollbackFailingContainerCreation(ctx, c)
 		}
 	}()
 
-	// setup rootfs -- if its block based, we'll receive a non-nil storage object representing
-	// the block device for the rootfs, which us utilized for mounting in the guest. This'll be handled
-	// already for non-block based rootfs
+	hodf.H_log("Building container rootfs")
+	var ctrStorages []*grpc.Storage
+	var ctrDevices []*grpc.Device
+	var rootfs *grpc.Storage
+	rootPathParent := filepath.Join(kataGuestSharedDir(), c.id)
+	rootPath := filepath.Join(rootPathParent, c.rootfsSuffix)
 	if rootfs, err = k.buildContainerRootfs(ctx, sandbox, c, rootPathParent); err != nil {
 		return nil, err
 	}
-
 	if rootfs != nil {
-		// Add rootfs to the list of container storage.
-		// We only need to do this for block based rootfs, as we
-		// want the agent to mount it into the right location
-		// (kataGuestSharedDir/ctrID/
 		ctrStorages = append(ctrStorages, rootfs)
 	}
 
+	hodf.H_log("Fetching OCI spec for container")
 	ociSpec := c.GetPatchedOCISpec()
 	if ociSpec == nil {
 		return nil, errorMissingOCISpec
 	}
 
-	// Handle container mounts
+	hodf.H_log("Handling container mounts")
 	sharedDirMounts := make(map[string]Mount)
 	ignoredMounts := make(map[string]Mount)
-
 	shareStorages, err := c.mountSharedDirMounts(ctx, sharedDirMounts, ignoredMounts)
 	if err != nil {
 		return nil, err
 	}
 	ctrStorages = append(ctrStorages, shareStorages...)
 
+	hodf.H_log("Handling shared memory")
 	k.handleShm(ociSpec.Mounts, sandbox)
 
+	hodf.H_log("Handling ephemeral storage")
 	epheStorages, err := k.handleEphemeralStorage(ociSpec.Mounts)
 	if err != nil {
 		return nil, err
 	}
-
 	ctrStorages = append(ctrStorages, epheStorages...)
 
+	hodf.H_log("Handling local storage")
 	localStorages, err := k.handleLocalStorage(ociSpec.Mounts, sandbox.id, c.rootfsSuffix)
 	if err != nil {
 		return nil, err
 	}
-
 	ctrStorages = append(ctrStorages, localStorages...)
 
-	// We replace all OCI mount sources that match our container mount
-	// with the right source path (The guest one).
+	hodf.H_log("Replacing OCI mount source")
 	if err = k.replaceOCIMountSource(ociSpec, sharedDirMounts); err != nil {
 		return nil, err
 	}
 
-	// Remove all mounts that should be ignored from the spec
+	hodf.H_log("Removing ignored OCI mounts")
 	if err = k.removeIgnoredOCIMount(ociSpec, ignoredMounts); err != nil {
 		return nil, err
 	}
 
-	// Append container devices for block devices passed with --device.
+	hodf.H_log("Appending container devices")
 	ctrDevices = k.appendDevices(ctrDevices, c)
 
-	// Handle all the volumes that are block device files.
-	// Note this call modifies the list of container devices to make sure
-	// all hotplugged devices are unplugged, so this needs be done
-	// after devices passed with --device are handled.
+	hodf.H_log("Handling block volumes")
 	volumeStorages, err := k.handleBlockVolumes(c)
 	if err != nil {
 		return nil, err
 	}
-
 	if err := k.replaceOCIMountsForStorages(ociSpec, volumeStorages); err != nil {
 		return nil, err
 	}
-
 	ctrStorages = append(ctrStorages, volumeStorages...)
 
+	hodf.H_log("Converting OCI spec to GRPC spec")
 	grpcSpec, err := grpc.OCItoGRPC(ociSpec)
 	if err != nil {
 		return nil, err
 	}
-
-	// We need to give the OCI spec our absolute rootfs path in the guest.
 	grpcSpec.Root.Path = rootPath
 
 	sharedPidNs := k.handlePidNamespace(grpcSpec, sandbox)
-
 	passSeccomp := !sandbox.config.DisableGuestSeccomp && sandbox.seccompSupported
-
-	// We need to constraint the spec to make sure we're not passing
-	// irrelevant information to the agent.
 	k.constraintGRPCSpec(grpcSpec, passSeccomp)
 
+	hodf.H_log("Sending request to create container")
 	req := &grpc.CreateContainerRequest{
 		ContainerId:  c.id,
 		ExecId:       c.id,
@@ -1432,11 +1416,11 @@ func (k *kataAgent) createContainer(ctx context.Context, sandbox *Sandbox, c *Co
 		OCI:          grpcSpec,
 		SandboxPidns: sharedPidNs,
 	}
-
 	if _, err = k.sendReq(ctx, req); err != nil {
 		return nil, err
 	}
 
+	hodf.H_log("Container creation done")
 	return buildProcessFromExecID(req.ExecId)
 }
 
@@ -2050,18 +2034,22 @@ func (k *kataAgent) getReqContext(ctx context.Context, reqName string) (newCtx c
 }
 
 func (k *kataAgent) sendReq(spanCtx context.Context, request interface{}) (interface{}, error) {
+	hodf.H_log("kataAgent sendReq called")
+
 	start := time.Now()
 
+	hodf.H_log("Attempting to connect to kataAgent")
 	if err := k.connect(spanCtx); err != nil {
 		return nil, err
 	}
 	if !k.keepConn {
 		defer k.disconnect(spanCtx)
 	}
-
 	msgName := proto.MessageName(request.(proto.Message))
 	handler := k.reqHandlers[msgName]
+	hodf.H_log("message name: " + msgName)
 	if msgName == "" || handler == nil {
+		hodf.H_log("Invalid request type for sendReq")
 		return nil, errors.New("Invalid request type")
 	}
 	message := request.(proto.Message)
@@ -2070,6 +2058,8 @@ func (k *kataAgent) sendReq(spanCtx context.Context, request interface{}) (inter
 		defer cancel()
 	}
 	k.Logger().WithField("name", msgName).WithField("req", message.String()).Trace("sending request")
+
+	hodf.H_log(fmt.Sprintf("Sending request with message name: %s", msgName))
 
 	defer func() {
 		agentRPCDurationsHistogram.WithLabelValues(msgName).Observe(float64(time.Since(start).Nanoseconds() / int64(time.Millisecond)))

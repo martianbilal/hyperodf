@@ -22,6 +22,7 @@ import (
 var HODF_LOG_FILE string = "/tmp/hodf.txt"
 var hodf_logger = logrus.New()
 var hodf_file *os.File
+var hodf_initialized bool = false
 
 // CustomFormatter is our custom logrus formatter
 type CustomFormatter struct{}
@@ -49,6 +50,9 @@ func DecorateRuntimeContext(logger *logrus.Logger) *logrus.Entry {
 }
 
 func H_init() {
+	if hodf_initialized {
+		return
+	}
 	fmt.Println("init hodf")
 	// init log file
 	var err error
@@ -61,7 +65,7 @@ func H_init() {
 	} else {
 		panic("can not open file")
 	}
-
+	hodf_initialized = true
 }
 
 func H_hello() {
@@ -78,9 +82,31 @@ func H_hello() {
 }
 
 func H_log(info string) {
+	if !hodf_initialized {
+		H_init()
+	}
 	Log := DecorateRuntimeContext // so I don't have to type it out every time
 
 	Log(hodf_logger).Debug(info)
+}
+
+func H_dump_stack_trace(fileName string) {
+	// dump stack trace
+	if !hodf_initialized {
+		H_init()
+	}
+
+	buf := make([]byte, 1<<16)
+	stacklen := runtime.Stack(buf, true)
+
+	if fileName != "" {
+		stack_trace_file, _ := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0666)
+		stack_trace_file.Write(buf[:stacklen])
+		defer stack_trace_file.Close()
+	} else {
+		hodf_logger.Debug(string(buf[:stacklen]))
+	}
+
 }
 
 func H_close() {
