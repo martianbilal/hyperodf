@@ -481,7 +481,7 @@ static void extract_common_blockdev_options(QemuOpts *opts, int *bdrv_flags,
 }
 
 /* Takes the ownership of bs_opts */
-static BlockBackend *blockdev_init(const char *file, QDict *bs_opts,
+BlockBackend *blockdev_init(const char *file, QDict *bs_opts,
                                    Error **errp)
 {
     const char *buf;

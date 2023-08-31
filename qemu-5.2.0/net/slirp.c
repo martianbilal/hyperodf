@@ -609,6 +609,41 @@ error:
     qemu_del_net_client(nc);
     return -1;
 }
+// find the slirpstate without the monitor
+static SlirpState *getSlirpState(void)
+{
+    SlirpState *tmp;
+    const char *id = "__org.qemu.net0";
+    NetClientState *nc = qemu_find_netdev(id);
+    if (!nc) {
+        fprintf(stderr, "unrecognized netdev id '%s'\n", id);
+        exit(1);
+    }
+    if (strcmp(nc->model, "user")) {
+        fprintf(stderr, "invalid device specified\n");
+        exit(1);
+    }
+    tmp = DO_UPCAST(SlirpState, nc, nc);
+    return tmp;
+}
+
+void update_hostfwd(const char *redir_str){
+    int err = 0;
+    SlirpState *s = getSlirpState();
+
+    struct in_addr host_addr;
+    host_addr.s_addr = 16777343;
+        
+    slirp_hostfwd(s, redir_str, NULL);
+    
+    DEBUG_PRINT("Done adding new hostfwd\n");
+    err = slirp_remove_hostfwd(s->slirp, 0, host_addr, 10021);
+    if (err < 0) {
+        fprintf(stderr, "failed to remove hostfwd\n");
+        exit(1);
+    }
+    return;
+}
 
 static SlirpState *slirp_lookup(Monitor *mon, const char *id)
 {

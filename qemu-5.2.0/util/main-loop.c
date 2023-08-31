@@ -28,6 +28,8 @@
 #include "qemu/timer.h"
 #include "sysemu/qtest.h"
 #include "sysemu/cpu-timers.h"
+
+#include "sysemu/cpus.h"
 #include "sysemu/replay.h"
 #include "qemu/main-loop.h"
 #include "block/aio.h"
