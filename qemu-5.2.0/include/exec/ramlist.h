@@ -76,5 +76,6 @@ void ram_block_notify_add(void *host, size_t size);
 void ram_block_notify_remove(void *host, size_t size);
 
 void ram_block_dump(Monitor *mon);
+void ram_block_dump_hyperodf(void);
 
 #endif /* RAMLIST_H */

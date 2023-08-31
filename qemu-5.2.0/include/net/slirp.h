@@ -24,6 +24,7 @@
 #ifndef QEMU_NET_SLIRP_H
 #define QEMU_NET_SLIRP_H
 
+void update_hostfwd(const char* redir_str);
 
 #ifdef CONFIG_SLIRP
 

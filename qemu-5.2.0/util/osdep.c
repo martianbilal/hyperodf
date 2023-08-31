@@ -64,6 +64,7 @@ int qemu_madvise(void *addr, size_t len, int advice)
         errno = EINVAL;
         return -1;
     }
+    if(advice == QEMU_MADV_DONTFORK) return 0;
 #if defined(CONFIG_MADVISE)
     return madvise(addr, len, advice);
 #elif defined(CONFIG_POSIX_MADVISE)

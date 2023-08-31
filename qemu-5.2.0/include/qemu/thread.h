@@ -22,6 +22,8 @@ typedef struct QemuThread QemuThread;
 #define QEMU_THREAD_JOINABLE 0
 #define QEMU_THREAD_DETACHED 1
 
+#define USE_HYPERODF 1
+
 void qemu_mutex_init(QemuMutex *mutex);
 void qemu_mutex_destroy(QemuMutex *mutex);
 int qemu_mutex_trylock_impl(QemuMutex *mutex, const char *file, const int line);

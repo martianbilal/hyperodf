@@ -102,6 +102,13 @@ struct kvm_userspace_memory_region {
 	__u64 userspace_addr; /* start of the userspace allocated memory */
 };
 
+/* for KVM_FORK */
+struct fork_info {
+  unsigned long kvm_userspace_mem; 
+  int vm_fd; 
+  int vcpu_fd;
+};
+
 /*
  * The bit 0 ~ bit 15 of kvm_memory_region::flags are visible for userspace,
  * other bits are reserved for kvm internal use which are defined in
@@ -1520,6 +1527,7 @@ struct kvm_enc_region {
 /* Available with  KVM_CAP_S390_VCPU_RESETS */
 #define KVM_S390_NORMAL_RESET	_IO(KVMIO,   0xc3)
 #define KVM_S390_CLEAR_RESET	_IO(KVMIO,   0xc4)
+#define KVM_FORK                _IOWR(KVMIO, 0xc5, struct fork_info)
 
 struct kvm_s390_pv_sec_parm {
 	__u64 origin;

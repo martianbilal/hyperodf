@@ -5,6 +5,14 @@
 #include "qemu/bitmap.h"
 #include "qemu/thread.h"
 #include "qom/object.h"
+// #define DBG_CHAR
+#ifdef DBG_CHAR
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s:%d] " fmt, \
+    __func__,  __LINE__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) /* do nothing */
+#endif
+
 
 #define IAC_EOR 239
 #define IAC_SE 240
