@@ -730,7 +730,7 @@ void qemu_opts_print(QemuOpts *opts, const char *separator)
     QemuOpt *opt;
     QemuOptDesc *desc = opts->list->desc;
     const char *sep = "";
-    printf("inside the qemu_opts_print\n");
+
     if (opts->id) {
         printf("id=%s", opts->id); /* passed id_wellformed -> no commas */
         sep = separator;
@@ -763,8 +763,6 @@ void qemu_opts_print(QemuOpts *opts, const char *separator)
         }
         sep = separator;
     }
-    fflush(stdout);
-
 }
 
 static const char *get_opt_name_value(const char *params,
@@ -946,7 +944,7 @@ QemuOpts *qemu_opts_parse_noisily(QemuOptsList *list, const char *params,
     Error *err = NULL;
     QemuOpts *opts;
     bool help_wanted = false;
-    printf("qemu_opts_parse_noisily: %s\n", params);
+
     opts = opts_parse(list, params, permit_abbrev, false, &help_wanted, &err);
     if (err) {
         if (help_wanted) {

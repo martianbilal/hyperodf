@@ -95,10 +95,10 @@ static void qemu_chr_open_stdio(Chardev *chr,
         return;
     }
 
-    // if (stdio_in_use) {
-    //     error_setg(errp, "cannot use stdio by multiple character devices");
-    //     return;
-    // }
+    if (stdio_in_use) {
+        error_setg(errp, "cannot use stdio by multiple character devices");
+        return;
+    }
 
     stdio_in_use = true;
     old_fd0_flags = fcntl(0, F_GETFL);

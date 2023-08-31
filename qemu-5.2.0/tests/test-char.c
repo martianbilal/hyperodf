@@ -1464,7 +1464,6 @@ int main(int argc, char **argv)
     qemu_add_opts(&qemu_chardev_opts);
 
     g_test_add_func("/char/null", char_null_test);
-    return g_test_run();
     g_test_add_func("/char/invalid", char_invalid_test);
     g_test_add_func("/char/ringbuf", char_ringbuf_test);
     g_test_add_func("/char/mux", char_mux_test);
@@ -1538,14 +1537,14 @@ int main(int argc, char **argv)
     if (has_ipv4) {
         SOCKET_SERVER_TEST(tcp, &tcpaddr);
         SOCKET_CLIENT_TEST(tcp, &tcpaddr);
-        // g_test_add_data_func("/char/socket/server/two-clients/tcp", &tcpaddr,
-                            //  char_socket_server_two_clients_test);
+        g_test_add_data_func("/char/socket/server/two-clients/tcp", &tcpaddr,
+                             char_socket_server_two_clients_test);
     }
 #ifndef WIN32
     SOCKET_SERVER_TEST(unix, &unixaddr);
     SOCKET_CLIENT_TEST(unix, &unixaddr);
-    // g_test_add_data_func("/char/socket/server/two-clients/unix", &unixaddr,
-                        //  char_socket_server_two_clients_test);
+    g_test_add_data_func("/char/socket/server/two-clients/unix", &unixaddr,
+                         char_socket_server_two_clients_test);
 #endif
 
     g_test_add_func("/char/udp", char_udp_test);

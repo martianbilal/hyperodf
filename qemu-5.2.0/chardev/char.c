@@ -45,29 +45,6 @@
 /***********************************************************/
 /* character device */
 
-// void qemu_print_Chardev(struct Chardev *chardev) {
-//     if (chardev == NULL) {
-//         printf("Null pointer provided.\n");
-//         return;
-//     }
-
-//     printf("parent_obj: %p\n", (void*) &(chardev->parent_obj));
-//     printf("chr_write_lock: %p\n", (void*) &(chardev->chr_write_lock));
-//     printf("be: %p\n", (void*) chardev->be);
-//     printf("label: %s\n", chardev->label);
-//     printf("filename: %s\n", chardev->filename);
-//     printf("logfd: %d\n", chardev->logfd);
-//     printf("be_open: %d\n", chardev->be_open);
-//     printf("gsource: %p\n", (void*) chardev->gsource);
-//     printf("gcontext: %p\n", (void*) chardev->gcontext);
-//     printf("features: ");
-//     for (int i = 0; i < QEMU_CHAR_FEATURE_LAST; i++) {
-//         printf("%d", test_bit(i, chardev->features));
-//     }
-//     printf("\n");
-// }
-
-
 Object *get_chardevs_root(void)
 {
     return container_get(object_get_root(), "/chardevs");
@@ -371,16 +348,11 @@ QemuOpts *qemu_chr_parse_compat(const char *label, const char *filename,
     QemuOpts *opts;
     Error *local_err = NULL;
 
-
-    DEBUG_PRINT("qemu_chr_parse_compat: label=%s, filename=%s\n", label, filename);
-
     opts = qemu_opts_create(qemu_find_opts("chardev"), label, 1, &local_err);
     if (local_err) {
         error_report_err(local_err);
         return NULL;
     }
-
-    DEBUG_PRINT("created the qemu opts  %s\n", label);
 
     if (strstart(filename, "mon:", &p)) {
         if (!permit_mux_mon) {
@@ -671,8 +643,6 @@ Chardev *qemu_chr_new_from_opts(QemuOpts *opts, GMainContext *context,
     const char *id = qemu_opts_id(opts);
     char *bid = NULL;
 
-    DEBUG_PRINT("Printing opts: %p\n", opts);
-    // qemu_opts_print(opts, "\n");
     if (name && is_help_option(name)) {
         GString *str = g_string_new("");
 
@@ -993,13 +963,9 @@ static Chardev *chardev_new(const char *id, const char *typename,
     Chardev *chr = NULL;
     Error *local_err = NULL;
     bool be_opened = true;
-    ObjectProperty *prop;
-
 
     assert(g_str_has_prefix(typename, "chardev-"));
 
-    DEBUG_PRINT("chardev_new: id=%s, typename=%s\n", id, typename);
-    DEBUG_PRINT("chardev_backend: %d\n", backend ? backend->type : -1);
     obj = object_new(typename);
     chr = CHARDEV(obj);
     chr->label = g_strdup(id);
@@ -1021,19 +987,8 @@ static Chardev *chardev_new(const char *id, const char *typename,
         object_property_try_add_child(get_chardevs_root(), id, obj,
                                       &local_err);
         if (local_err) {
-            // prop = object_class_property_find(object_get_class(get_chardevs_root()), "gdb", NULL);
-            // if(prop) {
-
-            // }
-            object_property_del(get_chardevs_root(), id);
-            object_property_try_add_child(get_chardevs_root(), id, obj,
-                                            &local_err);
-            if(!local_err){
-                goto second_chance;
-            }
             goto end;
         }
-        second_chance:
         object_unref(obj);
     }
 

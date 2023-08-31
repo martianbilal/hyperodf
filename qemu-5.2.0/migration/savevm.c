@@ -35,8 +35,6 @@
 #include "migration/misc.h"
 #include "migration/register.h"
 #include "migration/global_state.h"
-#include "qemu/queue.h"
-#include "qemu/typedefs.h"
 #include "ram.h"
 #include "qemu-file-channel.h"
 #include "qemu-file.h"
@@ -49,9 +47,6 @@
 #include "sysemu/cpus.h"
 #include "exec/memory.h"
 #include "exec/target_page.h"
-#include "exec/address-spaces.h"
-#include "exec/ramlist.h"
-
 #include "trace.h"
 #include "qemu/iov.h"
 #include "qemu/main-loop.h"
@@ -67,11 +62,6 @@
 #include "migration/colo.h"
 #include "qemu/bitmap.h"
 #include "net/announce.h"
-#include "util/forkall-coop.h"
-#include <string.h>
-#include <time.h>
-
-// #define DBG
 
 const unsigned int postcopy_ram_discard_version;
 
@@ -154,9 +144,6 @@ static ssize_t block_writev_buffer(void *opaque, struct iovec *iov, int iovcnt,
 static ssize_t block_get_buffer(void *opaque, uint8_t *buf, int64_t pos,
                                 size_t size, Error **errp)
 {
-    #ifdef DBG
-    // printf("%s is called\n", __func__); 
-    #endif
     return bdrv_load_vmstate(opaque, buf, pos, size);
 }
 
@@ -177,9 +164,6 @@ static const QEMUFileOps bdrv_write_ops = {
 
 static QEMUFile *qemu_fopen_bdrv(BlockDriverState *bs, int is_writable)
 {
-    #ifdef DBG
-    printf("%s function is called\n", __func__); 
-    #endif 
     if (is_writable) {
         return qemu_fopen_ops(bs, &bdrv_write_ops);
     }
@@ -891,90 +875,13 @@ void vmstate_unregister(VMStateIf *obj, const VMStateDescription *vmsd,
     }
 }
 
-#ifndef QEMU_FILE
-#define QEMU_FILE
-
-#define IO_BUF_SIZE 32768
-#define MAX_IOV_SIZE MIN_CONST(IOV_MAX, 64)
-struct QEMUFile {
-    const QEMUFileOps *ops;
-    const QEMUFileHooks *hooks;
-    void *opaque;
-
-    int64_t bytes_xfer;
-    int64_t xfer_limit;
-
-    int64_t pos; /* start of buffer when writing, end of buffer
-                    when reading */
-    int buf_index;
-    int buf_size; /* 0 when writing */
-    uint8_t buf[IO_BUF_SIZE];
-
-    DECLARE_BITMAP(may_free, MAX_IOV_SIZE);
-    struct iovec iov[MAX_IOV_SIZE];
-    unsigned int iovcnt;
-
-    int last_error;
-    Error *last_error_obj;
-    /* has the file has been shutdown */
-    bool shutdown;
-};
-#endif
-
-// static void qemu_file_set_buf_index(QEMUFile *f, int index)
-// {
-//     f->buf_index = index;
-// }
-
-// static void qemu_file_set_pos(QEMUFile *f, int64_t pos)
-// {
-//     f->pos = pos;
-// }
-
-
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
 {
-    int ret = 0;
-    // printf("idstr : %s\tpos : %ld\n", se->idstr, f->pos);
-    // if(strcmp("ram", se->idstr) == 0){
-    //     printf("ram load skipping\n");
-    //     qemu_file_set_buf_index(f, 12425);
-    //     qemu_file_set_pos(f, 191837378);
-
-    //     return 0;
-    // }
-
-    // // skip loading the ioapic device
-    // if(strcmp("0000:00:00.0/I440FX", se->idstr) == 0){
-    //     printf("0000:00:00.0/I440FX load skipping\n");
-    //     return 0;
-    // }
-    struct timespec start, end;
-    double time_taken;
-
-    clock_gettime(CLOCK_REALTIME, &start);
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
     if (!se->vmsd) {         /* Old style */
-        // if(strcmp("ram", se->idstr) == 0){
-        //     printf("ram load skipping\n");
-        //     return 0;
-        // }
-
-
-        ret = se->ops->load_state(f, se->opaque, se->load_version_id);
-        // printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
-        clock_gettime(CLOCK_REALTIME, &end);
-        time_taken = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)1000000000L;
-        printf("Time taken to load %s : %lf\n", se->idstr, time_taken);
-        
-        return ret;
+        return se->ops->load_state(f, se->opaque, se->load_version_id);
     }
-    ret = vmstate_load_state(f, se->vmsd, se->opaque, se->load_version_id);
-    // printf("\tbuf_index : %d\tpos: %ld\tret: %d\n", f->buf_index, f->pos, ret);
-    clock_gettime(CLOCK_REALTIME, &end);
-    time_taken = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)1000000000L;
-    printf("Time taken to load %s : %lf\n", se->idstr, time_taken);
-    return ret;
+    return vmstate_load_state(f, se->vmsd, se->opaque, se->load_version_id);
 }
 
 static void vmstate_save_old_style(QEMUFile *f, SaveStateEntry *se, QJSON *vmdesc)
@@ -1316,16 +1223,6 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
 
     trace_savevm_state_iterate();
     QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
-        if(strcmp(se->idstr, "ram") == 0){
-            printf("[skip] ram in savevm_state_iterate\n");
-            continue;
-        }
-        // if(strcmp(se->idstr, "timer") == 0){
-        //     printf("[skip] timer in savevm_state_iterate\n");
-        //     continue;
-        // }
-
-
         if (!se->ops || !se->ops->save_live_iterate) {
             continue;
         }
@@ -1349,11 +1246,6 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
         }
         if (qemu_file_rate_limit(f)) {
             return 0;
-        }
-        printf("Saving %s\n", se->idstr);
-        if(strcmp(se->idstr, "ram") == 0){
-            printf("[skip] ram in savevm_state_iterate\n");
-            continue;
         }
         trace_savevm_section_start(se->idstr, se->section_id);
 
@@ -1444,14 +1336,6 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
                 continue;
             }
         }
-
-        // [important : this is the one taking most amount of time]
-        // [note] [Bilal] this skip brings the time to 70ms
-        printf("[precopy_iter]Saving %s\n", se->idstr);
-        if(strcmp(se->idstr, "ram") == 0){
-            printf("[skip] ram in precopy iter\n");
-            continue;
-        }
         trace_savevm_section_start(se->idstr, se->section_id);
 
         save_section_header(f, se, QEMU_VM_SECTION_END);
@@ -1467,7 +1351,6 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
 
     return 0;
 }
-#define BILLION  1000000000L;
 
 static
 int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
@@ -1478,8 +1361,6 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
     int vmdesc_len;
     SaveStateEntry *se;
     int ret;
-    struct timespec start, end;
-    double time_taken;
 
     vmdesc = qjson_new();
     json_prop_int(vmdesc, "page_size", qemu_target_page_size());
@@ -1493,13 +1374,7 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
             trace_savevm_section_skip(se->idstr, se->section_id);
             continue;
         }
-        // printf("[precopy_noniter]Saving %s\n", se->idstr);
-        // if(strcmp(se->idstr, "ram") != 0 && strcmp(se->idstr, "cpu") != 0) {
-        //     printf("[SKIP]%s skipped\n", se->idstr);
-        //     continue;
-        // }
-        // measure the time taken using the clock_gettime()
-        clock_gettime(CLOCK_REALTIME, &start);
+
         trace_savevm_section_start(se->idstr, se->section_id);
 
         json_start_object(vmdesc, NULL);
@@ -1516,9 +1391,6 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
         save_section_footer(f, se);
 
         json_end_object(vmdesc);
-        clock_gettime(CLOCK_REALTIME, &end);
-        time_taken = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)BILLION;
-        printf("[precopy_noniter]Saving %s took %f seconds\n", se->idstr, time_taken);
     }
 
     if (inactivate_disks) {
@@ -2865,11 +2737,6 @@ int save_snapshot(const char *name, Error **errp)
     struct tm tm;
     AioContext *aio_context;
 
-
-    #ifdef DBG
-    printf("save_snapshot is called!\n");
-    #endif
-
     if (migration_is_blocked(errp)) {
         return ret;
     }
@@ -2911,7 +2778,6 @@ int save_snapshot(const char *name, Error **errp)
         return ret;
     }
     vm_stop(RUN_STATE_SAVE_VM);
-
 
     bdrv_drain_all_begin();
 
@@ -3072,23 +2938,6 @@ void qmp_xen_load_devices_state(const char *filename, Error **errp)
     }
     migration_incoming_state_destroy();
 }
-#define KiB (1024ULL)
-static void print_memory_region_tree(MemoryRegion *mr, int depth) {
-    printf("%*s%s (%s) size=%" PRId64 "KB addr=0x%" PRIx64 "\n", 
-            depth * 2, " ", mr->name, mr->ram_block ? "ROM" : "RAM",
-            mr->size / KiB, mr->addr);
-
-    MemoryRegion *sub_mr;
-    QTAILQ_FOREACH(sub_mr, &mr->subregions, subregions_link) {
-        print_memory_region_tree(sub_mr, depth + 1);
-    }
-}
-
-void kick_all(void){
-    printf("kick_all is called \n");
-    cpu_kick_all();
-    return;
-}
 
 int load_snapshot(const char *name, Error **errp)
 {
@@ -3098,12 +2947,6 @@ int load_snapshot(const char *name, Error **errp)
     int ret;
     AioContext *aio_context;
     MigrationIncomingState *mis = migration_incoming_get_current();
-   
-    #ifdef DBG
-    printf("load_snapshot is called \n");
-    #endif
-    printf("load_snapshot is called \n");
-
 
     if (!bdrv_all_can_snapshot(&bs)) {
         error_setg(errp,
@@ -3111,7 +2954,6 @@ int load_snapshot(const char *name, Error **errp)
                    bdrv_get_device_or_node_name(bs));
         return -ENOTSUP;
     }
-    printf("Finding the snapshot...\n");
     ret = bdrv_all_find_snapshot(name, &bs);
     if (ret < 0) {
         error_setg(errp,
@@ -3120,17 +2962,12 @@ int load_snapshot(const char *name, Error **errp)
         return ret;
     }
 
-    printf("Finding VM State ... \n");
-
     bs_vm_state = bdrv_all_find_vmstate_bs();
-    printf("pre aio progress... \n");
     if (!bs_vm_state) {
         error_setg(errp, "No block device supports snapshots");
         return -ENOTSUP;
     }
-    printf("aio progress...\n");
     aio_context = bdrv_get_aio_context(bs_vm_state);
-    printf("progress...\n");
 
     /* Don't even try to load empty VM states */
     aio_context_acquire(aio_context);
@@ -3168,28 +3005,11 @@ int load_snapshot(const char *name, Error **errp)
         goto err_drain;
     }
 
-    // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+    qemu_system_reset(SHUTDOWN_CAUSE_NONE);
     mis->from_src_file = f;
 
     aio_context_acquire(aio_context);
-    // print_memory_region_tree(address_space_memory.root, 0);
-    // print_memory_region_tree(address_space_io.root, 0);
-    // mtree_info(true, true, true, false);
-    // ram_block_dump_hyperodf();
     ret = qemu_loadvm_state(f);
-    // mtree_info(true, true, true, false);
-    // ram_block_dump_hyperodf();
-    // print_memory_region_tree(address_space_memory.root, 0);
-    // print_memory_region_tree(address_space_io.root, 0);
-    // SaveStateEntry *se;
-    // QTAILQ_FOREACH(se, &savevm_state.handlers, entry){
-    //     if(se->vmsd){
-    //         if(se->vmsd->post_load){
-    //             se->vmsd->post_load(f, se->version_id);
-    //         }
-    //     }
-    // }
-
     migration_incoming_state_destroy();
     aio_context_release(aio_context);
 
@@ -3199,7 +3019,6 @@ int load_snapshot(const char *name, Error **errp)
         error_setg(errp, "Error %d while loading VM state", ret);
         return ret;
     }
-    printf("progress...\n");
 
     return 0;
 

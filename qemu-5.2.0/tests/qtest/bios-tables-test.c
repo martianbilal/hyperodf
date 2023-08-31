@@ -1246,7 +1246,6 @@ int main(int argc, char *argv[])
     int ret;
 
     g_test_init(&argc, &argv, NULL);
-    return g_test_run();
 
     if (strcmp(arch, "i386") == 0 || strcmp(arch, "x86_64") == 0) {
         ret = boot_sector_init(disk);

@@ -324,7 +324,6 @@ int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
 
-    return g_test_run();
     qtest_add_func("device/introspect/list", test_device_intro_list);
     qtest_add_func("device/introspect/list-fields", test_qom_list_fields);
     qtest_add_func("device/introspect/none", test_device_intro_none);

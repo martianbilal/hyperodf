@@ -33,8 +33,6 @@
 #define IO_BUF_SIZE 32768
 #define MAX_IOV_SIZE MIN_CONST(IOV_MAX, 64)
 
-#ifndef QEMU_FILE
-#define QEMU_FILE
 struct QEMUFile {
     const QEMUFileOps *ops;
     const QEMUFileHooks *hooks;
@@ -58,7 +56,7 @@ struct QEMUFile {
     /* has the file has been shutdown */
     bool shutdown;
 };
-#endif
+
 /*
  * Stop a file from being read/written - not all backing files can do this
  * typically only sockets can.

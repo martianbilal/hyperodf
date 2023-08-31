@@ -4,7 +4,6 @@
 #include "qemu/processor.h"
 #include "qemu/atomic.h"
 
-
 typedef struct QemuCond QemuCond;
 typedef struct QemuSemaphore QemuSemaphore;
 typedef struct QemuEvent QemuEvent;
@@ -22,8 +21,6 @@ typedef struct QemuThread QemuThread;
 
 #define QEMU_THREAD_JOINABLE 0
 #define QEMU_THREAD_DETACHED 1
-
-#define USE_HYPERODF 1
 
 void qemu_mutex_init(QemuMutex *mutex);
 void qemu_mutex_destroy(QemuMutex *mutex);

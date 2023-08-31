@@ -78,23 +78,16 @@
 #include "migration/colo.h"
 #include "migration/postcopy-ram.h"
 #include "sysemu/kvm.h"
-#include "sysemu/kvm_int.h"
-#include "../accel/kvm/kvm-cpus.h"
 #include "sysemu/hax.h"
 #include "qapi/qobject-input-visitor.h"
 #include "qemu/option.h"
 #include "qemu/config-file.h"
 #include "qemu-options.h"
 #include "qemu/main-loop.h"
-#include "util/hodf-util.h"
-#include <stdbool.h>
 #ifdef CONFIG_VIRTFS
 #include "fsdev/qemu-fsdev.h"
 #endif
 #include "sysemu/qtest.h"
-
-#include "block/snapshot.h"
-#include "block/block_int.h"
 
 #include "disas/disas.h"
 
@@ -121,17 +114,9 @@
 #include "qapi/qmp/qerror.h"
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
-#include "block/qcow2.h"
-#include <signal.h>
-#include "util/forkall-coop.h"
-#include "util/hodf-util.h"
 
 #define MAX_VIRTIO_CONSOLES 1
-// #define DBG
-// #define DBG_CMP_DRIVE_SNAPSHOT
-#define SET_VCPU_IN_MAIN
 
-static const char *SNAPSHOT_DISK_NAME = "prefork_state";
 static const char *data_dir[16];
 static int data_dir_idx;
 const char *bios_name = NULL;
@@ -208,11 +193,6 @@ static int default_cdrom = 1;
 static int default_sdcard = 1;
 static int default_vga = 1;
 static int default_net = 1;
-
-static int ARGC; 
-static char **ENVP; 
-static char **ARGV;
-static MachineClass *MACHINECLASS;
 
 static struct {
     const char *driver;
@@ -673,71 +653,6 @@ static const RunStateTransition runstate_transitions_def[] = {
     { RUN_STATE__MAX, RUN_STATE__MAX },
 };
 
-
-#define KVM_MSI_HASHTAB_SIZE    256
-
-struct KVMParkedVcpu {
-    unsigned long vcpu_id;
-    int kvm_fd;
-    QLIST_ENTRY(KVMParkedVcpu) node;
-};
-
-struct KVMState
-{
-    AccelState parent_obj;
-
-    int nr_slots;
-    int fd;
-    int vmfd;
-    int coalesced_mmio;
-    int coalesced_pio;
-    struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
-    bool coalesced_flush_in_progress;
-    int vcpu_events;
-    int robust_singlestep;
-    int debugregs;
-#ifdef KVM_CAP_SET_GUEST_DEBUG
-    QTAILQ_HEAD(, kvm_sw_breakpoint) kvm_sw_breakpoints;
-#endif
-    int max_nested_state_len;
-    int many_ioeventfds;
-    int intx_set_mask;
-    int kvm_shadow_mem;
-    bool kernel_irqchip_allowed;
-    bool kernel_irqchip_required;
-    OnOffAuto kernel_irqchip_split;
-    bool sync_mmu;
-    uint64_t manual_dirty_log_protect;
-    /* The man page (and posix) say ioctl numbers are signed int, but
-     * they're not.  Linux, glibc and *BSD all treat ioctl numbers as
-     * unsigned, and treating them as signed here can break things */
-    unsigned irq_set_ioctl;
-    unsigned int sigmask_len;
-    GHashTable *gsimap;
-#ifdef KVM_CAP_IRQ_ROUTING
-    struct kvm_irq_routing *irq_routes;
-    int nr_allocated_irq_routes;
-    unsigned long *used_gsi_bitmap;
-    unsigned int gsi_count;
-    QTAILQ_HEAD(, KVMMSIRoute) msi_hashtab[KVM_MSI_HASHTAB_SIZE];
-#endif
-    KVMMemoryListener memory_listener;
-    QLIST_HEAD(, KVMParkedVcpu) kvm_parked_vcpus;
-
-    /* memory encryption */
-    void *memcrypt_handle;
-    int (*memcrypt_encrypt_data)(void *handle, uint8_t *ptr, uint64_t len);
-
-    /* For "info mtree -f" to tell if an MR is registered in KVM */
-    int nr_as;
-    struct KVMAs {
-        KVMMemoryListener *ml;
-        AddressSpace *as;
-    } *as;
-};
-
-
-
 static bool runstate_valid_transitions[RUN_STATE__MAX][RUN_STATE__MAX];
 
 bool runstate_check(RunState state)
@@ -1083,7 +998,7 @@ static int cleanup_add_fd(void *opaque, QemuOpts *opts, Error **errp)
 static int drive_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     BlockInterfaceType *block_default_type = opaque;
-    printf("drive init called :: type: %d \n", *(int *)opaque);
+
     return drive_new(opts, *block_default_type, errp) == NULL;
 }
 
@@ -1123,13 +1038,9 @@ typedef struct BlockdevOptionsQueueEntry {
 
 typedef QSIMPLEQ_HEAD(, BlockdevOptionsQueueEntry) BlockdevOptionsQueue;
 
-static BlockdevOptionsQueue BDO_Q;
-static MachineClass *MACHINECLASS;
-
 static void configure_blockdev(BlockdevOptionsQueue *bdo_queue,
                                MachineClass *machine_class, int snapshot)
 {
-    MACHINECLASS = machine_class;
     /*
      * If the currently selected machine wishes to override the
      * units-per-bus property of its default HBA interface type, do so
@@ -1749,7 +1660,6 @@ static bool main_loop_should_exit(void)
     if (qemu_powerdown_requested()) {
         qemu_system_powerdown();
     }
-    // if (qemu_vmstop_requested(&r) && !save_snapshot_event) {
     if (qemu_vmstop_requested(&r)) {
         vm_stop(r);
     }
@@ -1759,10 +1669,9 @@ static bool main_loop_should_exit(void)
 void qemu_main_loop(void)
 {
 #ifdef CONFIG_PROFILER
-    int64_t ti;1
+    int64_t ti;
 #endif
     while (!main_loop_should_exit()) {
-    // while (true) {
 #ifdef CONFIG_PROFILER
         ti = profile_getclock();
 #endif
@@ -1914,10 +1823,6 @@ static void select_vgahw(const MachineClass *machine_class, const char *p)
         exit(0);
     }
 
-    // #ifdef DBG
-    // printf("[debug] vga_interface_type : %d", vga_interface_type);
-    // #endif
-    vga_interface_type = VGA_NONE; 
     assert(vga_interface_type == VGA_NONE);
     for (t = 0; t < VGA_TYPE_MAX; t++) {
         const VGAInterfaceInfo *ti = &vga_interfaces[t];
@@ -2209,36 +2114,13 @@ static int device_init_func(void *opaque, QemuOpts *opts, Error **errp)
 static int chardev_init_func(void *opaque, QemuOpts *opts, Error **errp)
 {
     Error *local_err = NULL;
-    DEBUG_PRINT("chardev_init_func printing opts : \n");
-    // qemu_opts_print(opts, "\n\t");
+
     if (!qemu_chr_new_from_opts(opts, NULL, &local_err)) {
         if (local_err) {
             error_propagate(errp, local_err);
             return -1;
         }
         exit(0);
-    }
-    return 0;
-}
-
-#ifndef QEMU_OPTION_INT_H
-struct QemuOpts {
-    char *id;
-    QemuOptsList *list;
-    Location loc;
-    QTAILQ_HEAD(, QemuOpt) head;
-    QTAILQ_ENTRY(QemuOpts) next;
-};
-#endif
-
-static int chardev_pre_init_func(void *opaque, QemuOpts *opts, Error **errp)
-{
-    DEBUG_PRINT("chardev_pre_init_func \n");
-
-    if(strcmp("compat_monitor1", opts->id) == 0){
-        DEBUG_PRINT("chardev_pre_init_func calling the actual func\n");
-        // qemu_opts_print(opts, "\n\t");
-        return chardev_init_func(opaque, opts, errp);
     }
     return 0;
 }
@@ -2255,19 +2137,6 @@ static int mon_init_func(void *opaque, QemuOpts *opts, Error **errp)
     return monitor_init_opts(opts, errp);
 }
 
-
-
-static int mon_pre_init_func(void *opaque, QemuOpts *opts, Error **errp)
-{   
-    // compare opts->id to compat_monitor0
-    if(strcmp(opts->id, "compat_monitor0") == 0)
-    {
-        DEBUG_PRINT("mon_pre_init_func\n");
-        return 0;
-    }
-    return mon_init_func(opaque, opts, errp);
-}
-
 static void monitor_parse(const char *optarg, const char *mode, bool pretty)
 {
     static int monitor_device_index = 0;
@@ -2275,16 +2144,12 @@ static void monitor_parse(const char *optarg, const char *mode, bool pretty)
     const char *p;
     char label[32];
 
-    DEBUG_PRINT("optsarg: %s  |  mode : %s\n", optarg, mode);
-
     if (strstart(optarg, "chardev:", &p)) {
         snprintf(label, sizeof(label), "%s", p);
     } else {
-        DEBUG_PRINT("monitor_device_index: %d\n", monitor_device_index);
         snprintf(label, sizeof(label), "compat_monitor%d",
                  monitor_device_index);
         opts = qemu_chr_parse_compat(label, optarg, true);
-        DEBUG_PRINT("label : %s\n", label);
         if (!opts) {
             error_report("parse error: %s", optarg);
             exit(1);
@@ -2328,17 +2193,6 @@ static void add_device_config(int type, const char *cmdline)
     conf->cmdline = cmdline;
     loc_save(&conf->loc);
     QTAILQ_INSERT_TAIL(&device_configs, conf, next);
-}
-
-static void change_gdb_device_config(){
-    struct device_config *conf; 
-    QTAILQ_FOREACH(conf, &device_configs, next){
-        if(conf->type == DEV_GDB){
-            conf->cmdline = "tcp::4444";
-        }
-    }
-    return 0;
-
 }
 
 static int foreach_device_config(int type, int (*func)(const char *cmdline))
@@ -3009,1063 +2863,6 @@ static char *find_datadir(void)
     return get_relocated_path(CONFIG_QEMU_DATADIR);
 }
 
-
-
-/**
- * @brief Saves the vcpu state of the KVM vcpu identified by vcpufd 
- * in state. 
- * 
- * Return -1 failure and 0 on success. 
- * 
- * @param state 
- * @param vcpufd 
- * @return ** int 
- */
-// int cpu_get_pre_fork_state(struct cpu_prefork_state *state, int vcpufd) 
-// { 
-
-//     int ret = 0; 
-    
-//     struct kvm_regs regs; 
-//     struct kvm_sregs sregs;
-//     struct kvm_cpuid2 cpuid2;
-//     struct kvm_msrs msrs;  
-//     struct kvm_xsave xsave;
-//     struct kvm_xcrs xcrs; 
-//     struct kvm_mp_state mp_state;
-//     struct kvm_vcpu_events vcpu_events;
-//     struct kvm_fpu fpu; 
-//     struct kvm_irqchip irqchip[3];
-
-//     int tsc_khz;
-    
-//     char *attr = "";
-    
-//     // for(int i = 0; i < num_of_get_ioctls; i++)
-//     // {
-//     //     get_attr(get_ioctls[i], vcpufd, get_struct[i]);
-//     // }
-
-//     // get_attr(KVM_GET_REGS, vcpufd, regs);
-//     // get_attr(KVM_GET_SREGS, vcpufd, sregs);
-
-    
-
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_REGS, &regs);
-//     } while (ret == -EINTR);
-//     attr = "regs";
-//     if(ret < 0) goto err;
-//     state->regs = regs;
-        
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_SREGS, &sregs);
-//     } while (ret == -EINTR);
-//     attr = "sregs";
-//     if(ret < 0) goto err;
-//     state->sregs = sregs;
-
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_FPU, &fpu);
-//     } while (ret == -EINTR);
-//     attr = "fpu";
-//     if(ret < 0) goto err;
-//     state->fpu = fpu;
-
-//     // uncomment this code if we need to set the cpuid later on
-//     // TODO: Set up the cpuid2 properly 
-//     // do
-//     // {
-//     //     ret = ioctl(vcpufd, KVM_GET_CPUID2, &cpuid2);
-//     // } while (ret == -EINTR);
-//     // attr = "cpuid2";
-//     // if(ret < 0) goto err;
-//     // state->cpuid2 = cpuid2;
-
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_MSRS, &msrs);
-//     } while (ret == -EINTR);
-//     attr = "msrs";
-//     if(ret < 0) goto err;
-//     state->msrs = msrs;
-
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_TSC_KHZ, &tsc_khz);
-//     } while (ret == -EINTR);
-//     attr = "tsc_khz";
-//     if(ret < 0) goto err;
-//     state->tsc_khz = tsc_khz;
-
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_XSAVE, &xsave);
-//     } while (ret == -EINTR);
-//     attr = "xsave";
-//     if(ret < 0) goto err;
-//     state->xsave = xsave;
-
-
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_XCRS, &xcrs);
-//     } while (ret == -EINTR);
-//     attr = "xcrs";
-//     if(ret < 0) goto err;
-//     state->xcrs = xcrs;
-    
-//     do
-//     {
-//         ret = ioctl(vcpufd, KVM_GET_MP_STATE, &mp_state);
-//     } while (ret == -EINTR);
-//     attr = "mp_state";
-//     if(ret < 0) goto err;
-//     state->mp_state = mp_state;
-
-
-//     memset(&vcpu_events, 0, sizeof(vcpu_events));
-//     ret = ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &vcpu_events);
-//     attr = "vcpu_events";
-//     if(ret < 0) goto err;
-//     state->vcpu_events = vcpu_events;
-
-
-
-
-//         //for more complex ioctls 
-//         //TODO: write this function
-//         // kvm_ioctl_get_state(int ioctl_id, int vcpufd, void* input_args);
-
-//         // kvm_set_state(void *input_args);
-
-//         //In case attribute's state can not be retrieved from KVM 
-//         //this function gets state from the CPUState or KVMState
-//         // kvm_cpu_get_state(void* input_args);
-
-//     return ret; 
-
-
-// err: 
-//     printf("Failed to get attributes for %s, returned with reason: %d", attr, ret);
-//     perror("FAILED TO GET VCPU ATTRIBUTES");
-//     return -1;
-
-// }
-
-int read_cpu_state(CPUState *cpu, char *filename){
-    FILE *infile; 
-    infile = fopen(filename, "r");
-    if (infile == NULL)
-	{
-		fprintf(stderr, "\nError opening CPU dump file\n");
-		exit (1);
-	}
-
-    fread(cpu, sizeof(CPUState), 1, infile);
-    
-    if(fwrite != 0)
-		printf("[log] loaded cpu content from %s!\n", filename);
-	else
-		printf("[log] failed to load cpu from %s!\n", filename);
-
-	// close file
-	fclose (infile);
-    return 0;
-}
-
-int dump_cpu_state(CPUState *cpu, char *filename){
-    FILE *outfile; 
-    outfile = fopen(filename, "w");
-    if (outfile == NULL)
-	{
-		fprintf(stderr, "\nError opening CPU dump file\n");
-		exit (1);
-	}
-
-    fwrite (cpu, sizeof(CPUState), 1, outfile);
-    
-    if(fwrite != 0)
-		printf("[log] dumped cpu content to %s!\n", filename);
-	else
-		printf("[log] failed cpu dump to %s!\n", filename);
-
-	// close file
-	fclose (outfile);
-
-	return 0;
-
-}
-
-/**
- * @brief VCPU Thread init function fails if some of the CPUState fields 
- * have already been set, this functions handles resetting those fields. 
- * It is mainly for use in the handle_fork in the child process. 
- * 
- * @param cpu 
- * @return ** void 
- */
-static void cpu_reset_state(CPUState *cpu){
-    
-    return; 
-}
-
-
-/**
- * @brief 
- * 
- * @param cpu 
- * @param state 
- * @return ** int 
- */
-int fork_set_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
-    int ret; 
-    struct KVMState *s = cpu->kvm_state; 
-    struct kvm_run *run;
-	struct kvm_pit_config pit_config = { .flags = 0, };
-    int identity_base = 0xfeffc000;
-    int mmap_size; 
-
-
-    cpu->kvm_fd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
-    
-    
-    //set up the kvm_run for the vcpu --> update it in the vmstate
-    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
-    if (mmap_size < 0) {
-        ret = mmap_size;
-        return -1;
-    }
-    // runstate_set(RUN_STATE_RUNNING);
-    // qemu_notify_event();
-    run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        cpu->kvm_fd, 0);
-    // memcpy(cpu->kvm_run, run, sizeof(run)); 
-    cpu->old_kvm_run = cpu->kvm_run;
-    cpu->kvm_run = run;
-    
-    #ifdef DBG
-    printf("[debug] setting vm state\n");
-    #endif
-    /**
-     * @brief set KVM VM state using ioctls 
-     * Also create chips, etc as necessary 
-     */
-    state->clock_data.flags = 0;
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_SET_CLOCK, &(state->clock_data));
-    } while (ret == -EINTR);
-    if(ret < 0) goto end_loop;
-
-
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_CREATE_PIT2, &pit_config);
-    } while (ret == -EINTR);
-    if(ret < 0) goto end_loop;
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_SET_PIT2, &(state->pit2));
-    } while (ret == -EINTR);
-    if(ret < 0) printf("KVM_SET_PIT2 failed");
-
-    //creating irqchip for new VM
-    // kvm_irqchip_create(s);
-
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_CREATE_IRQCHIP);
-    } while (ret == -EINTR);
-    if(ret < 0) goto end_loop;
-    
-
-    //setting irqchips for the new VM
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &(state->irqchip[0]));
-    } while (ret == -EINTR);
-    if(ret < 0) printf("master failed");
-    
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &(state->irqchip[1]));
-    } while (ret == -EINTR);
-    if(ret < 0) printf("slave failed ");
-
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &(state->irqchip[2]));
-    } while (ret == -EINTR);
-    if(ret < 0) printf("3 failed ");
-    
-    do 
-    {
-        ret = ioctl(s->vmfd, KVM_SET_IDENTITY_MAP_ADDR, &identity_base);
-    } while (ret == -EINTR);
-    
-    do 
-    {
-        ret = ioctl(s->vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
-    } while (ret == -EINTR);
-    
-
-    #ifdef SET_VCPU_IN_MAIN            
-
-    ret = kvm_set_vcpu_attrs(cpu, state, cpu->kvm_fd);
-
-    #ifdef DBG 
-    printf("[debug] done with set attrs");
-    // fflush(stdout);
-    #endif 
-
-    // cpu_synchronize_all_post_init();
-    #endif    
-    
-    ret = 0; 
-end_loop: 
-    return ret; 
-}
-
-/**
- * @brief saves the vm and vcpu state of the KVM 
- * VM and VCPU identified by identifiers in 
- * cpu->kvm_state->vmfd and vcpufd respectively in state
- * 
- * @param cpu 
- * @param state 
- * @return ** int 
- */
-int fork_save_vm_state(CPUState *cpu, struct cpu_prefork_state *state){
-    struct KVMSlot slot;
-    struct KVMState *s = cpu->kvm_state;
-    struct kvm_run *run = cpu->kvm_run;
-    struct kvm_userspace_memory_region mem; 
-    struct fork_info info;
-    struct kvm_clock_data clock_data;
-    struct kvm_irqchip irqchip[3];
-    struct kvm_pit_state2 pit2; 
-    int ret;        
-    int slot_size;     
-                      
-    //fork here 
-    //
-    //get the locks being used by the rest of the threads 
-    //magic number
-    // should_fork = 'a';
-    // cpu->nr_fork_vms = 1;
-    // do {
-    //     ret = write(cpu->fork_event.wfd, &should_fork, sizeof(should_fork));
-    // } while (ret < 0 && errno == EINTR);
-    // printf("result for write : %d\n", result);
-    //complete the I/O before copying state
-    ret = 0; 
-    // continue;
-    // vcpu_complete_io(cpu);
-
-    #ifdef DBG
-        printf("[debug] starting the fork vm state! \n");
-        fflush(stdout);
-    #endif 
-
-    //get the values of the attributes before the fork
-    cpu_get_pre_fork_state(cpu, state, cpu->kvm_fd);
-    #ifdef DBG
-        printf("[debug] Done with getting cpu state! \n");
-        fflush(stdout);
-    #endif 
-    // slot_size = cpu->kvm_state->nr_slots;
-    // //set up the shared memory for the child vm 
-    // /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
-    // for(int i = 0; i < slot_size; i++){
-        // slot = cpu->kvm_state->memory_listener.slots[i]; 
-        // if(slot.memory_size == 0){
-        //     continue;
-        // }
-        // mprotect(slot.ram, slot.memory_size, PROT_READ | PROT_WRITE);
-            // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
-            //  | (kvm_state->memory_listener.as_id << 16)
-        // mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
-        // mem.guest_phys_addr = 0;
-        // mem.userspace_addr = 0;
-        // mem.flags = 0;
-        // mem.memory_size = 0;
-
-        // ret = ioctl(cpu->kvm_state->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
-        // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
-        //             mem.memory_size, mem.userspace_addr, ret);
-    // }
-
-    //printing a value from the first slot before fork 
-
-    // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
-    
-    #ifdef DBG
-    printf("Parent PID : %ld\n", (long)getpid());
-    #endif
-    // fflush(stdout);
-    
-    // do
-    // {
-    //     ret = ioctl(s->vmfd, KVM_GET_TSC_KHZ, 0);
-    // } while (ret == -EINTR);
-    // if(ret < 0) 
-    // {
-    //     perror("master failed");
-    // }
-    // state->tsc_khz = ret; 
-
-    do
-    {
-        #ifdef DBG
-        printf("[debug] kvm_get_clock` \n");
-        fflush(stdout);
-        #endif
-        ret = ioctl(s->vmfd, KVM_GET_CLOCK, &(state->clock_data));
-    } while (ret == -EINTR);
-    if(ret < 0) 
-    {
-        perror("master failed");
-    }
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_GET_PIT2, &(state->pit2));
-    } while (ret == -EINTR);
-    if(ret < 0) 
-    {
-        perror("master failed");
-    } 
-
-    state->irqchip[0].chip_id = KVM_IRQCHIP_PIC_MASTER;
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &(state->irqchip[0]));
-    } while (ret == -EINTR);
-    if(ret < 0) 
-    {
-        fflush(stdout);
-        perror("master failed");
-    }  
-    
-    state->irqchip[1].chip_id = KVM_IRQCHIP_PIC_SLAVE;
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &(state->irqchip[1]));
-    } while (ret == -EINTR);
-    if(ret < 0) printf("slave failed ");
-    #ifdef DBG
-        printf("[debug] protected the memory! \n");
-        fflush(stdout);
-    #endif
-    state->irqchip[2].chip_id = KVM_IRQCHIP_IOAPIC;
-    do
-    {
-        ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &(state->irqchip[2]));
-    } while (ret == -EINTR);
-    if(ret < 0) printf("ioapic failed ");         
-    
-    #ifdef DBG
-        printf("[debug] saved vm state \n");
-        // fflush(stdout);
-    #endif
-
-
-    return ret; 
-}
-
-static void setup_parent_snapshot_drive(Error **errp){
-    
-    return; 
-}
-
-static void setup_worker_thread(Error **errp){
-    BlockDriverState *bs; 
-    BdrvNextIterator it; 
-    QCow2OpenCo qoc;
-    // char file[1024] = "./snapshot.qcow2";
-    
-    // bdrv_drain_all_begin();
-    
-    for (bs = bdrv_first(&it); bs; bs = bdrv_next(&it)) {
-        // bs->filename = file;
-        qoc.bs = bs;
-        qoc.options = bs->options; 
-        // AioContext *ctx = bdrv_get_aio_context(bs);
-
-        assert(qemu_get_current_aio_context() == qemu_get_aio_context());
-        qemu_coroutine_enter(qemu_coroutine_create(qcow2_open_entry, &qoc));
-        BDRV_POLL_WHILE(bs, qoc.ret == -EINPROGRESS);
-        // if (bdrv_all_snapshots_includes_bs(bs)) {
-        //     ret = bdrv_snapshot_goto(bs, name, errp);
-        // }
-        // blockdev_init("./snapshot.qcow2", bs->options, NULL);
-        // aio_context_release(ctx);
-        // if (ret < 0) {
-        //     bdrv_next_cleanup(&it);
-        //     goto err_drain;
-        // }
-    }
-
-
-    // bdrv_drain_all_end();
-
-
-}
-
-void setup_child_snapshot_drive(Error **errp){
-    BlockDriverState *bs, *bs_vm_state;
-    char *name = SNAPSHOT_DISK_NAME;
-    BdrvNextIterator it;
-    int ret = 0;
-    if (!bdrv_all_can_snapshot(&bs)) {
-        error_setg(errp,
-                   "Device '%s' is writable but does not support snapshots",
-                   bdrv_get_device_or_node_name(bs));
-        return -ENOTSUP;
-    }
-    
-    replay_flush_events();
-
-    /* Flush all IO requests so they don't interfere with the new state.  */
-    // bdrv_drain_all_begin();
-
-    // ret = bdrv_all_goto_snapshot(name, &bs, errp);
-    
-    for (bs = bdrv_first(&it); bs; bs = bdrv_next(&it)) {
-        // AioContext *ctx = bdrv_get_aio_context(bs);
-
-        // aio_context_acquire(ctx);
-        // if (bdrv_all_snapshots_includes_bs(bs)) {
-        //     ret = bdrv_snapshot_goto(bs, name, errp);
-        // }
-        blockdev_init("./snapshot.qcow2", bs->options, NULL);
-        // aio_context_release(ctx);
-        if (ret < 0) {
-            bdrv_next_cleanup(&it);
-            goto err_drain;
-        }
-    }
-
-
-    
-    if (ret < 0) {
-        error_prepend(errp, "Could not load snapshot '%s' on '%s': ",
-                      name, bdrv_get_device_or_node_name(bs));
-        goto err_drain;
-    }
-    // bdrv_drain_all_end();
-    return 0; 
-err_drain: 
-    return ret;
-
-}
-
-static void qemu_pre_save_snapshot_cleanup(void){
-    return;
-}
-
-
-static void qemu_pre_load_snapshot_setup(void){
-    return;
-}
-#define BILLION  1000000000L;
-static int save_snapshot_now = 1;
-
-void handle_save_snapshot(void *opaque){
-    CPUState *cpu = (CPUState*)opaque; 
-    struct KVMState* s = cpu->kvm_state;
-    int result; 
-    struct timespec start, stop;
-    double accum;
-
-    // if(save_snapshot_now != 1){
-    //     return;
-    // } else {
-    //     save_snapshot_now = 0;
-    // }
-    printf("[Debug] handle_save_snapshot is called! \n");
-    if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
-    {
-        perror( "clock gettime" );
-        return EXIT_FAILURE;
-    }
-
-    result = event_notifier_test_and_clear(&(cpu->save_event));
-    if(result == 1 ) {
-        printf("[Debug] Save_snapshot event;\n");
-        int ret = save_snapshot("newtest", NULL);
-        if(ret == 0){
-            entering_after_save_snap = 1;
-            if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
-            {
-                perror( "clock gettime" );
-                return EXIT_FAILURE;
-            }
-            accum = ( stop.tv_sec - start.tv_sec )
-                + (double)( stop.tv_nsec - start.tv_nsec )
-                / (double)BILLION;
-            printf( "save_snapshot took %.5lf seconds\n", accum );
-            fflush(stdout);
-
-            vm_start();
-        } else {
-            printf("Failed to save snapshot returned: %d\n", ret);
-        }
-    }
-}
-
-
-
-// static void update_hostfwd(){
-//     getSlirpState();
-//     return;
-// }
-
-struct odf_info{
-	int parent_vcpu_fd;
-	int child_vcpu_fd;
-	int mem_size;
-};
-
-void handle_load_snapshot(void *opaque){
-    CPUState *cpu = (CPUState*)opaque; 
-    struct KVMState* s = cpu->kvm_state;
-    int result; 
-    struct timespec start, stop;
-    struct odf_info o_info;
-    double accum;
-
-
-    // create the o_info
-    o_info.child_vcpu_fd = cpu->kvm_fd;
-	o_info.parent_vcpu_fd = PARENT_VCPU_FD;
-	
-    // TODO : put the right memory size
-    // as seen in kvm_set_mem or something
-    o_info.mem_size = 0x200000;
-	printf("PID of the process : %d\n", getpid());
-    #define KVM_EPT_ODF 0xC00CAEC7
-    
-
-    printf("[Debug] handle_load_snapshot is called! \n");
-    if( clock_gettime( CLOCK_REALTIME, &start) == -1 )
-    {
-        perror( "clock gettime" );
-        return EXIT_FAILURE;
-    }
-
-    // vm_stop(RUN_STATE_RESTORE_VM);
-    result = event_notifier_test_and_clear(&(cpu->load_event));
-    if(result == 1 ) {
-        printf("[Debug] Load_snapshot event;\n");
-        int ret = load_snapshot("newtest", NULL);
-        if(ret == 0){
-            save_snapshot_event = 0;
-            // make the ioctl to share the TDP table/EPT
-            // ioctl(s->fd, KVM_EPT_ODF, &o_info);
-            // update_hostfwd("tcp:127.0.0.1:10023-:22");
-            vm_start();
-        } else {
-            printf("Failed to load snapshot returned: %d\n", ret);
-        }
-    }
-    if( clock_gettime( CLOCK_REALTIME, &stop) == -1 )
-    {
-        perror( "clock gettime" );
-        return EXIT_FAILURE;
-    }
-    accum = ( stop.tv_sec - start.tv_sec )
-    + (double)( stop.tv_nsec - start.tv_nsec ) / (double)BILLION;
-    printf( "Time spent in the load_snapshot:  %lf\n", accum );
-    return;
-}
-
-
-static void create_mon_socket(void){
-    monitor_parse("unix:qemu-monitor-socket3,server,nowait", "readline", NULL);
-    DEBUG_PRINT("returned from the monitor parse\n");
-    qemu_opts_foreach(qemu_find_opts("chardev"),
-        chardev_pre_init_func, NULL, &error_fatal);
-    DEBUG_PRINT("returned from the chardev pre init func\n");
-    qemu_opts_foreach(qemu_find_opts("mon"),
-                      mon_pre_init_func, NULL, &error_fatal);
-    return;
-}
-
-
-void handle_fork(void *opaque){
-    CPUState *cpu = (CPUState*)opaque; 
-    // CPUState *new_cpu;
-    struct KVMState* s = cpu->kvm_state;
-    struct kvm_userspace_memory_region mem; 
-    struct cpu_prefork_state* prefork_state = g_new0(struct cpu_prefork_state, 1); 
-    struct KVMSlot slot;
-    char buf;
-    int result;
-    int ret;
-    int status;
-    int slot_size; 
-    Error *local_err = NULL;
-    // AioContext *ctx;
-    PARENT_VM_FD = s->vmfd;
-
-
-    // memset(&prefork_state, 0, sizeof(prefork_state));
-    #ifdef DBG
-    printf("We are reading for the fork\n");
-    #endif
-
-    printf("[%s:%d] handling the fork event\n", __func__, __LINE__);
-
-    result = event_notifier_test_and_clear(&(cpu->fork_event));
-
-    #ifdef DBG
-    printf("result for read : %d\n", result);
-    printf("buf :: %c\n", buf);    
-    #endif
-
-    //if the result is 1, we are ready for the fork 
-    if(result == 1){
-         #ifdef DBG_CMP_DRIVE_SNAPSHOT
-        // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-        // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
-        // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-        // load_snapshot("forktest", NULL);
-        // return;
-        #endif
-        // dump_cpu_state(cpu, "pre-fork.dat");
-        // cpu->cpu_ases = NULL;
-        // read_cpu_state(cpu, "pre-fork.dat");
-        // return;
-        #ifdef DBG
-        printf("we can fork the main thread now\n");
-        printf("Saving the snapshot! \n");
-        #endif
-
-        #ifdef DBG
-        set_address_space(1);
-        if (qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()){
-            printf("[debug] This is the main thread!\n");
-        } else {
-            printf("[debug] This is not the main thread");
-        }
-        #endif 
-        
-        assert(qemu_get_current_aio_context() == qemu_get_aio_context() && qemu_mutex_iothread_locked()); 
-        
-        if (migration_is_blocked(NULL)) {
-            return false;
-        }
-
-        if (!replay_can_snapshot()) {
-            return false;
-        }
-
-        // vm_stop(RUN_STATE_SAVE_VM);
-
-        #ifdef DBG
-        printf("[debug] stopped the vm\n");
-        #endif
-        
-        runstate_is_running();
-
-        bdrv_drain_all_begin();
-        // cpu_synchronize_all_states();
-        // cpu_stop_current();
-        // // job_cancel_sync_all();
-        // bdrv_close_all();
-        bdrv_drain_all_end();
-        // if (!bdrv_all_can_snapshot(has_devices, devices, errp)) {
-        //     return false;
-        // }
-
-
-        aio_context_acquire(qemu_get_aio_context());
-        // save_snapshot("prefork_state", NULL);
-        // fork_save_vm_state(cpu, prefork_state);
-        // close(9);
-        // save_kvm_state(cpu); 
-
-
-        
-        #ifdef DBG
-        printf("PID : %ld, Parent PID : %ld", (long)getpid(), (long)getppid());
-        printf("Done with the save snapshot!");
-        #endif  
-        
-        aio_context_release(qemu_get_aio_context());
-        // save_snapshot("prefork_state", NULL);
-        // close("snapshot.qcow2");
-        // sleep(30);
-        // ski_forkall_hypercall_ready();
-        // while(1){
-        //     if(ski_forkall_thread_pool_ready_check()){
-        //         break;
-        //     }
-        // }
-
-        // [Bilal] [Measure] clock time when making the forkall_master call 
-        if( clock_gettime( CLOCK_REALTIME, &(cpu->start_forkall_master)) == -1 ) {
-            perror( "clock gettime" );
-            exit( EXIT_FAILURE );
-        }
-
-        #ifdef DBG_CMP_DRIVE_SNAPSHOT
-        // save_snapshot("ForkTest", NULL);
-        #endif  
-
-        // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
-
-        // kvm_set_old_env(cpu);
-        gdbserver_cleanup();
-        // gdbserver_fork_linux();
-
-        // Bilal : Adding this call to the forkall master for testing
-        ret = ski_forkall_master();
-        // [Bilal] [Measure] clock time on return from forkall master
-        if( clock_gettime( CLOCK_REALTIME, &(cpu->end_forkall_master)) == -1 ) {
-            perror( "clock gettime" );
-            exit( EXIT_FAILURE );
-        }
-        // ret = fork(); 
-        #ifdef DBG
-        printf("[DEBUG] [SKI] ret value : %d\n", ret );
-        fflush(stdout);
-        #endif
-        if (ret < 0){
-            printf("Failed to fork\n");
-        } else if (ret == 0) {
-            // exit(0);
-            // [Bilal] [Measure] clock time on hypercall
-            printf("[DEBUG] load snapshot is called!\n");
-            fflush(stdout);
-            if( clock_gettime( CLOCK_REALTIME, &(cpu->stop_universal)) == -1 ) {
-                perror( "clock gettime" );
-                exit( EXIT_FAILURE );
-            } 
-           
-            
-            #ifdef DBG_CMP_DRIVE_SNAPSHOT
-            // vm_stop(RUN_STATE_RESTORE_VM);
-            
-            qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-            qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
-            qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-            // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-            // qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
-            // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-            printf("[DEBUG] load snapshot is called!\n");
-            fflush(stdout);
-            // load_snapshot("forktest", NULL);
-            #endif
-        
-            // sleep(30);
-            /*child process*/
-            // TODO : Create a new KVM VM and VCPU and
-            // update bookkeeping 
-            // 1. close the previous kvm related FDs 
-            // 2. save the prefork VM and VCPU state
-            // 3. open the new kvm fds 
-            // 4. set them up using the prefork status
-            // 5. let the QEMU main loop run for the new VM
-            //close kvm fds 
-            // return;
-            // close(cpu->kvm_fd);
-            // close(s->fd);
-            // close(s->vmfd);
-            // #ifdef DBG 
-            //     printf("[debug] creating child VM \n"); 
-            // #endif
-            // // raise(SIGSTOP);
-            // //open the new kvm fds
-            // s->fd = open("/dev/kvm", 2); 
-            // s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
-            // if (s->vmfd < 0) {
-            // fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
-            //     strerror(-ret));
-            // }
-
-            // if (s->fd < 0) {
-            //     fprintf(stderr, "ioctl(DEV KVM) failed: %d %s\n", -ret,
-            //     strerror(-ret));
-            // }
-            // // new_cpu->kvm_fd = cpu->kvm_fd;
-            // // new_cpu->kvm_state->fd = cpu->kvm_state->fd;
-            // // new_cpu->kvm_state->vmfd = cpu->kvm_state->vmfd;
-            
-            // slot_size = cpu->kvm_state->nr_slots;
-            // //set up the shared memory for the child vm 
-            // /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
-            // #ifdef DBG 
-            //     printf("[debug] setting mem \n"); 
-            // #endif
-            // for(int j = 0; j < cpu->kvm_state->nr_as; j++){
-            //     for(int i = 0; i < slot_size; i++){
-                    
-            //         slot = cpu->kvm_state->as[j].ml->slots[i]; 
-                    
-            //         // if(slot.memory_size == 0){
-            //         //     continue;
-            //         // }
-            //         // printf("slot Address : %ld", slot.ram);
-
-            //         // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-            //         // if(new_ram == MAP_FAILED) { 
-            //         //     printf("Failed to allocated memory!");
-            //         //     exit(0);
-            //         // }
-            //         // memmove(new_ram, slot.ram, slot.memory_size);
-
-            //             // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
-            //             //  | (kvm_state->memory_listener.as_id << 16)
-            //         mem.slot = slot.slot | (kvm_state->as[j].ml->as_id << 16);
-            //         mem.guest_phys_addr = slot.start_addr;
-            //         mem.userspace_addr = (unsigned long)slot.ram;
-            //         // #ifdef DBG
-            //         // printf("[debug] kvm nr as : %d\n", cpu->kvm_state->nr_as);
-            //         // printf("[debug] kvm 0 : %s\n", cpu->kvm_state->as[0].as->name);
-            //         // printf("[debug] kvm 1 : %s\n", cpu->kvm_state->as[1].as->name);
-            //         // #endif
-            //         mem.flags = slot.flags;
-            //         mem.memory_size = slot.memory_size;
-
-            //         #ifdef DBG
-            //         if(mem.userspace_addr){
-            //             printf("[debug] mem.ram: %p\n", mem.userspace_addr);
-            //             printf("[debug] mem.slot: %p\n", mem.slot);
-            //             fflush(stdout);
-            //             ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
-            //             if(ret < 0){
-            //                 printf("KVM SET MEMORY FAILED!! \n");
-            //                 fflush(stdout);
-            //             }
-            //         }
-            //         #endif
-            //         // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
-            //                     // mem.memory_size, mem.userspace_addr, ret);
-            //         #ifdef DBG
-            //         // if(ret == 0) printf("[debug] ret: %d\n", ret);
-            //         #endif
-            //     }
-            // }               
-            //set kvm VM according to the prefork state
-            // fork_set_vm_state(cpu, prefork_state);
-            // new_cpu->prefork_state = prefork_state;
-            // new_cpu->child_cpu = 1;
-            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
-            
-
-            
-            // register_global_state();
-            // cpu->prefork_state = prefork_state;
-            // cpu->child_cpu = 1; 
-            // #define DEFAULT_GDBSTUB_PORT "1254"
-            // printf("[debug] starting the gdb server for the child process \n ");
-            // change_gdb_device_config();
-            // if (foreach_device_config(DEV_GDB, gdbserver_start) < 0) {
-            //     printf("[debug] {Failed} to start the gdb server for the child process \n ");
-            //     exit(1);
-            // }
-            // printf("[debug] {Started} the gdb server for the child process \n ");
-
-            // return;
-            
-            // qemu_mutex_unlock_iothread();
-            // qemu_init_child(ARGC, ARGV, ENVP 
-
-            // qemu_opts_foreach(qemu_find_opts("drive"), drive_init_func,
-                        //   &MACHINE_CLASS->block_default_type, &error_fatal)
-            // setup_child_snapshot_drive(&local_err);
-            // load_snapshot("prefork_state",NULL);
-            // setup_worker_thread(NULL);
-            // configure_blockdev(&BDO_Q, MACHINE_CLASS, 1);
-            // setup_worker_thread(NULL);
-            // kvm_start_vcpu_thread(cpu);
-            // qemu_mutex_lock_iothread();
-
-
-
-            //recreate the driver thread
-            //recreate vcpu thread
-            
-            // sleep(60);
-            #ifdef DBG 
-            printf("Loading the snapshot with pid : %ld\n", (long)getpid()); 
-            #endif 
-
-            // // close(9);
-            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
-            // register_global_state();
-            // if (load_snapshot("prefork_state", &local_err) < 0) {
-            //     error_report_err(local_err);
-            //     #ifdef DBG 
-            //         printf("Failed to load snapshot\n"); 
-            //     #endif 
-            //     autostart = 0;
-            //     exit(1);
-            // }
-
-            
-            #ifdef DBG 
-                printf("We have loaded the snapshot!\n"); 
-            #endif 
-            // qemu_mutex_lock_iothread();
-
-            // printf("[DEBUG] load snapshot is called!\n");
-            // fflush(stdout);
-
-            // // doing this caused a dead lock 
-            // // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-            // // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
-            // // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-            // // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
-            // // qemu_cond_broadcast(&cpu->vcpu_recreated_cond);
-            // // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
-            // printf("[DEBUG] load snapshot is called!\n");
-            // fflush(stdout);
-            // load_snapshot("newtest", NULL);
-            return; 
-        } else {
-            // waitpid(ret, &status, 0);
-            // wait(1);
-            // wait for 1 second
-            sleep(2);
-            PARENT_PID = getpid();
-
-            monitor_parse("unix:qemu-monitor-socket1,server,nowait", "readline", NULL);
-            DEBUG_PRINT("returned from the monitor parse\n");
-            qemu_opts_foreach(qemu_find_opts("chardev"),
-                      chardev_pre_init_func, NULL, &error_fatal);
-            DEBUG_PRINT("returned from the chardev pre init func\n");
-            qemu_opts_foreach(qemu_find_opts("mon"),
-                      mon_pre_init_func, NULL, &error_fatal);
-            // update_hostfwd("tcp:127.0.0.1:10025-:22");
-            // qemu_cleanup();
-            // load_snapshot("newtest", NULL);
-            // dump_cpu_state(cpu, "pre-fork.dat");
-            // vm_start();
-            // load_snapshot("newtest", NULL);
-            // kvm_cpu_synchronize_post_init(cpu);
-            // vm_start();
-            DEBUG_PRINT("Started the VM\n");
-            
-            printf("[%s:%d]IN the parent process\n", __func__, __LINE__);
-            // exit(0);
-            return;
-            // qemu_mutex_unlock_iothread();
-
-        }
-    
-        // load_snapshot("prefork_state", NULL); 
-    }
-
-    return; 
-}
-
-
 void qemu_init(int argc, char **argv, char **envp)
 {
     int i;
@@ -4102,19 +2899,7 @@ void qemu_init(int argc, char **argv, char **envp)
     BlockdevOptionsQueue bdo_queue = QSIMPLEQ_HEAD_INITIALIZER(bdo_queue);
     QemuPluginList plugin_list = QTAILQ_HEAD_INITIALIZER(plugin_list);
     int mem_prealloc = 0; /* force preallocation of physical target memory */
-    EventNotifier notifier;
-    static AioContext *ctx;
-    int result; 
-    int forkvmfd[2];
-    CPUState *cpu;
 
-    ARGV = argv;
-    ENVP = envp; 
-    ARGC = argc;
-
-    h_initialize();
-
-    // used only for changing the buffering type of the stdout
     os_set_line_buffering();
 
     error_init(argv[0]);
@@ -4218,7 +3003,6 @@ void qemu_init(int argc, char **argv, char **envp)
             break;
         if (argv[optind][0] != '-') {
             loc_set_cmdline(argv, optind, 1);
-
             drive_add(IF_DEFAULT, 0, argv[optind++], HD_OPTS);
         } else {
             const QEMUOption *popt;
@@ -4237,9 +3021,6 @@ void qemu_init(int argc, char **argv, char **envp)
             case QEMU_OPTION_hdb:
             case QEMU_OPTION_hdc:
             case QEMU_OPTION_hdd:
-                printf("we touched it \n");
-                printf("popt->index : %d, optarg : %s\n", popt->index, optarg);
-
                 drive_add(IF_DEFAULT, popt->index - QEMU_OPTION_hda, optarg,
                           HD_OPTS);
                 break;
@@ -4284,9 +3065,6 @@ void qemu_init(int argc, char **argv, char **envp)
             case QEMU_OPTION_snapshot:
                 {
                     Error *blocker = NULL;
-                    #ifdef DBG
-                    printf("reached the snapshot option! \n");
-                    #endif 
                     snapshot = 1;
                     error_setg(&blocker, QERR_REPLAY_NOT_SUPPORTED,
                                "-snapshot");
@@ -5099,7 +3877,7 @@ void qemu_init(int argc, char **argv, char **envp)
                                               machine_class);
 
     os_daemonize();
-    // rcu_disable_atfork();
+    rcu_disable_atfork();
 
     if (pid_file && !qemu_write_pidfile(pid_file, &err)) {
         error_reportf_err(err, "cannot create PID file: ");
@@ -5113,9 +3891,6 @@ void qemu_init(int argc, char **argv, char **envp)
         error_report_err(main_loop_err);
         exit(1);
     }
-    ctx = qemu_get_aio_context(); 
-    event_notifier_init(&notifier, true);
-
 
 #ifdef CONFIG_SECCOMP
     olist = qemu_find_opts_err("sandbox", NULL);
@@ -5382,9 +4157,6 @@ void qemu_init(int argc, char **argv, char **envp)
      * machine_set_property(), so machine properties can refer to
      * them.
      */
-
-    BDO_Q = bdo_queue;
-    MACHINECLASS = machine_class; 
     configure_blockdev(&bdo_queue, machine_class, snapshot);
     audio_init_audiodevs();
 
@@ -5729,48 +4501,8 @@ void qemu_init(int argc, char **argv, char **envp)
         vm_start();
     }
 
-    cpu = qemu_get_cpu(0); 
-    printf("Before :: Event RFD : %d\n", cpu->fork_event.rfd);
-    printf("Before :: Event WFD : %d\n", cpu->fork_event.wfd);
-    result = event_notifier_init(&(cpu->fork_event), 0); 
-    if(result < 0) {
-        printf("Failed to init notifier\n");
-    }
-    
-    result = event_notifier_init(&(cpu->load_event), 0); 
-    if(result < 0) {
-        printf("Failed to init notifier\n");
-    }
-
-    result = event_notifier_init(&(cpu->save_event), 0); 
-    if(result < 0) {
-        printf("Failed to init notifier[save_event]\n");
-    }
-
-    printf("Event RFD : %d\n", cpu->fork_event.rfd);
-    printf("Event WFD : %d\n", cpu->fork_event.wfd);
-
-    //qemu_pipe and pipe both fail here 
-    // result = qemu_pipe(forkvmfd);
-    // if(result < 0){
-    //     printf("failed to make the pipe system call \n");
-    //     // return -1;
-    // }
-    // current_cpu->fork_fd[0] = forkvmfd[0];
-    // current_cpu->fork_fd[1] = forkvmfd[1];
-    
-    // printf("fork_fd[0] : %d -- fork_fd[1] : %d\n", current_cpu->fork_fd[0], current_cpu->fork_fd[1]);
-
-    // printf("success :: make the pipe system call \n");
-    qemu_set_fd_handler(cpu->fork_event.rfd, handle_fork, NULL, cpu);
-    qemu_set_fd_handler(cpu->load_event.rfd, handle_load_snapshot, NULL, cpu);
-    qemu_set_fd_handler(cpu->save_event.rfd, handle_save_snapshot, NULL, cpu);
-    qemu_set_fd_handler(mon_create_event.rfd, create_mon_socket, NULL, NULL);   
-
     accel_setup_post(current_machine);
     os_setup_post();
-    // save_snapshot("newtest", NULL);
-    // load_snapshot("newtest", NULL);
 
     return;
 }
@@ -5813,250 +4545,4 @@ void qemu_cleanup(void)
     qemu_chr_cleanup();
     user_creatable_cleanup();
     /* TODO: unref root container, check all devices are ok */
-}
-
-void qemu_cleanup_child(){
-     gdbserver_cleanup();
-
-    /*
-     * cleaning up the migration object cancels any existing migration
-     * try to do this early so that it also stops using devices.
-     */
-    migration_shutdown();
-
-    /*
-     * We must cancel all block jobs while the block layer is drained,
-     * or cancelling will be affected by throttling and thus may block
-     * for an extended period of time.
-     * vm_shutdown() will bdrv_drain_all(), so we may as well include
-     * it in the drained section.
-     * We do not need to end this section, because we do not want any
-     * requests happening from here on anyway.
-     */
-    bdrv_drain_all_begin();
-
-    /* No more vcpu or device emulation activity beyond this point */
-    vm_shutdown();
-    replay_finish();
-
-    job_cancel_sync_all();
-    bdrv_close_all();
-
-    res_free();
-
-    /* vhost-user must be cleaned up before chardevs.  */
-    tpm_cleanup();
-    net_cleanup();
-    audio_cleanup();
-    monitor_cleanup();
-    qemu_chr_cleanup();
-
-    return; 
-}
-
-void qemu_init_child(int argc, char **argv, char **envp)
-{
-    int i;
-    int snapshot, linux_boot;
-    const char *initrd_filename;
-    const char *kernel_filename, *kernel_cmdline;
-    const char *boot_order = NULL;
-    const char *boot_once = NULL;
-    DisplayState *ds;
-    QemuOpts *opts, *machine_opts;
-    QemuOpts *icount_opts = NULL, *accel_opts = NULL;
-    QemuOptsList *olist;
-    int optind;
-    const char *optarg;
-    const char *loadvm = NULL;
-    MachineClass *machine_class;
-    const char *cpu_option;
-    const char *vga_model = NULL;
-    const char *incoming = NULL;
-    bool userconfig = true;
-    bool nographic = false;
-    int display_remote = 0;
-    const char *log_mask = NULL;
-    const char *log_file = NULL;
-    ram_addr_t maxram_size;
-    uint64_t ram_slots = 0;
-    FILE *vmstate_dump_file = NULL;
-    Error *main_loop_err = NULL;
-    Error *err = NULL;
-    bool list_data_dirs = false;
-    char **dirs;
-    const char *mem_path = NULL;
-    bool have_custom_ram_size;
-    BlockdevOptionsQueue bdo_queue = QSIMPLEQ_HEAD_INITIALIZER(bdo_queue);
-    QemuPluginList plugin_list = QTAILQ_HEAD_INITIALIZER(plugin_list);
-    int mem_prealloc = 0; /* force preallocation of physical target memory */
-    EventNotifier notifier;
-    static AioContext *ctx;
-    int result; 
-    int forkvmfd[2];
-    CPUState *cpu;
-
-    ARGV = argv;
-    ENVP = envp; 
-    ARGC = argc;
-
-    // os_set_line_buffering();
-
-    error_init(argv[0]);
-    // module_call_init(MODULE_INIT_TRACE);
-
-    // qemu_init_cpu_list();
-    // qemu_init_cpu_loop();
-
-    qemu_mutex_lock_iothread();
-
-    atexit(qemu_run_exit_notifiers);
-    qemu_init_exec_dir(argv[0]);
-
-    // module_call_init(MODULE_INIT_QOM);
-    // module_call_init(MODULE_INIT_MIGRATION);
-
-    qemu_add_opts(&qemu_drive_opts);
-    // qemu_add_drive_opts(&qemu_legacy_drive_opts);
-    // qemu_add_drive_opts(&qemu_common_drive_opts);
-    // qemu_add_drive_opts(&qemu_drive_opts);
-    // qemu_add_drive_opts(&bdrv_runtime_opts);
-    // qemu_add_opts(&qemu_chardev_opts);
-    // qemu_add_opts(&qemu_device_opts);
-    // qemu_add_opts(&qemu_netdev_opts);
-    // qemu_add_opts(&qemu_nic_opts);
-    // qemu_add_opts(&qemu_net_opts);
-    // qemu_add_opts(&qemu_rtc_opts);
-    // qemu_add_opts(&qemu_global_opts);
-    // qemu_add_opts(&qemu_mon_opts);
-    // qemu_add_opts(&qemu_trace_opts);
-    // qemu_plugin_add_opts();
-    // qemu_add_opts(&qemu_option_rom_opts);
-    // qemu_add_opts(&qemu_machine_opts);
-    // qemu_add_opts(&qemu_accel_opts);
-    // qemu_add_opts(&qemu_mem_opts);
-    // qemu_add_opts(&qemu_smp_opts);
-    // qemu_add_opts(&qemu_boot_opts);
-    // qemu_add_opts(&qemu_add_fd_opts);
-    // qemu_add_opts(&qemu_object_opts);
-    // qemu_add_opts(&qemu_tpmdev_opts);
-    // qemu_add_opts(&qemu_realtime_opts);
-    // qemu_add_opts(&qemu_overcommit_opts);
-    // qemu_add_opts(&qemu_msg_opts);
-    // qemu_add_opts(&qemu_name_opts);
-    // qemu_add_opts(&qemu_numa_opts);
-    // qemu_add_opts(&qemu_icount_opts);
-    // qemu_add_opts(&qemu_semihosting_config_opts);
-    // qemu_add_opts(&qemu_fw_cfg_opts);
-    // module_call_init(MODULE_INIT_OPTS);
-
-    // runstate_init();
-    // precopy_infrastructure_init();
-    // postcopy_infrastructure_init();
-    // monitor_init_globals();
-
-    // if (qcrypto_init(&err) < 0) {
-    //     error_reportf_err(err, "cannot initialize crypto: ");
-    //     exit(1);
-    // }
-
-    // QTAILQ_INIT(&vm_change_state_head);
-    // os_setup_early_signal_handling();
-
-    cpu_option = NULL;
-    snapshot = 0;
-
-    nb_nics = 0;
-
-    // bdrv_init_with_whitelist();
-
-    autostart = 1;
-
-    /* first pass of option parsing */
-    optind = 1;
-    while (optind < argc) {
-        if (argv[optind][0] != '-') {
-            /* disk image */
-            optind++;
-        } else {
-            const QEMUOption *popt;
-
-            popt = lookup_opt(argc, argv, &optarg, &optind);
-            switch (popt->index) {
-            case QEMU_OPTION_nouserconfig:
-                userconfig = false;
-                break;
-            }
-        }
-    }
-    if (userconfig) {
-        if (qemu_read_default_config_file() < 0) {
-            exit(1);
-        }
-    }
-
-    /* second pass of option parsing */
-    optind = 1;
-    for(;;) {
-        if (optind >= argc)
-            break;
-        if (argv[optind][0] != '-') {
-            loc_set_cmdline(argv, optind, 1);
-
-            drive_add(IF_DEFAULT, 0, argv[optind++], HD_OPTS);
-        } else {
-            const QEMUOption *popt;
-
-            popt = lookup_opt(argc, argv, &optarg, &optind);
-            if (!(popt->arch_mask & arch_type)) {
-                error_report("Option not supported for this target");
-                exit(1);
-            }
-            switch(popt->index) {
-            case QEMU_OPTION_cpu:
-                /* hw initialization will check this */
-                cpu_option = optarg;
-                break;
-            case QEMU_OPTION_hda:
-            case QEMU_OPTION_hdb:
-            case QEMU_OPTION_hdc:
-            case QEMU_OPTION_hdd:
-                printf("we touched it \n");
-                printf("popt->index : %d, optarg : %s\n", popt->index, optarg);
-
-                drive_add(IF_DEFAULT, popt->index - QEMU_OPTION_hda, optarg,
-                          HD_OPTS);
-                break;
-            case QEMU_OPTION_blockdev:
-                {
-                    Visitor *v;
-                    BlockdevOptionsQueueEntry *bdo;
-
-                    v = qobject_input_visitor_new_str(optarg, "driver",
-                                                      &error_fatal);
-
-                    bdo = g_new(BlockdevOptionsQueueEntry, 1);
-                    visit_type_BlockdevOptions(v, NULL, &bdo->bdo,
-                                               &error_fatal);
-                    visit_free(v);
-                    loc_save(&bdo->loc);
-                    QSIMPLEQ_INSERT_TAIL(&bdo_queue, bdo, entry);
-                    break;
-                }
-            default: 
-                break;
-            }
-        }
-    }
-            
-
-
-
-
-
-
-
-    configure_blockdev(&bdo_queue, MACHINECLASS, 1);
-
-    return;
 }

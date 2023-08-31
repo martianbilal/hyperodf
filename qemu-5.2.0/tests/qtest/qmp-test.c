@@ -335,7 +335,6 @@ int main(int argc, char *argv[])
 {
     g_test_init(&argc, &argv, NULL);
 
-    return g_test_run();
     qtest_add_func("qmp/protocol", test_qmp_protocol);
     qtest_add_func("qmp/oob", test_qmp_oob);
     qtest_add_func("qmp/preconfig", test_qmp_preconfig);

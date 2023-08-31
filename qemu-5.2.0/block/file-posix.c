@@ -1479,8 +1479,6 @@ static int handle_aiocb_rw(void *opaque)
     ssize_t nbytes;
     char *buf;
 
-    // printf("[debug] Handle aiocb rw :: Filename : %s \n", aiocb->bs->filename);
-
     if (!(aiocb->aio_type & QEMU_AIO_MISALIGNED)) {
         /*
          * If there is just a single buffer, and it is properly aligned

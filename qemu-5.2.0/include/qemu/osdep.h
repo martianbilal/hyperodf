@@ -221,6 +221,7 @@ extern int daemon(int, int);
 #ifndef TIME_MAX
 #define TIME_MAX TYPE_MAXIMUM(time_t)
 #endif
+
 /* HOST_LONG_BITS is the size of a native pointer in bits. */
 #if UINTPTR_MAX == UINT32_MAX
 # define HOST_LONG_BITS 32
@@ -686,9 +687,3 @@ char *qemu_get_host_name(Error **errp);
 size_t qemu_get_host_physmem(void);
 
 #endif
-
-// #ifndef DBG
-// #define DBG
-// #define DBG_MEMORY
-// #endif
-

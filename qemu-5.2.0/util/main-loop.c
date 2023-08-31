@@ -28,20 +28,17 @@
 #include "qemu/timer.h"
 #include "sysemu/qtest.h"
 #include "sysemu/cpu-timers.h"
-#include "sysemu/cpus.h"
-// #include "include/hw/core/cpu.h"
 #include "sysemu/replay.h"
 #include "qemu/main-loop.h"
 #include "block/aio.h"
 #include "qemu/error-report.h"
-// #include "qemu/queue.h"
+#include "qemu/queue.h"
 
 #ifndef _WIN32
 #include <sys/wait.h>
 #endif
 
 #ifndef _WIN32
-
 
 /* If we have signalfd, we mask out the signals we want to handle and then
  * use signalfd to listen for them.  We rely on whatever the current signal
@@ -167,12 +164,10 @@ int qemu_init_main_loop(Error **errp)
     gpollfds = g_array_new(FALSE, FALSE, sizeof(GPollFD));
     src = aio_get_g_source(qemu_aio_context);
     g_source_set_name(src, "aio-context");
-    printf("reaching only here in main loop\n");
     g_source_attach(src, NULL);
     g_source_unref(src);
     src = iohandler_get_g_source();
     g_source_set_name(src, "io-handler");
-    printf("reaching here in main loop\n");
     g_source_attach(src, NULL);
     g_source_unref(src);
     return 0;
@@ -233,8 +228,6 @@ static int os_host_main_loop_wait(int64_t timeout)
 {
     GMainContext *context = g_main_context_default();
     int ret;
-
-    // printf("waiting in the main loop\n");
 
     g_main_context_acquire(context);
 
@@ -504,22 +497,6 @@ void main_loop_wait(int nonblocking)
     };
     int ret;
     int64_t timeout_ns;
-    char should_fork;
-    int oldflags; 
-    void *cpu;
-    int index = 0; //testing for single VCPU user case 
-
-    // oldflags = fcntl(forkvmfd[0], F_GETFL, 0); 
-    // fcntl(forkvmfd[0], F_SETFL, oldflags | O_NONBLOCK);
-    // GSList *list, *elt;
-
-    // list = object_class_get_list("device", true);
-    //     elt->
-    // for (elt = list; elt; elt = elt->next) {
-    // }
-    // g_slist_free(list);
-    // cpu = qemu_get_cpu(0);
-
 
     if (nonblocking) {
         mlpoll.timeout = 0;
@@ -541,14 +518,6 @@ void main_loop_wait(int nonblocking)
                                           &main_loop_tlg));
 
     ret = os_host_main_loop_wait(timeout_ns);
-    // if(cpu->nr_fork_vms > 0) {
-    //     printf("We have to fork at this point\n");
-    // }
-    // read(forkvmfd[0], &should_fork, 1);
-    // if(should_fork == 1){ 
-    //     printf("we are ready for fork");
-    // }
-    
     mlpoll.state = ret < 0 ? MAIN_LOOP_POLL_ERR : MAIN_LOOP_POLL_OK;
     notifier_list_notify(&main_loop_poll_notifiers, &mlpoll);
 
@@ -560,7 +529,6 @@ void main_loop_wait(int nonblocking)
         icount_start_warp_timer();
     }
     qemu_clock_run_all_timers();
-
 }
 
 /* Functions to operate on the main QEMU AioContext.  */

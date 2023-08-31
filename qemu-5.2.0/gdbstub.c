@@ -3255,7 +3255,6 @@ int gdbserver_start(const char *port_or_path)
     int port = g_ascii_strtoull(port_or_path, NULL, 10);
     int gdb_fd;
 
-    printf("[Debug]: function gdbserver_start called with port number \n");
     if (port > 0) {
         gdb_fd = gdbserver_open_port(port);
     } else {
@@ -3290,19 +3289,6 @@ void gdbserver_fork(CPUState *cpu)
     cpu_watchpoint_remove_all(cpu, BP_GDB);
 }
 #else
-
-void gdbserver_fork()
-{
-    // if (!gdbserver_state.init || gdbserver_state.fd < 0) {
-    //     return;
-    // }
-    // close(gdbserver_state.fd);
-    // gdbserver_state.
-    // gdbserver_state.fd = -1;
-    // cpu_breakpoint_remove_all(cpu, BP_GDB);
-    // cpu_watchpoint_remove_all(cpu, BP_GDB);
-}
-
 static int gdb_chr_can_receive(void *opaque)
 {
   /* We can handle an arbitrarily large amount of data.
@@ -3443,8 +3429,6 @@ int gdbserver_start(const char *device)
     char gdbstub_device_name[128];
     Chardev *chr = NULL;
     Chardev *mon_chr;
-
-    printf("[Debug]: function gdbserver_start called with device %s \n", device);
 
     if (!first_cpu) {
         error_report("gdbstub: meaningless to attach gdb to a "

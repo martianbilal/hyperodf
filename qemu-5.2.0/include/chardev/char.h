@@ -6,16 +6,6 @@
 #include "qemu/thread.h"
 #include "qom/object.h"
 
-
-// #define DBG_CHAR
-#ifdef DBG_CHAR
-#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "[%s:%d] " fmt, \
-    __func__,  __LINE__, ##args)
-#else
-#define DEBUG_PRINT(fmt, args...) /* do nothing */
-#endif
-
-
 #define IAC_EOR 239
 #define IAC_SE 240
 #define IAC_NOP 241
@@ -79,8 +69,6 @@ struct Chardev {
     GMainContext *gcontext;
     DECLARE_BITMAP(features, QEMU_CHAR_FEATURE_LAST);
 };
-
-void qemu_print_Chardev(struct Chardev *chardev);
 
 /**
  * qemu_chr_new_from_opts:

@@ -48,10 +48,4 @@ int monitor_fdset_dup_fd_add(int64_t fdset_id, int flags);
 void monitor_fdset_dup_fd_remove(int dup_fd);
 int64_t monitor_fdset_dup_fd_find(int dup_fd);
 
-int monitor_get_chardev_fd(Error **errp);
-void monitor_print_fds_cur(void);
-void monitor_print_fds(Monitor *mon, Error **errp);
-
-void send_cpu_kick(void);
-
 #endif /* MONITOR_H */

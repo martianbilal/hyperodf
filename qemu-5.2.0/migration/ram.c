@@ -56,7 +56,6 @@
 #include "savevm.h"
 #include "qemu/iov.h"
 #include "multifd.h"
-#include <time.h>
 
 /***********************************************************/
 /* ram save/restore */
@@ -1747,9 +1746,6 @@ static int ram_save_host_page(RAMState *rs, PageSearchStatus *pss,
     return pages;
 }
 
-
-#define BILLION  1000000000L;
-
 /**
  * ram_find_and_save_block: finds a dirty page and sends it to f
  *
@@ -1770,13 +1766,6 @@ static int ram_find_and_save_block(RAMState *rs, bool last_stage)
     PageSearchStatus pss;
     int pages = 0;
     bool again, found;
-
-    // measuring time spent in this function using clock_gettime()
-    // struct timespec start, end;
-    // double accum = 0;
-    // clock_gettime(CLOCK_REALTIME, &start);
-
-
 
     /* No dirty page as there is zero RAM */
     if (!ram_bytes_total()) {
@@ -1807,11 +1796,6 @@ static int ram_find_and_save_block(RAMState *rs, bool last_stage)
 
     rs->last_seen_block = pss.block;
     rs->last_page = pss.page;
-
-    // clock_gettime(CLOCK_REALTIME, &end);
-    // accum = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)BILLION;
-
-    // printf( "[measurement]Time spent in the %s:  %lf\n", __func__, accum);
 
     return pages;
 }
@@ -2647,11 +2631,6 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
     RAMState *rs = *temp;
     int ret = 0;
 
-    struct timespec start, end;
-    double accum = 0;
-    clock_gettime(CLOCK_REALTIME, &start);
-
-
     WITH_RCU_READ_LOCK_GUARD() {
         if (!migration_in_postcopy()) {
             migration_bitmap_sync_precopy(rs);
@@ -2664,7 +2643,6 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
         /* flush all remaining blocks regardless of rate limiting */
         while (true) {
             int pages;
-            // break;
 
             pages = ram_find_and_save_block(rs, !migration_in_colo_state());
             /* no more blocks to sent */
@@ -2686,12 +2664,6 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
         qemu_put_be64(f, RAM_SAVE_FLAG_EOS);
         qemu_fflush(f);
     }
-
-    clock_gettime(CLOCK_REALTIME, &end);
-    accum = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)BILLION;
-
-    printf( "[measurement]Time spent in the %s:  %lf\n", __func__, accum);
-
 
     return ret;
 }
@@ -3165,6 +3137,7 @@ static int ram_load_setup(QEMUFile *f, void *opaque)
 static int ram_load_cleanup(void *opaque)
 {
     RAMBlock *rb;
+
     RAMBLOCK_FOREACH_NOT_IGNORED(rb) {
         qemu_ram_block_writeback(rb);
     }
@@ -3638,7 +3611,6 @@ static int ram_load(QEMUFile *f, void *opaque, int version_id)
 {
     int ret = 0;
     static uint64_t seq_iter;
-    // return 0;
     /*
      * If system is running in postcopy mode, page inserts to host memory must
      * be atomic

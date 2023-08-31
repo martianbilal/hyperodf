@@ -483,7 +483,7 @@ int main(int argc, char **argv)
     tmpdir = dir;
     tmpserver = g_strconcat(tmpdir, "/server", NULL);
 
-    // qtest_add_func("/ivshmem/single", test_ivshmem_single);
+    qtest_add_func("/ivshmem/single", test_ivshmem_single);
     qtest_add_func("/ivshmem/hotplug", test_ivshmem_hotplug);
     qtest_add_func("/ivshmem/memdev", test_ivshmem_memdev);
     if (g_test_slow()) {

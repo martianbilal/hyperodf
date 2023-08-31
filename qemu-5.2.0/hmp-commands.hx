@@ -53,19 +53,6 @@ SRST
 ERST
 
     {
-        .name       = "do_fork",
-        .args_type  = "",
-        .params     = "",
-        .help       = "Fork the VM",
-        .cmd = hmp_vmfork,
-    },
-
-SRST
-``hello``
-  print hello world.
-ERST
-
-    {
         .name       = "exit_preconfig",
         .args_type  = "",
         .params     = "",
@@ -281,19 +268,6 @@ ERST
         .params     = "filename",
         .help       = "output logs to 'filename'",
         .cmd        = hmp_logfile,
-    },
-
-SRST
-``logfile`` *filename*
-  Output logs to *filename*.
-ERST
-    
-    {
-        .name       = "debug_mon",
-        .args_type  = "filename:F",
-        .params     = "filename",
-        .help       = "prints helloworld to the file in tmp directory",
-        .cmd        = hmp_debug_mon,
     },
 
 SRST

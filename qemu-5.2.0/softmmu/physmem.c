@@ -71,8 +71,6 @@
 
 #include "monitor/monitor.h"
 
-// #define DBG_IO
-
 #ifdef CONFIG_LIBDAXCTL
 #include <daxctl/libdaxctl.h>
 #endif
@@ -1245,25 +1243,6 @@ void ram_block_dump(Monitor *mon)
     }
 }
 
-void ram_block_dump_hyperodf(void){
-    RAMBlock *block;
-    char *psize;
-    printf("==============RAM Block Dump================\n");
-    RCU_READ_LOCK_GUARD();
-    printf("%24s %8s  %18s %18s %18s\n",
-                   "Block Name", "PSize", "Offset", "Used", "Total");
-    RAMBLOCK_FOREACH(block) {
-        psize = size_to_str(block->page_size);
-        printf("%24s %8s  0x%" PRIx64 " 0x%" PRIx64
-                       " 0x%" PRIx64 "\n", block->idstr, psize,
-                       (uint64_t)block->offset,
-                       (uint64_t)block->used_length,
-                       (uint64_t)block->max_length);
-        g_free(psize);
-    }
-    return;
-}
-
 #ifdef __linux__
 /*
  * FIXME TOCTTOU: this iterates over memory backends' mem-path, which
@@ -1419,7 +1398,6 @@ static int64_t get_file_align(int fd)
 
 static int file_ram_open(const char *path,
                          const char *region_name,
-                         bool readonly,
                          bool *created,
                          Error **errp)
 {
@@ -1430,7 +1408,7 @@ static int file_ram_open(const char *path,
 
     *created = false;
     for (;;) {
-        fd = open(path, readonly ? O_RDONLY : O_RDWR);
+        fd = open(path, O_RDWR);
         if (fd >= 0) {
             /* @path names an existing file, use it */
             break;
@@ -1482,7 +1460,6 @@ static int file_ram_open(const char *path,
 static void *file_ram_alloc(RAMBlock *block,
                             ram_addr_t memory,
                             int fd,
-                            bool readonly,
                             bool truncate,
                             Error **errp)
 {
@@ -1533,7 +1510,7 @@ static void *file_ram_alloc(RAMBlock *block,
         perror("ftruncate");
     }
 
-    area = qemu_ram_mmap(fd, memory, block->mr->align, readonly,
+    area = qemu_ram_mmap(fd, memory, block->mr->align,
                          block->flags & RAM_SHARED, block->flags & RAM_PMEM);
     if (area == MAP_FAILED) {
         error_setg_errno(errp, errno,
@@ -1965,7 +1942,7 @@ static void ram_block_add(RAMBlock *new_block, Error **errp, bool shared)
 
 #ifdef CONFIG_POSIX
 RAMBlock *qemu_ram_alloc_from_fd(ram_addr_t size, MemoryRegion *mr,
-                                 uint32_t ram_flags, int fd, bool readonly,
+                                 uint32_t ram_flags, int fd,
                                  Error **errp)
 {
     RAMBlock *new_block;
@@ -2019,8 +1996,7 @@ RAMBlock *qemu_ram_alloc_from_fd(ram_addr_t size, MemoryRegion *mr,
     new_block->used_length = size;
     new_block->max_length = size;
     new_block->flags = ram_flags;
-    new_block->host = file_ram_alloc(new_block, size, fd, readonly,
-                                     !file_size, errp);
+    new_block->host = file_ram_alloc(new_block, size, fd, !file_size, errp);
     if (!new_block->host) {
         g_free(new_block);
         return NULL;
@@ -2039,19 +2015,18 @@ RAMBlock *qemu_ram_alloc_from_fd(ram_addr_t size, MemoryRegion *mr,
 
 RAMBlock *qemu_ram_alloc_from_file(ram_addr_t size, MemoryRegion *mr,
                                    uint32_t ram_flags, const char *mem_path,
-                                   bool readonly, Error **errp)
+                                   Error **errp)
 {
     int fd;
     bool created;
     RAMBlock *block;
 
-    fd = file_ram_open(mem_path, memory_region_name(mr), readonly, &created,
-                       errp);
+    fd = file_ram_open(mem_path, memory_region_name(mr), &created, errp);
     if (fd < 0) {
         return NULL;
     }
 
-    block = qemu_ram_alloc_from_fd(size, mr, ram_flags, fd, readonly, errp);
+    block = qemu_ram_alloc_from_fd(size, mr, ram_flags, fd, errp);
     if (!block) {
         if (created) {
             unlink(mem_path);
@@ -2182,7 +2157,7 @@ void qemu_ram_remap(ram_addr_t addr, ram_addr_t length)
                 flags = MAP_FIXED;
                 if (block->fd >= 0) {
                     flags |= (block->flags & RAM_SHARED ?
-                              MAP_PRIVATE : MAP_PRIVATE);
+                              MAP_SHARED : MAP_PRIVATE);
                     area = mmap(vaddr, length, PROT_READ | PROT_WRITE,
                                 flags, block->fd, offset);
                 } else {
@@ -2844,9 +2819,6 @@ MemTxResult flatview_read_continue(FlatView *fv, hwaddr addr,
             /* I/O case */
             release_lock |= prepare_mmio_access(mr);
             l = memory_access_size(mr, l, addr1);
-            #ifdef DBG_MEMORY
-            printf("memory_region_dispatch_read called: %ul, *mr: %lx, mr: %lx, mr->addr: %lx \n", addr1, *mr, mr, mr->addr);
-            #endif
             result |= memory_region_dispatch_read(mr, addr1, &val,
                                                   size_memop(l), attrs);
             stn_he_p(buf, l, val);
@@ -2885,11 +2857,6 @@ static MemTxResult flatview_read(FlatView *fv, hwaddr addr,
     hwaddr addr1;
     MemoryRegion *mr;
 
-    #ifdef DBG_IO 
-    
-        // printf("[debug] Handle IO is called\n");
-    #endif
-
     l = len;
     mr = flatview_translate(fv, addr, &addr1, &l, false, attrs);
     return flatview_read_continue(fv, addr, attrs, buf, len,
@@ -2905,20 +2872,8 @@ MemTxResult address_space_read_full(AddressSpace *as, hwaddr addr,
     if (len > 0) {
         RCU_READ_LOCK_GUARD();
         fv = address_space_to_flatview(as);
-            #ifdef DBG_MEMORY
-            printf("*AS :: %lx :: AS :: %lx :: AS ROOT :: %lx :: AS NAME :: %s :: KVM_EXIT_IN Read Called: %s\n", *as, as, as->root, as->name, (char*)(buf));
-            #endif
-            // return result;
-        
         result = flatview_read(fv, addr, attrs, buf, len);
-        
     }
-    // if(addr == 496)
-    // {
-        #ifdef DBG_MEMORY
-        printf("[debug] [PID : %ld] First DATA Val : %s\n", (long)getpid(), (char *)buf);
-        #endif
-    // }
 
     return result;
 }

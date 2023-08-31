@@ -105,11 +105,6 @@ typedef int (RAMBlockIterFunc)(RAMBlock *rb, void *opaque);
 int qemu_ram_foreach_block(RAMBlockIterFunc func, void *opaque);
 int ram_block_discard_range(RAMBlock *rb, uint64_t start, size_t length);
 
-
-// XXX: This is a hack to allow the CPU to be woken up from the
-// cpu_exec loop. 
-// void cpu_kick_all(void);
-
 #endif
 
 #endif /* CPU_COMMON_H */

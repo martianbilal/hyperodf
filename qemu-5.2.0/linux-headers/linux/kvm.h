@@ -54,6 +54,7 @@
 #define KVM_TRC_STLB_WRITE       (KVM_TRC_HANDLER + 0x17)
 #define KVM_TRC_STLB_INVAL       (KVM_TRC_HANDLER + 0x18)
 #define KVM_TRC_PPC_INSTR        (KVM_TRC_HANDLER + 0x19)
+
 struct kvm_user_trace_setup {
 	__u32 buf_size;
 	__u32 buf_nr;
@@ -99,13 +100,6 @@ struct kvm_userspace_memory_region {
 	__u64 guest_phys_addr;
 	__u64 memory_size; /* bytes */
 	__u64 userspace_addr; /* start of the userspace allocated memory */
-};
-
-/* for KVM_FORK */
-struct fork_info {
-  unsigned long kvm_userspace_mem; 
-  int vm_fd; 
-  int vcpu_fd;
 };
 
 /*
@@ -1526,7 +1520,6 @@ struct kvm_enc_region {
 /* Available with  KVM_CAP_S390_VCPU_RESETS */
 #define KVM_S390_NORMAL_RESET	_IO(KVMIO,   0xc3)
 #define KVM_S390_CLEAR_RESET	_IO(KVMIO,   0xc4)
-#define KVM_FORK                _IOWR(KVMIO, 0xc5, struct fork_info)
 
 struct kvm_s390_pv_sec_parm {
 	__u64 origin;

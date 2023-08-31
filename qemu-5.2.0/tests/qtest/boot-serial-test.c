@@ -255,13 +255,13 @@ int main(int argc, char *argv[])
 
     g_test_init(&argc, &argv, NULL);
 
-    // for (i = 0; tests[i].arch != NULL; i++) {
-    //     if (strcmp(arch, tests[i].arch) == 0) {
-    //         char *name = g_strdup_printf("boot-serial/%s", tests[i].machine);
-    //         qtest_add_data_func(name, &tests[i], test_machine);
-    //         g_free(name);
-    //     }
-    // }
+    for (i = 0; tests[i].arch != NULL; i++) {
+        if (strcmp(arch, tests[i].arch) == 0) {
+            char *name = g_strdup_printf("boot-serial/%s", tests[i].machine);
+            qtest_add_data_func(name, &tests[i], test_machine);
+            g_free(name);
+        }
+    }
 
     return g_test_run();
 }

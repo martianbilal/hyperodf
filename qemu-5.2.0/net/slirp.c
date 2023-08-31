@@ -610,43 +610,6 @@ error:
     return -1;
 }
 
-// find the slirpstate without the monitor
-static SlirpState *getSlirpState(void)
-{
-    SlirpState *tmp;
-    const char *id = "__org.qemu.net0";
-    NetClientState *nc = qemu_find_netdev(id);
-    if (!nc) {
-        fprintf(stderr, "unrecognized netdev id '%s'\n", id);
-        exit(1);
-    }
-    if (strcmp(nc->model, "user")) {
-        fprintf(stderr, "invalid device specified\n");
-        exit(1);
-    }
-    tmp = DO_UPCAST(SlirpState, nc, nc);
-    return tmp;
-}
-
-void update_hostfwd(const char *redir_str){
-    int err = 0;
-    SlirpState *s = getSlirpState();
-
-    struct in_addr host_addr;
-    host_addr.s_addr = 16777343;
-        
-    slirp_hostfwd(s, redir_str, NULL);
-    
-    DEBUG_PRINT("Done adding new hostfwd\n");
-    err = slirp_remove_hostfwd(s->slirp, 0, host_addr, 10021);
-    if (err < 0) {
-        fprintf(stderr, "failed to remove hostfwd\n");
-        exit(1);
-    }
-    return;
-}
-
-
 static SlirpState *slirp_lookup(Monitor *mon, const char *id)
 {
     if (id) {
@@ -726,7 +689,6 @@ void hmp_hostfwd_remove(Monitor *mon, const QDict *qdict)
     monitor_printf(mon, "invalid format\n");
 }
 
-
 static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
 {
     struct in_addr host_addr = { .s_addr = INADDR_ANY };
@@ -737,9 +699,6 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
     int is_udp;
     char *end;
     const char *fail_reason = "Unknown reason";
-
-    DEBUG_PRINT("redir_str: %s\n", redir_str);
-    DEBUG_PRINT("Netdev ID : %s\n",  s->nc.name);
 
     p = redir_str;
     if (!p || get_str_sep(buf, sizeof(buf), &p, ':') < 0) {
@@ -789,7 +748,6 @@ static int slirp_hostfwd(SlirpState *s, const char *redir_str, Error **errp)
         goto fail_syntax;
     }
 
-    DEBUG_PRINT("Calling the slirp_add_hostfwd\n");
     if (slirp_add_hostfwd(s->slirp, is_udp, host_addr, host_port, guest_addr,
                           guest_port) < 0) {
         error_setg(errp, "Could not set up host forwarding rule '%s'",

@@ -438,32 +438,14 @@ static MemTxResult  memory_region_read_accessor(MemoryRegion *mr,
                                                 MemTxAttrs attrs)
 {
     uint64_t tmp;
-    MemoryRegion *root;
-    char *container_name = "plchlder"; 
+
     tmp = mr->ops->read(mr->opaque, addr, size);
-    // #ifdef DBG_MEMORY
-    if(mr->container){
-        container_name = mr->container->name; 
-    }
-    // mr->name == "ide" && container_name == "io"
-    if( strcmp(mr->name, "ide") == 0 && strcmp(container_name, "io") == 0 && tmp == 0){
-        // printf("root name: %s, ", mr->name);
-        // printf("root addr: %p,", mr->addr);
-        for (root = mr; root->container;) {
-            root = root->container;
-            // printf("container name: %s, ", root->name);
-        }
-        // printf(" MR: %p, Mr->ioeventfd: %u, *MR :%p, MR->addr : %p, abs_adr: %p, tmp: %p name: %s, size: %p, owner: %p\n", (void *)mr, mr->ioeventfd_nb, *mr, (void *)mr->addr, (void *)addr, (void *)tmp, (char*)mr->name, (void *)mr->size, (void *)mr->owner);
-    }
-    // #endif
     if (mr->subpage) {
         trace_memory_region_subpage_read(get_cpu_index(), mr, addr, tmp, size);
     } else if (trace_event_get_state_backends(TRACE_MEMORY_REGION_OPS_READ)) {
         hwaddr abs_addr = memory_region_to_absolute_addr(mr, addr);
         trace_memory_region_ops_read(get_cpu_index(), mr, abs_addr, tmp, size);
     }
-    
-
     memory_region_shift_read_access(value, shift, mask, tmp);
     return MEMTX_OK;
 }
@@ -765,43 +747,6 @@ static FlatView *generate_memory_topology(MemoryRegion *mr)
     return view;
 }
 
-//function from stackoverflow 
-static void full_write(int fd, const char *buf, size_t len)
-{
-        while (len > 0) {
-                ssize_t ret = write(fd, buf, len);
-
-                if ((ret == -1) && (errno != EINTR))
-                        break;
-
-                buf += (size_t) ret;
-                len -= (size_t) ret;
-        }
-}
-
-//function from stackoverflow
-static void print_backtrace(void)
-{
-        static const char start[] = "BACKTRACE ------------\n";
-        static const char end[] = "----------------------\n";
-
-        void *bt[1024];
-        int bt_size;
-        char **bt_syms;
-        int i;
-
-        bt_size = backtrace(bt, 1024);
-        bt_syms = backtrace_symbols(bt, bt_size);
-        full_write(STDERR_FILENO, start, strlen(start));
-        for (i = 1; i < bt_size; i++) {
-                size_t len = strlen(bt_syms[i]);
-                full_write(STDERR_FILENO, bt_syms[i], len);
-                full_write(STDERR_FILENO, "\n", 1);
-        }
-        full_write(STDERR_FILENO, end, strlen(end));
-    free(bt_syms);
-}
-
 static void address_space_add_del_ioeventfds(AddressSpace *as,
                                              MemoryRegionIoeventfd *fds_new,
                                              unsigned fds_new_nb,
@@ -812,11 +757,6 @@ static void address_space_add_del_ioeventfds(AddressSpace *as,
     MemoryRegionIoeventfd *fd;
     MemoryRegionSection section;
 
-    #ifdef DBG_MEMORY
-    printf("Add/del ioeventfd for address space\n");
-    printf("*AS :: %lx :: AS :: %lx :: AS ROOT :: %lx :: AS NAME :: %s\n", *as, as, as->root, as->name);
-    #endif
-    // print_backtrace();
     /* Generate a symmetric difference of the old and new fd sets, adding
      * and deleting as necessary.
      */
@@ -1231,13 +1171,7 @@ static void memory_region_do_init(MemoryRegion *mr,
         char *escaped_name = memory_region_escape_name(name);
         char *name_array = g_strdup_printf("%s[*]", escaped_name);
 
-        #ifdef DBG_MEMORY
-       printf("Reached at this point for mr-> mr: %lx, name: %s", mr, name);    
-        #endif
         if (!owner) {
-            #ifdef DBG_MEMORY
-            printf("NON OWNER :: Reached at this point for mr-> mr: %lx, name: %s", mr, name);    
-            #endif
             owner = container_get(qdev_get_machine(), "/unattached");
         }
 
@@ -1342,7 +1276,7 @@ static uint64_t unassigned_mem_read(void *opaque, hwaddr addr,
                                     unsigned size)
 {
 #ifdef DEBUG_UNASSIGNED
-   printf("Unassigned mem read " TARGET_FMT_plx "\n", addr);
+    printf("Unassigned mem read " TARGET_FMT_plx "\n", addr);
 #endif
     return 0;
 }
@@ -1351,7 +1285,7 @@ static void unassigned_mem_write(void *opaque, hwaddr addr,
                                  uint64_t val, unsigned size)
 {
 #ifdef DEBUG_UNASSIGNED
-   printf("Unassigned mem write " TARGET_FMT_plx " = 0x%"PRIx64"\n", addr, val);
+    printf("Unassigned mem write " TARGET_FMT_plx " = 0x%"PRIx64"\n", addr, val);
 #endif
 }
 
@@ -1505,9 +1439,7 @@ MemTxResult memory_region_dispatch_read(MemoryRegion *mr,
 {
     unsigned size = memop_size(op);
     MemTxResult r;
-    #ifdef DBG_MEMORY
-    printf("mr : %lx,mr->addr: %lx, size: %lx  \n", mr, mr->addr, size);
-    #endif 
+
     fuzz_dma_read_cb(addr, size, mr, false);
     if (!memory_region_access_valid(mr, addr, size, false, attrs)) {
         *pval = unassigned_mem_read(mr, addr, size);
@@ -1592,9 +1524,6 @@ void memory_region_init_io(MemoryRegion *mr,
     mr->ops = ops ? ops : &unassigned_mem_ops;
     mr->opaque = opaque;
     mr->terminates = true;
-    #ifdef DBG_MEMORY
-   printf("Initialied MR :: mr: %lx, *mr: %lx, mr->addr: %lx, mr->name: %s\n", mr, *mr, mr->addr, mr->name);
-    #endif
 }
 
 void memory_region_init_ram_nomigrate(MemoryRegion *mr,
@@ -1660,18 +1589,15 @@ void memory_region_init_ram_from_file(MemoryRegion *mr,
                                       uint64_t align,
                                       uint32_t ram_flags,
                                       const char *path,
-                                      bool readonly,
                                       Error **errp)
 {
     Error *err = NULL;
     memory_region_init(mr, owner, name, size);
     mr->ram = true;
-    mr->readonly = readonly;
     mr->terminates = true;
     mr->destructor = memory_region_destructor_ram;
     mr->align = align;
-    mr->ram_block = qemu_ram_alloc_from_file(size, mr, ram_flags, path,
-                                             readonly, &err);
+    mr->ram_block = qemu_ram_alloc_from_file(size, mr, ram_flags, path, &err);
     mr->dirty_log_mask = tcg_enabled() ? (1 << DIRTY_MEMORY_CODE) : 0;
     if (err) {
         mr->size = int128_zero();
@@ -1695,7 +1621,7 @@ void memory_region_init_ram_from_fd(MemoryRegion *mr,
     mr->destructor = memory_region_destructor_ram;
     mr->ram_block = qemu_ram_alloc_from_fd(size, mr,
                                            share ? RAM_SHARED : 0,
-                                           fd, false, &err);
+                                           fd, &err);
     mr->dirty_log_mask = tcg_enabled() ? (1 << DIRTY_MEMORY_CODE) : 0;
     if (err) {
         mr->size = int128_zero();
@@ -2420,8 +2346,6 @@ void memory_region_add_eventfd(MemoryRegion *mr,
         .e = e,
     };
     unsigned i;
-    // printf("eventfd\n");
-    // printf("add_eventfd=MR: %lx, *MR :%lx, MR->addr : %lx, abs_adr: %lx\n", mr, *mr, mr->addr, addr);
 
     if (kvm_enabled() && (!(kvm_eventfds_enabled() ||
                             userspace_eventfd_warning))) {
@@ -3344,25 +3268,6 @@ void memory_region_init_rom_device(MemoryRegion *mr,
      */
     owner_dev = DEVICE(owner);
     vmstate_register_ram(mr, owner_dev);
-}
-
-void* get_address_spaces(){
-    return &address_spaces;
-}
-
-int set_address_space(int cpufd){
-    AddressSpace *as;
-
-    #ifdef DBG_MEM
-    // QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
-    //     printf("[debug] Going through all the as's--\n");
-    //     printf("[debug] as->name: %s\n", as->name);
-    //     as->root->addr
-    // }
-
-    #endif
-
-    return 0; 
 }
 
 /*

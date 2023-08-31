@@ -21,9 +21,6 @@
 #include "trace.h"
 #include "block/thread-pool.h"
 #include "qemu/main-loop.h"
-#include "forkall-coop.h"
-#include "exec/cpu-common.h"
-#include "util/hodf-util.h"
 
 static void do_spawn_thread(ThreadPool *pool);
 
@@ -80,102 +77,22 @@ static void *worker_thread(void *opaque)
 {
     ThreadPool *pool = opaque;
 
-    if(USE_HYPERODF){
-        ski_forkall_thread_add_self_tid();
-    }
-
     qemu_mutex_lock(&pool->lock);
     pool->pending_threads--;
-    do_spawn_thread(pool);  
-
-    int did_fork = 0;
-	int is_child = 0;
-    int count = 0;
-    
-    // while(1){
-	// 	ski_forkall_slave(&did_fork, &is_child);
-    //     if(did_fork){
-    //         break;
-    //     }
-    //     sleep(0);
-    // }
+    do_spawn_thread(pool);
 
     while (!pool->stopping) {
         ThreadPoolElement *req;
-        int ret = 0;
+        int ret;
 
         do {
             pool->idle_threads++;
-            if(did_fork){
-                forked:
-				// After forking resort to the original code
-                h_cpu_kick();
-                if(qemu_mutex_iothread_locked()) qemu_mutex_unlock_iothread();
-				qemu_mutex_unlock(&pool->lock);
-                qemu_sem_wait(&pool->sem);
-                ret = 0;
-                qemu_mutex_lock(&pool->lock);
-
-            }
-            else {
-                qemu_mutex_unlock(&pool->lock);
-                int j,k;
-					k=2;
-					asm volatile("rep; nop");
-					// while(!did_fork){
-                    // printf("[debug] [aio-thread] counter : %d \n", pool->sem.count);
-                    // printf("ret value : %d\n", ski_forkall_hypercall_done);
-                    // int init_count = pool->sem.count;
-                    timed_wait:
-                    if(!ski_forkall_hypercall_done){
-                        ski_forkall_thread_pool_not_ready();
-                        ret = qemu_sem_timedwait(&pool->sem, 100);
-                        ski_forkall_thread_pool_ready();
-                    }
-                    // printf("[debug] [aio-thread] lock : %d \n", ret);
-                    // printf("[debug] [aio-thread] counter : %d \n", pool->sem.count);
-                    // qemu_sem_destroy(&pool->sem);
-                    // if(qemu_mutex_iothread_locked()) qemu_mutex_unlock_iothread();
-                    ski_forkall_slave(&did_fork, &is_child);
-                    // kick_all();
-                    // cpu_kick_all();
-                    // h_cpu_kick();
-                    
-                    // }
-                    if(did_fork){
-                        ski_log_forkall("Did fork");
-                        count = &pool->sem.count;
-
-                        // qemu_sem_init(&pool->sem, count);
-                        // pool->idle_threads --;
-                        ski_log_forkall("Did fork");
-                        goto forked;
-                    } else if( !did_fork && ret == -1) {
-                        goto timed_wait;
-                    }
-					
-					// Sishuai: comment to see if it could speed up
-					/*
-					for(j=0;j<50*1000;j++){
-						asm volatile("rep; nop");
-						k=k*k+j;
-					}
-					*/
-
-					for(j=0;j<500;j++){
-						k=k*k+j;
-					}
-                    // ret = -1;
-                qemu_mutex_lock(&pool->lock);
-                // pool->idle_threads--;
-                
-                // continue;
-            }
-
+            qemu_mutex_unlock(&pool->lock);
+            ret = qemu_sem_timedwait(&pool->sem, 10000);
+            qemu_mutex_lock(&pool->lock);
             pool->idle_threads--;
         } while (ret == -1 && !QTAILQ_EMPTY(&pool->request_list));
         if (ret == -1 || pool->stopping) {
-
             break;
         }
 

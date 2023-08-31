@@ -8,44 +8,6 @@
 
 { 'include': 'common.json' }
 
-
-
-##
-# @forkResult:
-#
-# Returns VM Fork result
-#
-# Returns a @forkResult instance
-#
-##
-{ 'struct': 'forkResult',
-  'data': { 'childpid': 'int' } }
-##
-# @vm_fork:
-# Returns: @forkResult instance
-# 
-##
-{ 'command': 'vm_fork',
-  'returns': 'forkResult' }
-
-##
-# @HelloResult:
-#
-# Returns hello world
-#
-# Returns a @HelloResult instance
-#
-##
-{ 'struct': 'HelloResult',
-  'data': { 'greeting': 'str' } }
-##
-# @get_hello:
-# Returns: @HelloResult instance
-# 
-##
-{ 'command': 'get_hello',
-  'returns': 'HelloResult' }
-
 ##
 # @add_client:
 #

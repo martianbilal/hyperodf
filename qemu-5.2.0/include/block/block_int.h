@@ -1415,7 +1415,5 @@ static inline BlockDriverState *bdrv_primary_bs(BlockDriverState *bs)
  * should call it.
  */
 void bdrv_drain_all_end_quiesce(BlockDriverState *bs);
-BlockBackend *blockdev_init(const char *file, QDict *bs_opts,
-                                   Error **errp);
 
 #endif /* BLOCK_INT_H */

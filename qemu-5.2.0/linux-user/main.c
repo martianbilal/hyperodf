@@ -630,8 +630,6 @@ int main(int argc, char **argv, char **envp)
     int execfd;
     int log_mask;
     unsigned long max_reserved_va;
-    
-    printf(" ============we called the main of the linux-user\n ");
 
     error_init(argv[0]);
     module_call_init(MODULE_INIT_TRACE);

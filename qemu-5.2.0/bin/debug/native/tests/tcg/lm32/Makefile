@@ -1,1 +1,0 @@
-/root/kvm-samples/qemu-5.2.0/tests/tcg/lm32/Makefile

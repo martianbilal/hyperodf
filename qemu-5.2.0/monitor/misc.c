@@ -28,7 +28,6 @@
 #include "monitor/qdev.h"
 #include "hw/usb.h"
 #include "hw/pci/pci.h"
-#include "qemu/typedefs.h"
 #include "sysemu/watchdog.h"
 #include "hw/loader.h"
 #include "exec/gdbstub.h"
@@ -223,8 +222,6 @@ static void hmp_trace_file(Monitor *mon, const QDict *qdict)
 
 static void hmp_info_help(Monitor *mon, const QDict *qdict)
 {
-    // printf("PID : %d\n", getpid());
-    
     help_cmd(mon, "info");
 }
 
@@ -263,14 +260,6 @@ int monitor_set_cpu(Monitor *mon, int cpu_index)
     g_free(mon->mon_cpu_path);
     mon->mon_cpu_path = object_get_canonical_path(OBJECT(cpu));
     return 0;
-}
-
-
-void send_cpu_kick(void){
-    CPUState *cpu;
-    CPU_FOREACH(cpu){
-        qemu_cpu_kick(cpu);
-    }
 }
 
 /* Callers must hold BQL. */
@@ -469,21 +458,6 @@ static void hmp_logfile(Monitor *mon, const QDict *qdict)
     if (err) {
         error_report_err(err);
     }
-}
-
-static void hmp_debug_mon(Monitor *mon, const QDict *qdict){
-    const char *name = qdict_get_try_str(qdict, "filename");
-    if(name){
-        // create the file name in tmp and open it
-        char *filename = g_strdup_printf("/tmp/%s", name);
-        FILE *fp = fopen(filename, "w");
-        if(fp){
-            // write helloworld to the file
-            fprintf(fp, "Hello World!\n");
-            fclose(fp);
-        }
-    }
-    
 }
 
 static void hmp_log(Monitor *mon, const QDict *qdict)
@@ -1340,34 +1314,6 @@ int monitor_get_fd(Monitor *mon, const char *fdname, Error **errp)
     error_setg(errp, "File descriptor named '%s' has not been found", fdname);
     return -1;
 }
-
-void monitor_print_fds(Monitor *mon, Error **errp)
-{
-    mon_fd_t *monfd;
-
-    QEMU_LOCK_GUARD(&mon->mon_lock);
-    QLIST_FOREACH(monfd, &mon->fds, next) {
-        printf("fd: %d\tfd_name: %s\n", monfd->fd, monfd->name);
-    }
-    return;
-}
-
-void monitor_print_fds_cur(void)
-{
-    Monitor *mon = monitor_cur();
-
-    if (mon) {
-        monitor_print_fds(mon, NULL);
-    }
-}
-
-
-int monitor_get_chardev_fd(Error **errp){
-    Monitor *mon = monitor_cur();
-    // check monitor_printf
-    return 0;
-}
-
 
 static void monitor_fdset_cleanup(MonFdset *mon_fdset)
 {

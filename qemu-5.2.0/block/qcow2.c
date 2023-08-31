@@ -43,8 +43,6 @@
 #include "crypto.h"
 #include "block/aio_task.h"
 
-#define DEBUG_EXT
-
 /*
   Differences with QCOW:
 
@@ -1304,9 +1302,7 @@ static int coroutine_fn qcow2_do_open(BlockDriverState *bs, QDict *options,
     uint64_t l1_vm_state_index;
     bool update_header = false;
 
-
     ret = bdrv_pread(bs->file, 0, &header, sizeof(header));
-    printf("**DO OPEN has been called **\n");
     if (ret < 0) {
         error_setg_errno(errp, -ret, "Could not read qcow2 header");
         goto fail;
@@ -1864,15 +1860,15 @@ static int coroutine_fn qcow2_do_open(BlockDriverState *bs, QDict *options,
     return ret;
 }
 
-// typedef struct QCow2OpenCo {
-//     BlockDriverState *bs;
-//     QDict *options;
-//     int flags;
-//     Error **errp;
-//     int ret;
-// } QCow2OpenCo;
+typedef struct QCow2OpenCo {
+    BlockDriverState *bs;
+    QDict *options;
+    int flags;
+    Error **errp;
+    int ret;
+} QCow2OpenCo;
 
-void coroutine_fn qcow2_open_entry(void *opaque)
+static void coroutine_fn qcow2_open_entry(void *opaque)
 {
     QCow2OpenCo *qoc = opaque;
     BDRVQcow2State *s = qoc->bs->opaque;
@@ -1894,8 +1890,6 @@ static int qcow2_open(BlockDriverState *bs, QDict *options, int flags,
         .ret = -EINPROGRESS
     };
 
-
-    printf("** OPEN QCOW2 **\n");
     bs->file = bdrv_open_child(NULL, options, "file", bs, &child_of_bds,
                                BDRV_CHILD_IMAGE, false, errp);
     if (!bs->file) {

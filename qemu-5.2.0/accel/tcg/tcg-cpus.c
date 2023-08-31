@@ -417,32 +417,6 @@ static void *tcg_cpu_thread_fn(void *arg)
     cpu_thread_signal_created(cpu);
     qemu_guest_random_seed_thread_part2(cpu->random_seed);
 
-    qemu_mutex_unlock_iothread();
-    while (1) {
-            int did_fork;
-			int is_child;
-
-			ski_forkall_slave(&did_fork, &is_child);
-			if(did_fork){
-				// SKI: This at least contains a race...
-				CPUState *cpu = arg;
-				//printf("SKI: trying to setup the IPI handler\n");
-				qemu_thread_get_self(cpu->thread);
-                cpu_thread_signal_created(cpu);
-				cpu->thread_id = qemu_get_thread_id();
-				// CPU_FOREACH(cpu){
-				// }
-				break;
-			}
-			sleep(0);
-			/*
-			while (qemu_mutex_trylock(&qemu_global_mutex) == EBUSY){
-				sleep(0);
-			}
-			*/
-    }
-    qemu_mutex_lock_iothread();
-
     /* process any pending work */
     cpu->exit_request = 1;
 
