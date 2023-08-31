@@ -6,4 +6,8 @@
 # $1 is the qemu file to diff -- full address of file in qemu repo
 file=$1
 
-code --diff ~/tools/qemu/"$file" ~/tools/qemu-vmfork/qemu-5.2.0/"$file"
+echo "Diffing $file"
+echo "Address in default qemu: /home/bilal/tools/qemu/$file"
+echo "Address in qemu-vmfork: /home/bilal/tools/qemu-vmfork/qemu-5.2.0/$file"
+
+code --diff /home/bilal/tools/qemu/"$file" /home/bilal/tools/qemu-vmfork/qemu-5.2.0/"$file"
