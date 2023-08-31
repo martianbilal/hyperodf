@@ -29,7 +29,9 @@
 #include "qemu/rcu_queue.h"
 #include "qemu/queue.h"
 #include "qemu/thread.h"
+#include "qemu/event_notifier.h"
 #include "qemu/plugin.h"
+#include "qemu/typedefs.h"
 #include "qom/object.h"
 
 typedef int (*WriteCoreDumpFunction)(const void *buf, size_t size,
@@ -308,6 +310,11 @@ struct qemu_work_item;
 
 #define CPU_UNSET_NUMA_NODE_ID -1
 #define CPU_TRACE_DSTATE_MAX_EVENTS 32
+/*
+ * These values are obtained from the parent KVM vcpu before the
+ * fork syscall in the parent process.   
+ */
+struct cpu_prefork_state;
 
 /**
  * CPUState:
@@ -367,6 +374,7 @@ struct CPUState {
 
     int nr_cores;
     int nr_threads;
+    bool child_cpu;
 
     struct QemuThread *thread;
 #ifdef _WIN32
@@ -393,6 +401,7 @@ struct CPUState {
     int singlestep_enabled;
     int64_t icount_budget;
     int64_t icount_extra;
+    int64_t nr_fork_vms;
     uint64_t random_seed;
     sigjmp_buf jmp_env;
 
@@ -405,6 +414,7 @@ struct CPUState {
     MemoryRegion *memory;
 
     void *env_ptr; /* CPUArchState */
+    void *old_env_ptr;
     IcountDecr *icount_decr_ptr;
 
     /* Accessed in parallel; all accesses must be atomic */
@@ -431,6 +441,7 @@ struct CPUState {
     int kvm_fd;
     struct KVMState *kvm_state;
     struct kvm_run *kvm_run;
+    struct kvm_run *old_kvm_run;
 
     /* Used for events with 'vcpu' and *without* the 'disabled' properties */
     DECLARE_BITMAP(trace_dstate_delayed, CPU_TRACE_DSTATE_MAX_EVENTS);
@@ -443,6 +454,10 @@ struct CPUState {
     /* saved iotlb data from io_writex */
     SavedIOTLB saved_iotlb;
 #endif
+
+    EventNotifier fork_event; 
+    EventNotifier save_event;
+    EventNotifier load_event;
 
     /* TODO Move common fields from CPUArchState here. */
     int cpu_index;
@@ -461,12 +476,33 @@ struct CPUState {
 
     bool ignore_memory_transaction_failures;
 
+    // the VCPU thread should only wait for the fork, if the VCPU has received the call for fork
+    bool should_wait; 
+
+    // an indicator to run the post fork routine 
+    bool vm_forked; 
+
+    // true if the cpu is part of the FORK-ed process
+    bool is_child; 
+
     struct hax_vcpu_state *hax_vcpu;
 
+    // [Bilal] [Measure] variables to measure full and partial vm fork time 
+    struct timespec start_universal, stop_universal, start_forkall_master, end_forkall_master, cpu_thread_forked, end_cpu_restore;
+    
     int hvf_fd;
+    /* Used to send fork signals */
+    int fork_fd[2]; 
+
+    bool forked; 
 
     /* track IOMMUs whose translations we've cached in the TCG TLB */
     GArray *iommu_notifiers;
+    struct cpu_prefork_state *prefork_state;
+    bool vcpu_recreated;
+    QemuMutex vcpu_recreated_mutex; 
+    QemuCond vcpu_recreated_cond;
+    bool system_reset;
 };
 
 typedef QTAILQ_HEAD(CPUTailQ, CPUState) CPUTailQ;
