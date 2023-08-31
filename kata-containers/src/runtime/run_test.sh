@@ -37,6 +37,7 @@ POD_ID=$(sudo crictl --debug runp -r kata podsandbox-config.yaml |& tee -a $LOG_
 echo "Pod ID: $POD_ID"
 
 # remove the pod 
+sudo crictl stopp "$POD_ID"
 sudo crictl rmp "$POD_ID" 2>&1 | tee -a $LOG_FILE
 
 

@@ -3045,6 +3045,51 @@ func LaunchCustomQemu(ctx context.Context, path string, params []string, fds []*
 		errStr = stderr.String()
 		logger.Errorf("%s", errStr)
 	}
-	AttachStraceToQEMU("/tmp/strace.txt")
+	// AttachStraceToQEMU("/tmp/strace.txt")
 	return errStr, err
 }
+
+// func LaunchCustomQemu(ctx context.Context, path string, params []string, fds []*os.File,
+// 	attr *syscall.SysProcAttr, logger QMPLog) (string, error) {
+// 	if logger == nil {
+// 		logger = qmpNullLogger{}
+// 	}
+
+// 	errStr := ""
+
+// 	if path == "" {
+// 		path = "qemu-system-x86_64"
+// 	}
+
+// 	var paramsStr string
+// 	for _, param := range params {
+// 		paramsStr += param + " "
+// 	}
+
+// 	hodf.H_log(fmt.Sprintf("params : %s\n", paramsStr))
+
+// 	// Here we prepend the strace command and its arguments to the cmd slice
+// 	straceCmd := []string{"strace", "-f", "-o", "/tmp/strace.txt", path}
+// 	params = append(straceCmd, params...)
+
+// 	/* #nosec */
+// 	cmd := exec.CommandContext(ctx, "strace", params...)
+// 	if len(fds) > 0 {
+// 		logger.Infof("Adding extra file %v", fds)
+// 		cmd.ExtraFiles = fds
+// 	}
+
+// 	cmd.SysProcAttr = attr
+
+// 	var stderr bytes.Buffer
+// 	cmd.Stderr = &stderr
+// 	logger.Infof("launching %s with: %v", path, params)
+
+// 	err := cmd.Run()
+// 	if err != nil {
+// 		logger.Errorf("Unable to launch %s: %v", path, err)
+// 		errStr = stderr.String()
+// 		logger.Errorf("%s", errStr)
+// 	}
+// 	return errStr, err
+// }
