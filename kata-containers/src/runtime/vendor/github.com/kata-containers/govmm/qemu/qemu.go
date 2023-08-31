@@ -26,6 +26,7 @@ package qemu
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -36,6 +37,8 @@ import (
 	"syscall"
 
 	"context"
+
+	hodf "github.com/kata-containers/kata-containers/src/runtime/pkg/hodf"
 )
 
 // Machine describes the machine type qemu will emulate.
@@ -2858,6 +2861,61 @@ func (config *Config) appendFwCfg(logger QMPLog) {
 	}
 }
 
+/*
+	This function finds the process that is running the qemu instance
+	and attaches strace to it and starts storing the output of the
+	strace in a file.
+	basically runs this command sudo strace -p $(pid of the qemu process) -o /tmp/strace.txt
+	pid of the qemu process can be obtained by ps aux | grep qemu
+*/
+func AttachStraceToQEMU(outputFile string) error {
+	hodf.H_log("Starting to attach strace to QEMU process...")
+
+	// Get the list of running processes
+	hodf.H_log("Fetching list of running processes...")
+	cmd := exec.Command("ps", "aux")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		hodf.H_log(fmt.Sprintf("Failed to get the list of processes: %v", err))
+		return fmt.Errorf("failed to get the list of processes: %v", err)
+	}
+
+	// Search for the QEMU process
+	hodf.H_log("Searching for the QEMU process...")
+	lines := strings.Split(out.String(), "\n")
+	var qemuPID string
+	for _, line := range lines {
+		if strings.Contains(line, "qemu-system-x86_64") {
+			fields := strings.Fields(line)
+			if len(fields) > 1 {
+				qemuPID = fields[1]
+				break
+			}
+		}
+	}
+
+	if qemuPID == "" {
+		hodf.H_log("Could not find a running QEMU process.")
+		return errors.New("could not find a running QEMU process")
+	}
+
+	hodf.H_log(fmt.Sprintf("Found QEMU process with PID: %s", qemuPID))
+
+	// Attach strace to the QEMU process
+	hodf.H_log("Attaching strace to the QEMU process...")
+	straceCmd := exec.Command("sudo", "strace", "-p", qemuPID, "-o", outputFile)
+	err = straceCmd.Start()
+	if err != nil {
+		hodf.H_log(fmt.Sprintf("Failed to attach strace to the QEMU process: %v", err))
+		return fmt.Errorf("failed to attach strace to the QEMU process: %v", err)
+	}
+
+	hodf.H_log("Successfully attached strace to QEMU!")
+	return nil
+}
+
 // LaunchQemu can be used to launch a new qemu instance.
 //
 // The Config parameter contains a set of qemu parameters and settings.
@@ -2962,6 +3020,12 @@ func LaunchCustomQemu(ctx context.Context, path string, params []string, fds []*
 		path = "qemu-system-x86_64"
 	}
 
+	var paramsStr string
+	for _, param := range params {
+		paramsStr += param + " "
+	}
+
+	hodf.H_log(fmt.Sprintf("params : %s\n", paramsStr))
 	/* #nosec */
 	cmd := exec.CommandContext(ctx, path, params...)
 	if len(fds) > 0 {
@@ -2981,5 +3045,6 @@ func LaunchCustomQemu(ctx context.Context, path string, params []string, fds []*
 		errStr = stderr.String()
 		logger.Errorf("%s", errStr)
 	}
+	AttachStraceToQEMU("/tmp/strace.txt")
 	return errStr, err
 }

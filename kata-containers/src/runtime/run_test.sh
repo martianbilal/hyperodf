@@ -15,8 +15,13 @@ POD_CONFIG="podsandbox-config.yaml"
 RUNTIME="kata"
 # CLI="crictl"
 LOG_FILE="log.txt"
-HYPERODF_TMP_FILE="/tmp/test3.txt"
+HYPERODF_LOG_FILE="/tmp/hodf.txt"
+STRACE_LOG_FILE="/tmp/strace.txt"
 QEMU_LOG_FILE="/tmp/qemu_log.txt"
+
+
+sudo rm $HYPERODF_LOG_FILE
+sudo rm $STRACE_LOG_FILE
 
 # empty the log file 
 echo "============================LOG STARTING============================" > $LOG_FILE

@@ -789,6 +789,7 @@ func (q *qemu) startSandbox(ctx context.Context, timeout int) error {
 		return err
 	}
 	// append logfile only on debug
+	q.config.Debug = true
 	if q.config.Debug {
 		q.qemuConfig.LogFile = filepath.Join(vmPath, "qemu.log")
 	}
