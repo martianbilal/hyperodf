@@ -88,6 +88,7 @@ void *qemu_ram_mmap(int fd,
                     bool shared,
                     bool is_pmem)
 {
+    int prot;
     int flags;
     int map_sync_flags = 0;
     int guardfd;
@@ -127,7 +128,7 @@ void *qemu_ram_mmap(int fd,
     flags = MAP_PRIVATE | MAP_ANONYMOUS;
 #endif
 
-    guardptr = mmap(0, total, PROT_NONE, flags, guardfd, 0);
+    guardptr = mmap(0, total, PROT_READ | PROT_WRITE, flags, guardfd, 0);
 
     if (guardptr == MAP_FAILED) {
         return MAP_FAILED;
@@ -139,15 +140,15 @@ void *qemu_ram_mmap(int fd,
 
     flags = MAP_FIXED;
     flags |= fd == -1 ? MAP_ANONYMOUS : 0;
-    flags |= shared ? MAP_SHARED : MAP_PRIVATE;
+    // flags |= shared ? MAP_SHARED : MAP_PRIVATE;
+    flags |= MAP_PRIVATE;
     if (shared && is_pmem) {
         map_sync_flags = MAP_SYNC | MAP_SHARED_VALIDATE;
     }
 
     offset = QEMU_ALIGN_UP((uintptr_t)guardptr, align) - (uintptr_t)guardptr;
-
-    ptr = mmap(guardptr + offset, size, PROT_READ | PROT_WRITE,
-               flags | map_sync_flags, fd, 0);
+    prot = PROT_READ | PROT_WRITE;
+    ptr = mmap(guardptr + offset, size, prot, flags | map_sync_flags, fd, 0);
 
     if (ptr == MAP_FAILED && map_sync_flags) {
         if (errno == ENOTSUP) {
@@ -171,8 +172,7 @@ void *qemu_ram_mmap(int fd,
          * if map failed with MAP_SHARED_VALIDATE | MAP_SYNC,
          * we will remove these flags to handle compatibility.
          */
-        ptr = mmap(guardptr + offset, size, PROT_READ | PROT_WRITE,
-                   flags, fd, 0);
+        ptr = mmap(guardptr + offset, size, prot, flags, fd, 0);
     }
 
     if (ptr == MAP_FAILED) {
