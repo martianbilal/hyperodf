@@ -875,6 +875,36 @@ void vmstate_unregister(VMStateIf *obj, const VMStateDescription *vmsd,
     }
 }
 
+#ifndef QEMU_FILE
+#define QEMU_FILE
+
+#define IO_BUF_SIZE 32768
+#define MAX_IOV_SIZE MIN_CONST(IOV_MAX, 64)
+struct QEMUFile {
+    const QEMUFileOps *ops;
+    const QEMUFileHooks *hooks;
+    void *opaque;
+
+    int64_t bytes_xfer;
+    int64_t xfer_limit;
+
+    int64_t pos; /* start of buffer when writing, end of buffer
+                    when reading */
+    int buf_index;
+    int buf_size; /* 0 when writing */
+    uint8_t buf[IO_BUF_SIZE];
+
+    DECLARE_BITMAP(may_free, MAX_IOV_SIZE);
+    struct iovec iov[MAX_IOV_SIZE];
+    unsigned int iovcnt;
+
+    int last_error;
+    Error *last_error_obj;
+    /* has the file has been shutdown */
+    bool shutdown;
+};
+#endif
+
 static int vmstate_load(QEMUFile *f, SaveStateEntry *se)
 {
     trace_vmstate_load(se->idstr, se->vmsd ? se->vmsd->name : "(old)");
@@ -2937,6 +2967,12 @@ void qmp_xen_load_devices_state(const char *filename, Error **errp)
         error_setg(errp, QERR_IO_ERROR);
     }
     migration_incoming_state_destroy();
+}
+
+void kick_all(void){
+    printf("kick_all is called \n");
+    cpu_kick_all();
+    return;
 }
 
 int load_snapshot(const char *name, Error **errp)

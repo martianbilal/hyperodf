@@ -3270,6 +3270,25 @@ void memory_region_init_rom_device(MemoryRegion *mr,
     vmstate_register_ram(mr, owner_dev);
 }
 
+void* get_address_spaces(){
+    return &address_spaces;
+}
+
+int set_address_space(int cpufd){
+    AddressSpace *as;
+
+    #ifdef DBG_MEM
+    // QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
+    //     printf("[debug] Going through all the as's--\n");
+    //     printf("[debug] as->name: %s\n", as->name);
+    //     as->root->addr
+    // }
+
+    #endif
+
+    return 0; 
+}
+
 /*
  * Support softmmu builds with CONFIG_FUZZ using a weak symbol and a stub for
  * the fuzz_dma_read_cb callback

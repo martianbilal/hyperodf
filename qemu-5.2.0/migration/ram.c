@@ -56,6 +56,7 @@
 #include "savevm.h"
 #include "qemu/iov.h"
 #include "multifd.h"
+#include <time.h>
 
 /***********************************************************/
 /* ram save/restore */
@@ -1746,6 +1747,9 @@ static int ram_save_host_page(RAMState *rs, PageSearchStatus *pss,
     return pages;
 }
 
+
+#define BILLION  1000000000L;
+
 /**
  * ram_find_and_save_block: finds a dirty page and sends it to f
  *
@@ -2631,6 +2635,10 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
     RAMState *rs = *temp;
     int ret = 0;
 
+    struct timespec start, end;
+    double accum = 0;
+    clock_gettime(CLOCK_REALTIME, &start);
+
     WITH_RCU_READ_LOCK_GUARD() {
         if (!migration_in_postcopy()) {
             migration_bitmap_sync_precopy(rs);
@@ -2664,6 +2672,12 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
         qemu_put_be64(f, RAM_SAVE_FLAG_EOS);
         qemu_fflush(f);
     }
+
+    clock_gettime(CLOCK_REALTIME, &end);
+    accum = (end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+    // printf( "[measurement]Time spent in the %s:  %lf\n", __func__, accum);
+
 
     return ret;
 }
