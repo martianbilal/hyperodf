@@ -43,6 +43,7 @@
 #include "sysemu/cpu-timers.h"
 #include "hw/boards.h"
 #include "hw/hw.h"
+#include "util/forkall-coop.h"
 
 #ifdef CONFIG_LINUX
 
@@ -410,13 +411,40 @@ void qemu_wait_io_event_common(CPUState *cpu)
 void qemu_wait_io_event(CPUState *cpu)
 {
     bool slept = false;
+    #if USE_HYPERODF == 1
+    int did_fork = 0;
+    int is_child = 0;
+    int ret = 0;
+    int count = 0;
+    bool slept = false;
+    #endif 
 
     while (cpu_thread_is_idle(cpu)) {
         if (!slept) {
             slept = true;
             qemu_plugin_vcpu_idle_cb(cpu);
         }
-        qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        #if USE_HYPERODF == 1
+            wait_again:
+            if(!did_fork && !is_child && !forkall_check_child()){
+                ret = qemu_cond_timedwait(cpu->halt_cond, &qemu_global_mutex, 100);
+                // printf("returned from timedwait[%d][did_fork: %d][is_child: %d]\n", getpid(), did_fork, is_child);
+                ski_forkall_slave(&did_fork, &is_child);
+                
+                // TODO: count <= 1 would be problematic for starting multiple VMs
+                if(did_fork && is_child && count <= 1){
+                    count = count + 1;
+                    kvm_establish_child(cpu, &(cpu->kvm_state), &(cpu->kvm_run), cpu->prefork_state);
+                }
+                if(ret != 0){
+                    goto wait_again;
+                }
+            } else {
+                qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+            }
+        #else 
+            qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        #endif
     }
     if (slept) {
         qemu_plugin_vcpu_resume_cb(cpu);
@@ -526,6 +554,16 @@ void cpu_thread_signal_destroyed(CPUState *cpu)
 }
 
 
+static bool pause_vcpu(void){
+    CPUState *cpu;
+
+    CPU_FOREACH(cpu) {
+        cpu->stopped = true;
+    }
+
+    return true;
+}
+
 static bool all_vcpus_paused(void)
 {
     CPUState *cpu;
@@ -559,10 +597,15 @@ void pause_all_vcpus(void)
     replay_mutex_unlock();
 
     while (!all_vcpus_paused()) {
-        qemu_cond_wait(&qemu_pause_cond, &qemu_global_mutex);
-        CPU_FOREACH(cpu) {
-            qemu_cpu_kick(cpu);
+        if(USE_HYPERODF){
+            pause_vcpu();
+        } else {
+            qemu_cond_wait(&qemu_pause_cond, &qemu_global_mutex);
+            CPU_FOREACH(cpu) {
+                qemu_cpu_kick(cpu);
+            }
         }
+        
     }
 
     qemu_mutex_unlock_iothread();
