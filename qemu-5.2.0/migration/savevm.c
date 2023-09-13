@@ -35,6 +35,7 @@
 #include "migration/misc.h"
 #include "migration/register.h"
 #include "migration/global_state.h"
+#include "qemu/thread.h"
 #include "ram.h"
 #include "qemu-file-channel.h"
 #include "qemu-file.h"
@@ -62,6 +63,7 @@
 #include "migration/colo.h"
 #include "qemu/bitmap.h"
 #include "net/announce.h"
+#include <stdio.h>
 
 const unsigned int postcopy_ram_discard_version;
 
@@ -1253,6 +1255,12 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
 
     trace_savevm_state_iterate();
     QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
+        if(USE_HYPERODF){
+            if(strcmp(se->idstr, "ram") == 0){
+                continue;
+            }
+        }
+        
         if (!se->ops || !se->ops->save_live_iterate) {
             continue;
         }
