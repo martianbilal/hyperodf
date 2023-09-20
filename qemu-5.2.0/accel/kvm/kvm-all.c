@@ -13,10 +13,17 @@
  *
  */
 
+#include <time.h>
+#include <sys/time.h>
 #include "qemu/osdep.h"
 #include <sys/ioctl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #include <linux/kvm.h>
+#include <unistd.h>
 
 #include "qemu/atomic.h"
 #include "qemu/option.h"
@@ -27,6 +34,8 @@
 #include "hw/pci/msix.h"
 #include "hw/s390x/adapter.h"
 #include "exec/gdbstub.h"
+#include "qemu/typedefs.h"
+#include "sysemu/cpu-timers.h"
 #include "sysemu/kvm_int.h"
 #include "sysemu/runstate.h"
 #include "sysemu/cpus.h"
@@ -47,8 +56,35 @@
 #include "qemu/guest-random.h"
 #include "sysemu/hw_accel.h"
 #include "kvm-cpus.h"
+#include "migration/snapshot.h"
+#include "migration/misc.h"
+#include "target/i386/cpu.h"
 
 #include "hw/boards.h"
+#include "util/forkall-coop.h"
+#include "util/hodf-util.h"
+// #include "cpu.h"
+
+
+
+// #define DBG_IO
+#define DBG_MEASURE
+// #define DBG_FDS
+// #define DBG_RIP_CHILD
+// #define DBG_RIP_PARENT
+// #define DBG_RIP_PARENT_PREFORK
+
+// uncomment to print Parent RIP before each KVM_RUN [post fork]
+//#define DBG_TEST_RIP_PARENT_EXCLUSIVE
+
+#define KVM_DEBUG 0xC004AEC6
+
+#define BILLION  1E9
+
+static int FORK_COUNTER = 0; 
+
+// int forkvmfd[2];
+// #define DBG
 
 /* This check must be after config-host.h is included */
 #ifdef CONFIG_EVENTFD
@@ -60,7 +96,22 @@
  */
 #define PAGE_SIZE qemu_real_host_page_size
 
+#define num_of_get_ioctls 7
+
+// #define FORK_TEST 1 
+
+// #define TIMESTAMP_PRINT 1 
+
 //#define DEBUG_KVM
+
+// #define DEBUG
+#ifdef DEBUG
+#define DEBUG_PRINTF(format, ...) do{  fprintf( stderr, "%s::%s(%d) " format, __FILE__, __FUNCTION__,  __LINE__, ##__VA_ARGS__ ); } while( 0 )
+#else
+#define DEBUG_PRINTF(format, ...) do{ } while ( 0 )
+#endif
+
+
 
 #ifdef DEBUG_KVM
 #define DPRINTF(fmt, ...) \
@@ -131,6 +182,110 @@ struct KVMState
         AddressSpace *as;
     } *as;
 };
+
+
+/*
+
+Dumps the Values of the KVMState to a file 
+
+
+
+TODO: Add the support 
+        - printing gsimap
+        - printing parent_obj
+*/
+void dumpKVMState(struct KVMState *s, char* filename, char *description){
+    
+    printf("Start printing out the KVM State : \n");
+    FILE *dumpFile; 
+    dumpFile = fopen(filename, "w");
+
+    fprintf(dumpFile, "---- This is the struct for : %s --- \n", description);
+
+    // AccelState parent_obj;
+    fprintf(dumpFile, "Accel State - parent_obj : %lx\n", s->parent_obj);
+    // int nr_slots;
+    fprintf(dumpFile, "nr_slots : %d\n", s->nr_slots);
+    // int fd;
+    fprintf(dumpFile, "fd : %d\n", s->fd);
+    // int vmfd;
+    fprintf(dumpFile, "vmfd : %d\n", s->vmfd);
+
+    // int coalesced_mmio;
+    fprintf(dumpFile, "coalesced_mmio : %d\n", s->coalesced_mmio);
+    // int coalesced_pio;
+    fprintf(dumpFile, "coalesced_pio : %d\n", s->coalesced_pio);
+    
+    // struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
+    fprintf(dumpFile, "coalesced_mmio_ring : %lx\n", s->coalesced_mmio_ring);
+    // bool coalesced_flush_in_progress;
+    fprintf(dumpFile, "coalesced_flush_in_progress : %d\n", s->coalesced_flush_in_progress);
+    // int vcpu_events;
+    fprintf(dumpFile, "vcpu_events : %d\n", s->vcpu_events);
+    // int robust_singlestep;
+    fprintf(dumpFile, "robust_singlestep : %d \n", s->robust_singlestep);
+    // int debugregs;
+    fprintf(dumpFile, "debugregs : %d \n", s->debugregs);
+    
+    // int max_nested_state_len;
+    fprintf(dumpFile, "max_nested_state_len : %d \n", s->max_nested_state_len);
+    
+    // int many_ioeventfds;
+    fprintf(dumpFile, "many_ioeventfds : %d \n", s->many_ioeventfds);
+    
+    // int intx_set_mask;
+    fprintf(dumpFile, "intx_set_mask : %d \n", s->intx_set_mask);
+
+    // int kvm_shadow_mem;
+    fprintf(dumpFile, "kvm_shadow_mem : %d \n", s->kvm_shadow_mem);
+    // bool kernel_irqchip_allowed;
+    fprintf(dumpFile, "kernel_irqchip_allowed : %d \n", s->kernel_irqchip_allowed);
+    
+    // bool kernel_irqchip_required;
+    fprintf(dumpFile, "kernel_irqchip_required : %d \n", s->kernel_irqchip_required);
+    // OnOffAuto kernel_irqchip_split;
+    fprintf(dumpFile, "kernel_irqchip_split : %d \n", s->kernel_irqchip_split);
+    // bool sync_mmu;
+    fprintf(dumpFile, "sync_mmu : %d\n", s->sync_mmu);
+    // uint64_t manual_dirty_log_protect;
+    fprintf(dumpFile, "manual_dirty_log_protect : %d\n", s->manual_dirty_log_protect);
+    /* The man page (and posix) say ioctl numbers are signed int, but
+     * they're not.  Linux, glibc and *BSD all treat ioctl numbers as
+     * unsigned, and treating them as signed here can break things */
+    // unsigned irq_set_ioctl;
+    fprintf(dumpFile, "irq_set_ioctl : %x\n", s->irq_set_ioctl);
+    // unsigned int sigmask_len;
+    fprintf(dumpFile, "sigmask_len : %x\n", s->sigmask_len);
+
+    // GHashTable *gsimap;
+    
+#ifdef KVM_CAP_IRQ_ROUTING
+    // struct kvm_irq_routing *irq_routes;
+    fprintf(dumpFile, "irq_routes : %lx\n", s->irq_routes);
+    // int nr_allocated_irq_routes;
+    fprintf(dumpFile, "nr_allocated_irq_routes : %d\n", s->nr_allocated_irq_routes);
+    // unsigned long *used_gsi_bitmap;
+    fprintf(dumpFile, "used_gsi_bitmap : %lx\n", *(s->used_gsi_bitmap));
+    // unsigned int gsi_count;
+    fprintf(dumpFile, "gsi_count : %u\n", s->gsi_count);
+    // QTAILQ_HEAD(, KVMMSIRoute) msi_hashtab[KVM_MSI_HASHTAB_SIZE];
+#endif
+    // KVMMemoryListener memory_listener;
+    // QLIST_HEAD(, KVMParkedVcpu) kvm_parked_vcpus;
+
+    // /* memory encryption */
+    // void *memcrypt_handle;
+    // int (*memcrypt_encrypt_data)(void *handle, uint8_t *ptr, uint64_t len);
+
+    // /* For "info mtree -f" to tell if an MR is registered in KVM */
+    // int nr_as;
+    // struct KVMAs {
+    //     KVMMemoryListener *ml;
+    //     AddressSpace *as;
+    // } *as;
+    fclose(dumpFile);
+
+}
 
 KVMState *kvm_state;
 bool kvm_kernel_irqchip;
@@ -406,7 +561,9 @@ static int do_kvm_destroy_vcpu(CPUState *cpu)
     if (ret < 0) {
         goto err;
     }
-
+    
+    qemu_mutex_destroy(&cpu->vcpu_recreated_mutex);
+    qemu_cond_destroy(&cpu->vcpu_recreated_cond);
     vcpu = g_malloc0(sizeof(*vcpu));
     vcpu->vcpu_id = kvm_arch_vcpu_id(cpu);
     vcpu->kvm_fd = cpu->kvm_fd;
@@ -447,9 +604,19 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
     long mmap_size;
     int ret;
 
+    if(cpu->child_cpu){
+        kvm_state = cpu->kvm_state;
+        s = kvm_state;
+    }
+
     trace_kvm_init_vcpu(cpu->cpu_index, kvm_arch_vcpu_id(cpu));
 
-    ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu));
+    if(cpu->is_child){
+        ret = cpu->kvm_fd;
+    } else {
+        ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu));
+    }
+
     if (ret < 0) {
         error_setg_errno(errp, -ret, "kvm_init_vcpu: kvm_get_vcpu failed (%lu)",
                          kvm_arch_vcpu_id(cpu));
@@ -468,16 +635,17 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
         goto err;
     }
 
-    cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        cpu->kvm_fd, 0);
-    if (cpu->kvm_run == MAP_FAILED) {
-        ret = -errno;
-        error_setg_errno(errp, ret,
-                         "kvm_init_vcpu: mmap'ing vcpu state failed (%lu)",
-                         kvm_arch_vcpu_id(cpu));
-        goto err;
+    if(!cpu->is_child){
+        cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                            cpu->kvm_fd, 0);
+        if (cpu->kvm_run == MAP_FAILED) {
+            ret = -errno;
+            error_setg_errno(errp, ret,
+                            "kvm_init_vcpu: mmap'ing vcpu state failed (%lu)",
+                            kvm_arch_vcpu_id(cpu));
+            goto err;
+        }
     }
-
     if (s->coalesced_mmio && !s->coalesced_mmio_ring) {
         s->coalesced_mmio_ring =
             (void *)cpu->kvm_run + s->coalesced_mmio * PAGE_SIZE;
@@ -1921,7 +2089,7 @@ void kvm_irqchip_set_qemuirq_gsi(KVMState *s, qemu_irq irq, int gsi)
     g_hash_table_insert(s->gsimap, irq, GINT_TO_POINTER(gsi));
 }
 
-static void kvm_irqchip_create(KVMState *s)
+void kvm_irqchip_create(KVMState *s)
 {
     int ret;
 
@@ -2449,12 +2617,684 @@ static void kvm_eat_signals(CPUState *cpu)
     } while (sigismember(&chkset, SIG_IPI));
 }
 
+//union to be used in the get_attr() ioctl call 
+union get_structure 
+{
+    struct kvm_regs *regs; 
+    struct kvm_sregs *sregs;
+    struct kvm_cpuid2 *cpuid2; 
+    struct kvm_msrs *msrs; 
+    int *tsc_khz;
+    struct kvm_xsave *xsave; 
+    struct kvm_xcrs *xcrs; 
+
+}; 
+
+//saves the state of Parent VM
+int vm_pre_fork(struct KVMState *kvm) 
+{
+    return 0; 
+}
+
+//sets up the state of the Child VM  
+int vm_post_fork_child(struct KVMState *kvm) 
+{
+    return 0; 
+}
+
+int get_attr(int ioctl_id, int vcpufd, union get_structure in_union)
+{   
+    int ret = 0; 
+    do 
+    {
+        ret = ioctl(vcpufd, ioctl_id, in_union); 
+    } while ( ret == -EINTR); 
+    return ret; 
+}
+
+int cpu_get_pre_fork_state(CPUState *cpu, struct cpu_prefork_state *state, int vcpufd) 
+{ 
+
+    int ret = 0; 
+    int get_ioctls[num_of_get_ioctls] = {KVM_GET_REGS, KVM_SET_REGS, KVM_GET_CPUID2, KVM_GET_MSRS, KVM_GET_TSC_KHZ, KVM_GET_XSAVE, KVM_GET_XCRS}; 
+    
+    struct kvm_regs regs; 
+    struct kvm_sregs sregs;
+    struct kvm_cpuid2 cpuid2;
+    struct kvm_msrs msrs;  
+    struct kvm_xsave xsave;
+    struct kvm_xcrs xcrs; 
+    struct kvm_mp_state mp_state;
+    struct kvm_vcpu_events vcpu_events;
+    struct kvm_fpu fpu; 
+    struct kvm_irqchip irqchip[3];
+
+    int tsc_khz; 
+    union get_structure structs[num_of_get_ioctls] = {};
+
+    
+    char *attr = "";
+    
+    // for(int i = 0; i < num_of_get_ioctls; i++)
+    // {
+    //     get_attr(get_ioctls[i], vcpufd, get_struct[i]);
+    // }
+
+    // get_attr(KVM_GET_REGS, vcpufd, regs);
+    // get_attr(KVM_GET_SREGS, vcpufd, sregs);
+
+
+    #ifdef DBG
+    printf("[debug] calling %s", __func__);
+    #endif
+    
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_REGS, &regs);
+    } while (ret == -EINTR);
+    attr = "regs";
+    if(ret < 0) goto err;
+    state->regs = regs;
+        
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_SREGS, &sregs);
+    } while (ret == -EINTR);
+    attr = "sregs";
+    if(ret < 0) goto err;
+    state->sregs = sregs;
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_FPU, &fpu);
+    } while (ret == -EINTR);
+    attr = "fpu";
+    if(ret < 0) goto err;
+    state->fpu = fpu;
+
+    // uncomment this code if we need to set the cpuid later on
+    // TODO: Set up the cpuid2 properly 
+    // do
+    // {
+    //     ret = ioctl(vcpufd, KVM_GET_CPUID2, &cpuid2);
+    // } while (ret == -EINTR);
+    // attr = "cpuid2";
+    // if(ret < 0) goto err;
+    // state->cpuid2 = cpuid2;
+
+
+    // [BILAL] [TODO] Commenting it out cause it was erroring out
+    // [BILAL] remember to come back to it in case of any problem 
+    // do
+    // {
+    //     ret = ioctl(vcpufd, KVM_GET_MSRS, &msrs);
+    // } while (ret == -EINTR);
+    // attr = "msrs";
+    // if(ret < 0) goto err;
+    // state->msrs = msrs;
+    
+    // [Replacement] :  
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_TSC_KHZ, &tsc_khz);
+    } while (ret == -EINTR);
+    attr = "tsc_khz";
+    if(ret < 0) goto err;
+    state->tsc_khz = tsc_khz;
+    #ifdef DBG
+        printf("[debug] prefork-tsc : %d", tsc_khz);    
+    #endif
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_XSAVE, &xsave);
+    } while (ret == -EINTR);
+    attr = "xsave";
+    if(ret < 0) goto err;
+    state->xsave = xsave;
+
+
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_XCRS, &xcrs);
+    } while (ret == -EINTR);
+    attr = "xcrs";
+    if(ret < 0) goto err;
+    state->xcrs = xcrs;
+    
+    do
+    {
+        ret = ioctl(vcpufd, KVM_GET_MP_STATE, &mp_state);
+    } while (ret == -EINTR);
+    attr = "mp_state";
+    if(ret < 0) goto err;
+    state->mp_state = mp_state;
+
+
+    memset(&vcpu_events, 0, sizeof(vcpu_events));
+    ret = ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &vcpu_events);
+    attr = "vcpu_events";
+    if(ret < 0) goto err;
+    state->vcpu_events = vcpu_events;
+
+    ret = kvm_arch_get_registers(cpu);
+    // do_kvm_cpu_synchronize_state
+
+
+
+        //for more complex ioctls 
+        //TODO: write this function
+        // kvm_ioctl_get_state(int ioctl_id, int vcpufd, void* input_args);
+
+        // kvm_set_state(void *input_args);
+
+        //In case attribute's state can not be retrieved from KVM 
+        //this function gets state from the CPUState or KVMState
+        // kvm_cpu_get_state(void* input_args);
+
+    return ret; 
+
+
+err: 
+    printf("Failed to get attributes for %s, returned with reason: %d\n", attr, ret);
+    fflush(stdout);
+    perror("FAILED TO GET VCPU ATTRIBUTES");
+    return -1;
+
+}
+
+/* int kvm_copy_attr(CPUState *cpu,int get_type, int set_type){ */
+/*   int ret = 0; */ 
+/*   kvm_vcpu_ioctl(cpu, get_type, ); */
+/*   return ret; */ 
+/* } */
+
+/*
+ * set the attrs for vcpu id vcpufd same as that 
+ * of the vcpu id cpu->fd
+ * */
+int  kvm_set_vcpu_attrs(CPUState *cpu, struct cpu_prefork_state *state, int vcpufd)
+{
+    int ret = 0;
+    char *attr; 
+    X86CPU *cpu_x86 = X86_CPU(cpu);
+    
+    #ifdef DBG
+    printf("starting set attrs\n");
+    #endif
+    // state->regs.rip = 0xacdc;
+    //set regs
+    /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_REGS, regs); */
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_REGS, &(state->regs));
+    } while (ret == -EINTR);
+    attr="regs";
+    if(ret<0) goto err;
+    
+    //set sregs
+    /* ret = kvm_vcpu_ioctl(cpu, KVM_SET_SREGS, sregs); */
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_SREGS, &(state->sregs));
+    } while (ret == -EINTR);
+    attr="sregs";
+    if(ret<0) goto err;
+
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_TSC_KHZ, &(state->tsc_khz));
+    // } while (ret == -EINTR);
+    // attr="tsc_khz";
+    // if(ret<0) goto err;
+    
+    do
+    {
+        ret = ioctl(vcpufd, KVM_SET_FPU, &(state->fpu));
+    } while (ret == -EINTR);
+    attr = "fpu";
+    if(ret < 0) goto err;
+
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_MSRS, cpu_x86->kvm_msr_buf);
+    // } while (ret == -EINTR);
+    // attr="msrs";
+    // if(ret<0) goto err;
+
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_XSAVE, &(state->xsave));
+    } while (ret == -EINTR);
+    attr="xsave";
+    if(ret<0) goto err;
+
+    // [BILAL] [TODO] Commenting it out cause it was erroring out
+    // [BILAL] remember to come back to it in case of any problem 
+    // do 
+    // {
+    //     ret = ioctl(vcpufd, KVM_SET_XCRS, &(state->xcrs));
+    // } while (ret == -EINTR);
+    // attr="xcrs";
+    // if(ret<0) goto err;
+
+
+    state->vcpu_events.flags=0x00;
+    ret = ioctl(vcpufd, KVM_SET_VCPU_EVENTS, &(state->vcpu_events));
+    attr="vcpu_events";
+    if(ret<0) goto err;
+
+
+    
+    do 
+    {
+        ret = ioctl(vcpufd, KVM_SET_MP_STATE, &(state->mp_state));
+    } while (ret == -EINTR);
+    attr="mp_state";
+    if(ret<0) goto err;
+
+    
+
+
+    // //set mce 
+    // do { 
+    //     ret = ioctl(vcpufd, KVM_X86_SETUP_MCE, state->mce_num);
+    // } while (ret == -EINTR); 
+
+    // //set cpuid2 
+    // do  {
+
+    // }
+    
+
+    //set fpu 
+    //set msrs
+    //set xsave 
+    //set events 
+    //set lapic
+    //set xcrs 
+    //set irqchip[3]
+    //set clock data
+    //set pit2
+    //set mp_state0x7ffff7ff2000
+    //set debuggers
+    #ifdef DBG
+    printf("[debug] done with set attrs\n");
+    #endif
+    // ret = kvm_arch_put_registers(cpu, KVM_PUT_FULL_STATE);
+    return ret; 
+  
+err:
+    printf("Failed to set attributes for %s, returned with reason: %d", attr, ret);
+    perror("FAILED TO SET VCPU ATTRIBUTES");
+    return -1; 
+}
+
+void kvm_vcpu_print_times(CPUState *cpu){
+    double strt_uni, stp_uni, strt_frkl, end_frkl, end_crstr, cthr_frkd; 
+    strt_uni =  cpu->start_universal.tv_sec + cpu->start_universal.tv_nsec / 1E9;
+    stp_uni = cpu->stop_universal.tv_sec + cpu->stop_universal.tv_nsec / 1E9;
+    strt_frkl = cpu->start_forkall_master.tv_sec + cpu->start_forkall_master.tv_nsec / 1E9;
+    end_frkl = cpu->end_forkall_master.tv_sec + cpu->end_forkall_master.tv_nsec / 1E9;
+    cthr_frkd = cpu->cpu_thread_forked.tv_sec + cpu->cpu_thread_forked.tv_nsec / 1E9;
+    end_crstr = cpu->end_cpu_restore.tv_sec + cpu->end_cpu_restore.tv_nsec / 1E9;
+
+    printf("\n\n");
+    printf("----------------------[Measurements in seconds]----------------------\n");
+    printf("[DEBUG] [TIME] start_universal : %lf \n", strt_uni);
+    printf("[DEBUG] [TIME] stop_universal : %lf \n", stp_uni);
+    printf("[DEBUG] [TIME] start_forkall_master : %lf \n", strt_frkl);
+    printf("[DEBUG] [TIME] end_forkall_master : %lf \n", end_frkl);
+    printf("[DEBUG] [TIME] cpu_thread_forked : %lf \n", cthr_frkd);
+    printf("[DEBUG] [TIME] end_cpu_restore : %lf \n", end_crstr);
+    printf("-------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  stp_uni - strt_uni);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", end_frkl - strt_frkl);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", end_crstr - cthr_frkd);
+    printf("-------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in milli seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E3);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E3);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E3);
+    printf("----------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in micro seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E6);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E6);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E6);
+    printf("----------------------------------------------------------------------------\n");
+
+    printf("\n\n");
+    printf("----------------------[Measurements in nano seconds]----------------------\n");
+    printf("[DEBUG] [TIME] stop_universal - start_universal : %lf \n",  (stp_uni - strt_uni) * 1E9);
+    printf("[DEBUG] [TIME] end_forkall_master - start_forkall_master : %lf \n", (end_frkl - strt_frkl) * 1E9);
+    printf("[DEBUG] [TIME] end_cpu_restore - cpu_thread_forked : %lf \n", (end_crstr - cthr_frkd) * 1E9);
+    printf("----------------------------------------------------------------------------\n");
+
+
+    printf("\n\n");
+
+    return;
+}
+
+int vcpu_complete_io(CPUState *cpu) 
+{
+    int ret = 0; 
+    cpu->kvm_run->immediate_exit = 1; 
+    ret = ioctl(cpu->kvm_fd, KVM_RUN, NULL);
+    printf("return value for complete io : %d \n", ret);
+    cpu->kvm_run->immediate_exit = 0; 
+    return ret; 
+}
+
+
+//performs the initial setup/bookkeeping/lock acquisition for Parent VM 
+void start_fork()
+{
+    return; 
+}
+
+
+//performs the post fork setup/../.. in Child VM
+void end_fork_child()
+{
+    return; 
+}
+
+//performs the post fork setup/../.. in Parent VM
+void end_fork()
+{
+    return; 
+}
+
+void prefork_logging(CPUState *cpu){
+    X86CPU *cpu_x86 = X86_CPU(cpu);
+    return; 
+}
+
+/**
+ * @brief helper function to call all functions related to saving the 
+ * KVM state pre fork
+ * 
+ *      return: 0 on succes
+ *              -1 or obtained error otherwise    
+ */
+int kvm_vcpu_pre_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
+    int ret = 0;
+    
+    prefork_logging(cpu);
+
+    ret = fork_save_vm_state(cpu, prefork_state);
+    return ret; 
+}
+
+/**
+ * @brief helper function to call all functions related to loading the 
+ * KVM state post fork
+ * 
+ *      return: 0 on succes
+ *              -1 or obtained error otherwise    
+ */
+int kvm_vcpu_post_fork(CPUState *cpu, struct cpu_prefork_state *prefork_state){
+    struct KVMState *s = cpu->kvm_state;
+    struct KVMSlot slot;
+    struct kvm_userspace_memory_region mem; 
+    int slot_size = 0;
+    int ret = 0;
+    char buf;
+    int result;
+    int status;
+    Error *local_err = NULL;
+
+    #ifdef DBG 
+        printf("[debug] creating child VM \n"); 
+    #endif
+    // raise(SIGSTOP);
+    //open the new kvm fds
+    // s->fd = open("/dev/kvm", 2); 
+    // s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+    if (s->vmfd < 0) {
+    fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
+        strerror(-ret));
+    }
+    if (s->fd < 0) {
+        fprintf(stderr, "ioctl(DEV KVM) failed: %d %s\n", -ret,
+        strerror(-ret));
+    }
+
+    slot_size = cpu->kvm_state->nr_slots;
+    //set up the shared memory for the child vm 
+    /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+    #ifdef DBG 
+        printf("[debug] setting mem \n"); 
+    #endif
+    for(int j = 0; j < cpu->kvm_state->nr_as; j++){
+        for(int i = 0; i < slot_size; i++){
+            
+            slot = cpu->kvm_state->as[j].ml->slots[i]; 
+            
+            // if(slot.memory_size == 0){
+            //     continue;
+            // }
+            // printf("slot Address : %ld", slot.ram);
+
+            // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+            // if(new_ram == MAP_FAILED) { 
+            //     printf("Failed to allocated memory!");
+            //     exit(0);
+            // }
+            // memmove(new_ram, slot.ram, slot.memory_size);
+
+                // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                //  | (kvm_state->memory_listener.as_id << 16)
+            mem.slot = slot.slot | (kvm_state->as[j].ml->as_id << 16);
+            mem.guest_phys_addr = slot.start_addr;
+            mem.userspace_addr = (unsigned long)slot.ram;
+            // #ifdef DBG
+            // printf("[debug] kvm nr as : %d\n", cpu->kvm_state->nr_as);
+            // printf("[debug] kvm 0 : %s\n", cpu->kvm_state->as[0].as->name);
+            // printf("[debug] kvm 1 : %s\n", cpu->kvm_state->as[1].as->name);
+            // #endif
+            mem.flags = slot.flags;
+            mem.memory_size = slot.memory_size;
+
+            // #ifdef DBG
+            if(mem.userspace_addr){
+                // printf("[debug] mem.ram: %p\n", mem.userspace_addr);
+                // printf("[debug] mem.slot: %p\n", mem.slot);
+                fflush(stdout);
+            // #endif
+                ret = ioctl(s->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                if(ret < 0){
+                    printf("KVM SET MEMORY FAILED!! \n");
+                    fflush(stdout);
+                }
+            }
+            // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                        // mem.memory_size, mem.userspace_addr, ret);
+            #ifdef DBG
+            // if(ret == 0) printf("[debug] ret: %d\n", ret);
+            #endif
+        }
+    }               
+    
+    //set kvm VM according to the prefork state
+    fork_set_vm_state(cpu, prefork_state);
+    // new_cpu->prefork_state = prefork_state;
+    // new_cpu->child_cpu = 1;
+    // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+    
+
+    
+    // register_global_state();
+    cpu->prefork_state = prefork_state;
+    cpu->child_cpu = 1; 
+    
+
+}
+
+
+static void stupid_stub_function(CPUState *cpu){
+    return;
+}
+
+static void kvm_post_fork_fixup_kvm_run(CPUState *cpu){
+    struct kvm_run* new_run = cpu->kvm_run; 
+    struct kvm_run* old_run = cpu->old_kvm_run;
+
+
+
+    new_run->exit_reason = old_run->exit_reason;
+    new_run->ready_for_interrupt_injection = old_run->ready_for_interrupt_injection;
+    new_run->if_flag = old_run->if_flag;
+    new_run->apic_base = old_run->apic_base;
+    new_run->io.direction = old_run->io.direction;
+    new_run->io.size = old_run->io.size;
+    new_run->io.port = old_run->io.port;
+    new_run->io.count = old_run->io.count;
+    new_run->io.data_offset = old_run->io.data_offset;
+    new_run->mmio.len=old_run->mmio.len;
+    new_run->mmio.is_write=old_run->mmio.is_write;
+    return;
+}
+
+static void kvm_post_fork_fixup(CPUState *cpu, struct cpu_prefork_state *prefork_state){
+    // [Bilal] copy the kvm_run
+    kvm_post_fork_fixup_kvm_run(cpu);
+    kvm_post_fork_fixup_env(cpu);
+
+
+    //kvm_fixup 
+    
+    return;
+}
+
+
+static void debug_maps_dump(){
+    #ifdef DEBUG
+	int self_pid = getpid();
+	char cmd[128];
+	sprintf(cmd, "cat /proc/%d/maps", self_pid);
+	DEBUG_PRINTF("Executing command \"%s\"\n", cmd);
+	system(cmd);
+    #endif
+}
+
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
+
+/*
+    @brief: function to be called by the child process after fork
+           to set up the child VM. This function would be doing
+           the following:
+                1. set up child VM, VCPU, and memory
+                2. send the load_snapshot event
+                3. wait for the load_snapshot event to be completed
+                (in short all
+                the stuff previously done inside that loop after
+                fork)
+   
+    @param: info: struct containing the info about the child VM / maybe not 
+   
+    @return: 0 on success
+            -1 on failure
+*/ 
+int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, struct cpu_prefork_state *prefork_state){
+    KVMState *s = *sp;
+    struct kvm_run *run = *runp; // TODO : Update this with the global one
+
+    printf("=======================establishing child=========================\n");
+
+    qemu_cond_init(&cpu->vcpu_recreated_cond);
+    cpu->is_child = true;
+    s->fd = open("/dev/kvm", 2);
+    s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+
+    kvm_irqchip_create(s);
+
+    kvm_vcpu_post_fork(cpu, prefork_state);
+    kvm_init_vcpu(cpu, NULL);
+    kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
+
+    run = cpu->kvm_run;
+    s = cpu->kvm_state;
+
+    cpu->should_wait = false;
+    vm_stop(RUN_STATE_RESTORE_VM);
+
+    forkall_child_done();
+    printf("=======================completed established child=========================\n");
+    // event_notifier_test_and_clear(&(cpu->load_event));
+    // event_notifier_set(&(cpu->load_event));
+
+    return 0;
+}
+
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
-    int ret, run_ret;
+    struct kvm_userspace_memory_region mem; 
+    struct fork_info info;
+    struct odf_info o_info;
+	struct kvm_pit_config pit_config = { .flags = 0, };
+    struct kvm_clock_data clock_data;
+    struct cpu_prefork_state state; 
+    struct KVMState *s = KVM_STATE(current_accel());
+    struct KVMSlot slot;
+    struct timeval t;
+    struct cpu_prefork_state* prefork_state = g_new0(struct cpu_prefork_state, 1); 
+    // X86CPU *c86 = x86_CPU(cpu);
 
+
+    char should_fork; 
+    Error *err = NULL;
+    long long milliseconds;
+    long long timestamps[4];
+    int io_end = 0; 
+    int counter = 0;
+    int status;
+    int slot_size; 
+    int mmap_size;
+    int ret, run_ret;
+    int vmfd; //vm file descriptor for the child vm
+    int vcpufd; //vcpu file descriptro for child vcpu 
+    int identity_base = 0xfeffc000;
+    void *kvm_run;
+    pid_t pid; 
+    void *new_ram;
+    struct kvm_irqchip irqchip[3];
+    struct kvm_pit_state2 pit2; 
+    struct qemu_opts *opts;
+    struct QDict *bs_opts;
+    int result; 
     DPRINTF("kvm_cpu_exec()\n");
+    int i = 0;
+
+
+    
+    if(!cpu->prefork_state) cpu->prefork_state = malloc(sizeof(struct cpu_prefork_state));
+    fork_save_vm_state(cpu, cpu->prefork_state);
+
+    //register the piped fd with qemu main loop 
+
+
+    gettimeofday(&t, NULL);
+
+    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+    timestamps[0] = milliseconds;
 
     if (kvm_arch_process_async_events(cpu)) {
         qatomic_set(&cpu->exit_request, 0);
@@ -2488,7 +3328,94 @@ int kvm_cpu_exec(CPUState *cpu)
          */
         smp_rmb();
 
+        #ifdef DBG_RIP_PARENT_PREFORK
+        // check if we are running a child VM 
+        if(!cpu->forked && !cpu->child_cpu){
+            // print the rip in that case 
+            // synchronize the RIP with the actual VM 
+            kvm_arch_get_registers(cpu);
+            kvm_vcpu_debug_print_rip(cpu);
+            // print the synchornized VCPU RIP
+        }
+        #endif
+        
+        #ifdef DBG_RIP_PARENT
+        // check if we are running a child VM 
+        if(cpu->forked && !cpu->child_cpu){
+            // print the rip in that case 
+            // synchronize the RIP with the actual VM 
+            kvm_arch_get_registers(cpu);
+            kvm_vcpu_debug_print_rip(cpu);
+            // print the synchornized VCPU RIP
+        }
+        #endif
+        
+        #ifdef DBG_RIP_CHILD
+        // check if we are running a child VM 
+        if(cpu->forked && cpu->child_cpu){
+            // print the rip in that case 
+            // synchronize the RIP with the actual VM 
+            kvm_arch_get_registers(cpu);
+            kvm_vcpu_debug_print_rip(cpu);
+            // print the synchornized VCPU RIP
+        }
+        #endif
+
+        // if(save_snapshot_event){
+        //     goto fork_from_here;
+        // }
+        // printf("Calling the kvm_run with the process id : %ld\n", (long)getpid());
+        // skip KVM_RUN if we have received the hypercall but we have not completed the 
+        // save_snapshot function.. if we are done with the save_snapshot function then
+        // we can call the KVM_RUN again
+        // if(!save_snapshot_event){
+        //     run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        // }
+    //     if(entering_after_save_snap){
+    //     entering_after_save_snap = 1;
+    //     queued_work_complete = 1;
+    //     printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+    //     // goto testing_resume;
+    //     goto resume_after_save;
+    // }
+
+        int *did_fork = malloc(sizeof(int));
+        int *is_child = malloc(sizeof(int));
+        *did_fork = 0;
+        *is_child = 0;
+        
+        if(!(*did_fork)){
+            // ski_forkall_slave(did_fork, is_child);
+            // printf("calling the forkall slave in vcpu thread\n");
+        }
+
+        if(*did_fork){
+            if(forkall_check_child()){
+                // printf("[kvm_cpu_exec]Forked child process\n");
+            }
+        }
+
+        if(*did_fork && !(*is_child)){
+            // printf("[kvm_cpu_exec][%d]Forked parent process\n", getpid());
+            fflush(stdout);
+        }
+
+        if(*did_fork && *is_child){
+            // printf("[kvm_cpu_exec][%d]Forked child process\n", getpid());
+            // establish_child(cpu, &s, &run, prefork_state);
+            // fflush(stdout);
+        }
+
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+
+
+        if(PARENT_PID){
+            // DEBUG_PRINT("[pid: %d]kvm_run ret: %d\n", getpid(), run_ret);
+        }
+        i = i + 1;
+    testing_resume:
+
+
 
         attrs = kvm_arch_post_run(cpu, run);
 
@@ -2507,6 +3434,14 @@ int kvm_cpu_exec(CPUState *cpu)
                 DPRINTF("io window exit\n");
                 kvm_eat_signals(cpu);
                 ret = EXCP_INTERRUPT;
+                if(entering_after_save_snap){
+                    entering_after_save_snap = 0;
+                    queued_work_complete = 1;
+                    printf("[%s:%d] entering_after_save_snap\n", __func__, __LINE__);
+                    // goto testing_resume;
+                    ret = 0;
+                    goto resume_after_save;
+                }
                 break;
             }
             fprintf(stderr, "error: kvm run failed %s\n",
@@ -2525,14 +3460,710 @@ int kvm_cpu_exec(CPUState *cpu)
 
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
         switch (run->exit_reason) {
+        case KVM_EXIT_HLT:
+            printf("Received the KVM_EXIT_HLT\n");
+            exit(0);
+            break; 
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");
             /* Called outside BQL */
+            fflush(stdout);
+            // if(run->io.direction == KVM_EXIT_IO_IN){
+            //     printf("READ VALUE : %s\n",(((char *)run) + run->io.data_offset));
+            // }
+            
+            // if(run->io.port == 496)
+            // {
+                #ifdef DBG
+                printf("KVM_Exit_IO Called!=== ");
+                printf("PID : %ld\t", (long)getpid());
+                if(run->io.direction == KVM_EXIT_IO_IN)
+                    printf(" KVM_EXIT_IO_IN--");
+                printf("port no. : %d, size: %d\n", run->io.port, run->io.size);
+                #endif
+            // }
+            
+            // fflush(stdout);
+            //use this to print a charachter
+            if(run->io.port == 0x300){
+                printf("%c", *(((char *)run) + run->io.data_offset));
+            }
+            if(run->io.port == 0x300 &&
+                *(((char *)run) + run->io.data_offset) == 'c'){
+                    fflush(stdout);
+                    // qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+                    // ret = EXCP_INTERRUPT;
+                    // ret = 0;
+                    // goto end_loop;
+                    // io_end = 1; 
+                    // qemu_mutex_unlock_iothread();
+                    gettimeofday(&t, NULL);
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[3] = milliseconds;
+                    
+                    #ifdef TIMESTAMP_PRINT
+                    printf("\n=====>>>>>Timestamp when Parent calls cpu_exec: %lld\n", timestamps[0]);
+                    printf("Timestamp when QEMU Forks: %lld\n", timestamps[1]);
+                    printf("Timestamp when Parent exits: %lld ========\n", timestamps[3]);
+                    #endif
+                    
+                    
+                    _exit(0);
+                    // return ret;
+                    break;
+            }
+            if(run->io.port == 0x301 &&
+                *(((char *)run) + run->io.data_offset) == 'd'){
+                
+                event_notifier_test_and_clear(&(cpu->save_event));
+                event_notifier_set(&(cpu->save_event));
+
+                break;
+            }
+            if(run->io.port == 0x301 &&
+                *(((char *)run) + run->io.data_offset) == 'c'){
+                // [TEMP]
+                // qemu_mutex_lock_iothread();
+                // save_snapshot("newtest", NULL);
+                // load_snapshot("newtest", NULL);
+                // qemu_mutex_unlock_iothread();
+                // break;
+
+                //fork here 
+                //
+                //get the locks being used by the rest of the threads 
+                #ifndef DBG_MEASURE
+                printf("Received the call for fork\n");
+                #endif
+                
+                save_snapshot_event = 1;
+                // vm_stop(RUN_STATE_SAVE_VM);
+                // printf("[Debug] we are setting the save_snapshot event! \n");
+                event_notifier_test_and_clear(&(cpu->save_event));
+                event_notifier_set(&(cpu->save_event));
+                if(!queued_work_complete){
+                    // printf("[%s:%d] we are waiting for the queued work to complete! \n", __func__, __LINE__);
+                    goto end_loop; 
+                    // break;
+                }
+                resume_after_save:
+                // break;
+                // qemu_mutex_lock_iothread();
+                // save_snapshot("newtest", NULL);
+                // qemu_mutex_unlock_iothread();
+                // break;
+                // vm_start();
+                // fork_from_here:
+
+                do {
+                    ret = ioctl(cpu->kvm_fd , KVM_DEBUG, NULL);
+                } while (ret == -EINTR);
+                FORK_COUNTER = FORK_COUNTER + 1;
+                if(FORK_COUNTER > 1){
+                    ret = 0; 
+                    break;
+                }
+                // vm_stop(RUN_STATE_SAVE_VM);
+
+                
+                DEBUG_PRINTF("[DEBUG] parent dump\n");
+                debug_maps_dump();
+                // [TEST] [VERIFY] 
+                // if(cpu->should_wait){
+                //     ret = 0; 
+                //     break;
+                // }
+
+                // [Bilal] [Measure] clock time on hypercall
+                if( clock_gettime( CLOCK_REALTIME, &(cpu->start_universal)) == -1 ) {
+                    perror( "clock gettime" );
+                    exit( EXIT_FAILURE );
+                }
+
+                kvm_vcpu_pre_fork(cpu, prefork_state);
+                if (qemu_mutex_iothread_locked()){
+                    // printf("[debug] This is the main thread!\n");
+                }
+                cpu->should_wait = true;
+                // qemu_mutex_unlock_iothread();
+                //magic number
+                // should_fork = 'a';
+                // cpu->nr_fork_vms = 1;
+                #ifdef DBG
+                printf("CPUFORK :: Event RFD : %d\n", cpu->fork_event.rfd);
+                printf("CPUFORK :: Event WFD : %d\n", cpu->fork_event.wfd);
+                // pipe(forkvmfd);
+                printf("fork_fd[0] : %d -- fork_fd[1] : %d\n", cpu->fork_fd[0], cpu->fork_fd[1]);
+                printf("writing to the fork pipe ------ \n");
+                #endif 
+                // do {
+                //     ret = write(cpu->fork_event.wfd, &should_fork, sizeof(should_fork));
+                // } while (ret < 0 && errno == EINTR);
+                // printf("result for write : %d\n", result);
+                //complete the I/O before copying state
+                kvm_arch_get_registers(cpu);
+
+                // [DEBUG] [BILAL] Adding this to test if the disk snapshot can be 
+                // reloaded in the child VM
+                // printf("[%s:%d] sending the fork event\n", __func__, __LINE__);
+                int cleared_result = event_notifier_test_and_clear(&(cpu->fork_event));
+                int res = event_notifier_set(&(cpu->fork_event));
+                // printf("[%s:%d] result of clearing the fork event : %d\n", __func__, __LINE__, cleared_result);
+                // printf("[%s:%d] result of setting the fork event : %d\n", __func__, __LINE__, res);
+
+                // qemu_mutex_lock_iothread();
+                // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+
+                // event_notifier_test_and_clear(&(cpu->fork_event));
+                // cpu_synchronize_all_pre_loadvm();
+                // sleep(60);
+                ret = 0; 
+                // break;
+                while(1) {
+                    int did_fork;
+                    int is_child;
+                    ski_forkall_hypercall_done = 1;
+                    while(1){
+                        if(ski_forkall_thread_pool_ready_check()){
+                            break;
+                        }
+                    }
+                    // [Bilal] [Measure] clock time when cpu thread is restored
+                    if( clock_gettime( CLOCK_REALTIME, &(cpu->start_forkall_master)) == -1 ) {
+                        perror( "clock gettime" );
+                        exit( EXIT_FAILURE );
+                    }
+                    PARENT_VCPU_FD = cpu->kvm_fd;
+                    ski_forkall_slave(&did_fork, &is_child);
+                    if(did_fork){
+                        cpu->forked = true;
+                        // printf("pid of the child process  : %d", getpid());
+                        
+                        // [Bilal] [Measure] clock time when cpu thread is restored
+                        if( clock_gettime( CLOCK_REALTIME, &(cpu->cpu_thread_forked)) == -1 ) {
+                            perror( "clock gettime" );
+                            exit( EXIT_FAILURE );
+                        }
+                        qemu_thread_get_self(cpu->thread);
+                        cpu->thread_id = qemu_get_thread_id();
+                        current_cpu = cpu;
+                        if(is_child){
+                            // exit(0);
+                            // vm_stop(RUN_STATE_RESTORE_VM);
+                            // qemu_system_reset(SHUTDOWN_CAUSE_NONE);
+
+                            qemu_cond_init(&cpu->vcpu_recreated_cond);
+                            // qemu_mutex_init(&cpu->vcpu_recreated_mutex);
+                            cpu->is_child = true;
+
+                            #ifdef DBG_FDS
+                            printf("[DEBUG] [PARENT] cpu->kvm_fd -> %d\n", cpu->kvm_fd );
+                            printf("[DEBUG] [PARENT] s->fd -> %d\n", s->fd );
+                            printf("[DEBUG] [PARENT]  s->vmfd -> %d\n", s->vmfd );
+                            #endif
+                            // close(cpu->kvm_fd);
+                            // close(s->fd);
+                            // close(s->vmfd);
+                            s->fd = open("/dev/kvm", 2); 
+                            s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+                            kvm_irqchip_create(s);
+                            // qemu_init_cpu_list();
+                            // cpu->halt_cond = g_malloc0(sizeof(QemuCond));
+                            // qemu_cond_init(cpu->halt_cond);
+                            // kvm_init_msrs(X86_CPU(cpu));
+                            kvm_vcpu_post_fork(cpu, prefork_state);
+                            kvm_init_vcpu(cpu, NULL);
+
+                            // kvm_vcpu_post_fork(cpu, prefork_state);
+                            // kvm_arch_put_registers(cpu, KVM_PUT_RUNTIME_STATE);
+                            // kvm_arch_reset_vcpu(cpu);
+                            // prefork_state->regs.rip = 0xfff0;
+                            kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
+                            // kvm_arch_get_registers(cpu);
+                            #ifdef DBG_FDS
+                            printf("[DEBUG] [CHILD] cpu->kvm_fd -> %d\n", cpu->kvm_fd );
+                            printf("[DEBUG] [CHILD] s->fd -> %d\n", s->fd );
+                            printf("[DEBUG] [CHILD]  s->vmfd -> %d\n", s->vmfd );
+                            #endif
+                            // kvm_post_fork_fixup(cpu, prefork_state);
+                            stupid_stub_function(cpu);
+                            // [Bilal] fixup function 
+                            // vm_start();
+                            
+
+                            // dump_cpu_state(cpu, "post-fork.dat");
+                            // stupid_stub_function(cpu);
+
+                            // assert(kvm_buf_set_msrs(X86_CPU(cpu)) == 0);
+
+                            run = cpu->kvm_run;
+                            s = cpu->kvm_state;
+                            // [Bilal] [Measure] clock time on complete CPU restore
+                            if( clock_gettime( CLOCK_REALTIME, &(cpu->end_cpu_restore)) == -1 ) {
+                                perror( "clock gettime" );
+                                exit( EXIT_FAILURE );
+                            } 
+                           
+                            // qemu_mutex_lock(&cpu->vcpu_recreated_mutex);
+                            // qemu_cond_wait(&cpu->vcpu_recreated_cond, &cpu->vcpu_recreated_mutex);
+                            // qemu_mutex_unlock(&cpu->vcpu_recreated_mutex);
+                            
+                            // cpu->vcpu_dirty = false;
+                            // qemu_mutex_lock_iothread();
+                            // return ret;
+                            // cpu_synchronize_post_reset(cpu);
+                            #ifdef DBG_MEASURE
+                            kvm_vcpu_print_times(cpu);
+                            #endif
+
+                            DEBUG_PRINTF("\n\n\n[DEBUG] child dump\n");
+                            debug_maps_dump();
+
+                            #ifdef DBG_TEST_RIP_PARENT_EXCLUSIVE
+                            exit(0);
+                            #endif
+                            // vm_stop(RUN_STATE_RESTORE_VM);
+                            
+                        }
+                        cpu->should_wait = false;
+                        DEBUG_PRINT("is_child : %d\n", is_child);
+                            DEBUG_PRINT("is_child : %d\n", is_child);
+                            vm_stop(RUN_STATE_RESTORE_VM);
+
+                        if(is_child){
+                            // printf("[Debug] we are setting the load_snapshot event! \n");
+                            event_notifier_test_and_clear(&(cpu->load_event));
+                            event_notifier_set(&(cpu->load_event));
+                        }
+                        break;
+                    }
+                    sleep(0);
+                    // break;
+
+                }
+                break;
+                // continue;
+                vcpu_complete_io(cpu);
+
+                //get the values of the attributes before the fork
+                ret = cpu_get_pre_fork_state(cpu, &state, cpu->kvm_fd);
+                slot_size = cpu->kvm_state->nr_slots;
+                // //set up the shared memory for the child vm 
+                // /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+                for(int i = 0; i < slot_size; i++){
+                    slot = cpu->kvm_state->memory_listener.slots[i]; 
+                    // if(slot.memory_size == 0){
+                    //     continue;
+                    // }
+                    mprotect(slot.ram, slot.memory_size, PROT_READ | PROT_WRITE);
+                        // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                        //  | (kvm_state->memory_listener.as_id << 16)
+                    // mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                    // mem.guest_phys_addr = 0;
+                    // mem.userspace_addr = 0;
+                    // mem.flags = 0;
+                    // mem.memory_size = 0;
+    
+                    // ret = ioctl(cpu->kvm_state->vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                    // trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                    //             mem.memory_size, mem.userspace_addr, ret);
+                }
+
+                //printing a value from the first slot before fork 
+
+                // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
+                #ifdef DBG
+                printf("Parent PID : %ld\n", (long)getpid());
+                #endif
+                fflush(stdout);
+                gettimeofday(&t, NULL);
+                
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_CLOCK, &clock_data);
+                } while (ret == -EINTR);
+                if(ret < 0) 
+                {
+                    perror("master failed");
+                }
+
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_PIT2, &pit2);
+                } while (ret == -EINTR);
+                if(ret < 0) 
+                {
+                    perror("master failed");
+                } 
+
+                irqchip[0].chip_id = KVM_IRQCHIP_PIC_MASTER;
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &irqchip);
+                } while (ret == -EINTR);
+                if(ret < 0) 
+                {
+                    fflush(stdout);
+                    perror("master failed");
+                }  
+                
+                irqchip[1].chip_id = KVM_IRQCHIP_PIC_SLAVE;
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &irqchip[1]);
+                } while (ret == -EINTR);
+                if(ret < 0) printf("slave failed ");
+
+                irqchip[2].chip_id = KVM_IRQCHIP_IOAPIC;
+                do
+                {
+                    ret = ioctl(s->vmfd, KVM_GET_IRQCHIP, &irqchip[2]);
+                } while (ret == -EINTR);
+                if(ret < 0) printf("ioapic failed ");
+
+
+                milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                timestamps[1] = milliseconds;
+                printf("Saving Snapshot====\n");
+                qemu_mutex_lock_iothread();
+                // save_snapshot("fork-snap", &err);
+                qemu_mutex_unlock_iothread();
+                // printf("Timestamp when forking QEMU: %lld\n", milliseconds);
+                // dumpKVMState(s, "./ParentKVMDump", "Parent VM");
+child_spawn: 
+                start_fork();
+                // qemu_mutex_lock_iothread();
+                // qemu_cleanup();
+                printf("done with cleanup\n");
+                pid = fork();
+                if(pid < 0) {
+                    printf("Failed to fork\n");
+                    ret = -1; 
+                } else if (pid == 0){
+                    //child process
+                    end_fork_child();
+                    gettimeofday(&t, NULL);
+
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[1] = milliseconds;
+
+                    #ifdef TIMESTAMP_PRINT
+                    printf("Starting child process : %lld\n", milliseconds);
+                    #endif
+                    printf("Starting child process : %d\n", pid);
+                    printf("Child PID : %ld\n", (long)getpid());
+                    //release the locks obtained before forking 
+                    // printf("Memory at GPA 0 in child : %d", cpu->kvm_state->memory_listener.slots[0].ram);
+                    fflush(stdout);
+                    // *(int*)(cpu->kvm_state->memory_listener.slots[0].ram) = 1;
+                    // printf("Memory at GPA 0 in child aftr changing: %d", *(int*)(cpu->kvm_state->memory_listener.slots[0].ram));
+                    s = cpu->kvm_state;
+                    close(cpu->kvm_fd);
+                    close(s->vmfd);
+                    close(s->fd);
+                    s->fd = open("/dev/kvm", 2);
+
+                    //create new fds
+                    //make a call for creating a vm 
+                    vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+
+                    // cpu = kvm_init_vcpu(cpu, NULL);
+                    
+                    if (vmfd < 0) {
+                    fprintf(stderr, "ioctl(KVM_CREATE_VM) failed: %d %s\n", -ret,
+                        strerror(-ret));
+                    }
+                    s->vmfd = vmfd; 
+
+                    slot_size = cpu->kvm_state->nr_slots;
+                    //set up the shared memory for the child vm 
+                    /* kvm_set_user_memory_region(&(cpu->kvm_state->memory_listener), kvm_state->memory_listener.slots, 1); */ 
+                    for(int i = 0; i < slot_size; i++){
+                        
+                        slot = cpu->kvm_state->memory_listener.slots[i]; 
+                        
+                        // if(slot.memory_size == 0){
+                        //     continue;
+                        // }
+                        // printf("slot Address : %ld", slot.ram);
+
+                        // new_ram = mmap(NULL, slot.memory_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+                        // if(new_ram == MAP_FAILED) { 
+                        //     printf("Failed to allocated memory!");
+                        //     exit(0);
+                        // }
+                        // memmove(new_ram, slot.ram, slot.memory_size);
+
+                            // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                            //  | (kvm_state->memory_listener.as_id << 16)
+                        mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                        mem.guest_phys_addr = slot.start_addr;
+                        mem.userspace_addr = (unsigned long)slot.ram;
+                        mem.flags = slot.flags;
+                        mem.memory_size = slot.memory_size;
+        
+                        ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                        trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                                    mem.memory_size, mem.userspace_addr, ret);
+                    }
+                    
+                    clock_data.flags = 0;
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_CLOCK, &clock_data);
+                    } while (ret == -EINTR);
+                    if(ret < 0) goto end_loop;
+                    
+
+
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_CREATE_PIT2, &pit_config);
+                    } while (ret == -EINTR);
+                    if(ret < 0) goto end_loop;
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_PIT2, &pit2);
+                    } while (ret == -EINTR);
+                    if(ret < 0) printf("KVM_SET_PIT2 failed");
+
+                    //creating irqchip for new VM
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_CREATE_IRQCHIP);
+                    } while (ret == -EINTR);
+                    if(ret < 0) goto end_loop;
+                    
+
+                    //setting irqchips for the new VM
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &irqchip[0]);
+                    } while (ret == -EINTR);
+                    if(ret < 0) printf("master failed");
+                    
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &irqchip[1]);
+                    } while (ret == -EINTR);
+                    if(ret < 0) printf("slave failed ");
+
+                    do
+                    {
+                        ret = ioctl(s->vmfd, KVM_SET_IRQCHIP, &irqchip[2]);
+                    } while (ret == -EINTR);
+                    // if(ret < 0) printf("ioapic failed ");
+                    // for(int i = 0; i < slot_size; i++){
+                    //     slot = kvm_state->memory_listener.slots[i]; 
+                    //     if(slot.memory_size == 0){
+                    //         continue;
+                    //     }
+
+                    //         // kvm_set_user_memory_region(&(kvm_state->memory_listener), &slot, 1);
+                    //         //  | (kvm_state->memory_listener.as_id << 16)
+                    //     mem.slot = slot.slot | (kvm_state->memory_listener.as_id << 16);
+                    //     mem.guest_phys_addr = slot.start_addr;
+                    //     mem.userspace_addr = (unsigned long)slot.ram;
+                    //     mem.flags = slot.flags;
+                    //     mem.memory_size = slot.memory_size;
+        
+                    //     ret = ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &mem);
+                    //     trace_kvm_set_user_memory(mem.slot, mem.flags, mem.guest_phys_addr,
+                    //                 mem.memory_size, mem.userspace_addr, ret);
+                    // }
+                    /* kvm_memory_listener_register(s, &s->memory_listener, s->as->as, 0); */
+
+                    //make a call or creating onc vcpu for it 
+                    vcpufd =  kvm_vm_ioctl(s, KVM_CREATE_VCPU, 0);
+                    //TODO: set the regs, sregs, .. etc for the vcpuid
+                    do 
+                    {
+                        ret = ioctl(vmfd, KVM_SET_IDENTITY_MAP_ADDR, &identity_base);
+                    } while (ret == -EINTR);
+                    
+                    do 
+                    {
+                        ret = ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
+                    } while (ret == -EINTR);
+
+                    // x86_cpu_dump_local_apic_state
+                    // cpu_dump_state
+                    // cpu_dump_statistics
+                    // kvm_irqchip_create(s);
+                    kvm_set_vcpu_attrs(cpu, &state, vcpufd);
+                    cpu->kvm_fd = vcpufd;
+
+                    //set up the kvm_run for the vcpu --> update it in the vmstate
+                    mmap_size = kvm_ioctl(s, KVM_GET_VCPU_MMAP_SIZE, 0);
+                    if (mmap_size < 0) {
+                        ret = mmap_size;
+                        return -1;
+                    }
+
+                    cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                        cpu->kvm_fd, 0);
+                    run = cpu->kvm_run;
+                    // printf("Exiting child process!\n");
+                    
+                    if (cpu->kvm_run == MAP_FAILED) {
+                        printf("mmap failed!"); 
+                        return 0;                  
+                    }
+                    
+                    // for(int i = 0 ;; i++) {
+                    //     // printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                    //     ret = ioctl(vcpufd, KVM_RUN, 0);
+                    //     if(cpu->kvm_run->io.port!=496)
+                    //     {
+                    //         continue;
+                    //     } 
+                    //     else 
+                    //     {
+                    //         printf("port 496");
+                    //         break;
+                    //     }
+                    // }
+
+                    // main_loop_tlg.tl[0]=NULL;
+                    // main_loop_tlg.tl[1]=NULL;
+                    // main_loop_tlg.tl[2]=NULL;
+                    // main_loop_tlg.tl[3]=NULL;
+                    // qemu_mutex_unlock_iothread();
+                    // kvm_cpus.create_vcpu_thread(cpu);
+                    // fflush(stdout);
+                    // printf("Created VCPU Thread in Child\n");
+
+                    // qemu_mutex_lock_iothread();
+                    
+                    // aio_get_g_source(aio_context_new(NULL))->context = NULL;
+                    // iohandler_get_g_source()->context = NULL;
+                    // qemu_init_main_loop(NULL);
+                    // printf("initialized the qemu main loop");
+                    // qemu_main_loop();
+
+                    // bs_opts = qdict_new();
+                    // qemu_opts_to_qdict(opts, bs_opts);
+
+                    // blockdev_close_all_bdrv_states();
+                    printf("will create new drive for the child\n");
+                    
+                    // opts = drive_add(IF_DEFAULT, 0, "./bootloader.qcow2", "media=disk");
+                    // 
+                    // drive_new( opts, 1,  &error_fatal);
+                    printf("created new drive for the child\n");
+                    // dumpKVMState(s, "./ChildKVMDump", "Child VM after initial setup");
+                    printf("loading snapshot....\n");
+                    vm_stop(RUN_STATE_RESTORE_VM);
+                    err = NULL;
+                    load_snapshot("fork-snap", &err);
+                    vm_start();
+
+                    ret = 0; 
+                    break;
+    
+                    // printf("Exiting child process!\n");
+                    // sleep(50);
+                    // kvm_arch_pre_run(cpu, run);
+                    gettimeofday(&t, NULL);
+
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[1] = milliseconds;
+
+                    #ifdef TIMESTAMP_PRINT
+                    printf("Timestamp when child starts executing: %lld\n", milliseconds);
+                    #endif
+                    for(int i = 0; i < 2; i++ ){
+                        ret = ioctl(vcpufd, KVM_RUN, 0);
+                        printf("exit reason : %d", cpu->kvm_run->exit_reason);
+                        fflush(stdout);
+                        
+                        switch(cpu->kvm_run->exit_reason){
+                           case KVM_EXIT_IO:
+                                DPRINTF("handle_io\n");
+                                /* Called outside BQL */
+                                //use this to print a charachter
+                                if(cpu->kvm_run->io.port == 0x300){
+                                    printf("%c", *(((char *)run) + run->io.data_offset));
+                                }
+                                if(run->io.port == 0x300 &&
+                                    *(((char *)run) + run->io.data_offset) == 'c'){
+                                    // qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+                                    // ret = EXCP_INTERRUPT;
+                                    // goto end_loop;
+                                    exit(0);
+                                    break;
+                                } 
+                        }
+                    
+                    }
+                    // close(4);
+                    // close(7);
+                    // close(9);
+                    // close(10);
+                    // close(0);
+                    // qemu_mutex_unlock_iothread();
+                    gettimeofday(&t, NULL);
+                    milliseconds = t.tv_sec*1000LL + t.tv_usec/1000; // calculate milliseconds
+                    timestamps[2] = milliseconds;
+                    
+                    #ifdef TIMESTAMP_PRINT
+                    printf("\nTimestamp when Child exits: %lld\n", milliseconds);
+                    #endif
+                    
+                    _exit(0);
+
+
+                    //running this new vcpu
+                    /* kvm_cpu_exec(cpu); */
+                    //code for setting up the kvm_run for child vcpu in qemu state
+                    //add these values to qemu book keeping structures
+                } 
+                //parent process 
+                printf("Waiting for the child VM\n");
+
+                wait(NULL);
+                
+                end_fork();
+
+                #ifdef FORK_TEST
+                counter = counter + 1; 
+                if(counter < 10) goto child_spawn;
+                #endif 
+                
+                // if(waitpid(pid, &status, 0) < 0)
+                // {
+                //     printf("Could not wait");
+                //     ret = 0;
+                //     break;
+                // }
+
+                // if(WIFEXITED(status) && WEXITSTATUS(status) != 0)
+                // {
+                //     printf("Child exited with some error! ");
+                // }
+
+                printf("Resuming Parent VM\n");
+                // kvm_slots_unlock(&cpu->kvm_state->memory_listener);
+                // qemu_mutex_unlock_iothread();
+                
+                ret = 0;
+                break;
+            
+            }
+            if(run->io.direction == KVM_EXIT_IO_IN){
+                // printf("Port: %d\n", run->io.port);
+                // printf("READ VALUE Before handle : %s ",(((char *)run) + run->io.data_offset));
+            }
             kvm_handle_io(run->io.port, attrs,
                           (uint8_t *)run + run->io.data_offset,
                           run->io.direction,
                           run->io.size,
                           run->io.count);
+            // #ifdef DBG
+            if(run->io.direction == KVM_EXIT_IO_IN){
+                // printf("READ VALUE : %s, io size: %d, io count: %d\n",(((char *)run) + run->io.data_offset), run->io.size, run->io.count);
+            }
+skip_jump:
             ret = 0;
             break;
         case KVM_EXIT_MMIO:
@@ -2591,6 +4222,7 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         }
     } while (ret == 0);
+end_loop:
 
     cpu_exec_end(cpu);
     qemu_mutex_lock_iothread();
