@@ -23,6 +23,8 @@
 #include "qemu/error-report.h"
 #include "qemu/rcu.h"
 #include "qemu/main-loop.h"
+#include "util/hodf-util.h"
+#include "util/forkall-coop.h"
 
 typedef ObjectClass IOThreadClass;
 
@@ -49,8 +51,14 @@ AioContext *qemu_get_current_aio_context(void)
 static void *iothread_run(void *opaque)
 {
     IOThread *iothread = opaque;
+    int did_fork = 0;
+    int is_child = 0;
 
     rcu_register_thread();
+
+    #ifdef USE_HYPERODF
+    ski_forkall_thread_add_self_tid();
+    #endif 
     /*
      * g_main_context_push_thread_default() must be called before anything
      * in this new thread uses glib.
@@ -59,6 +67,9 @@ static void *iothread_run(void *opaque)
     my_iothread = iothread;
     iothread->thread_id = qemu_get_thread_id();
     qemu_sem_post(&iothread->init_done_sem);
+    #ifdef USE_HYPERODF
+    h_save_iothread_loop(iothread->main_loop);
+    #endif
 
     while (iothread->running) {
         /*
@@ -79,6 +90,9 @@ static void *iothread_run(void *opaque)
         if (iothread->running && qatomic_read(&iothread->run_gcontext)) {
             g_main_loop_run(iothread->main_loop);
         }
+        #ifdef USE_HYPERODF
+        ski_forkall_slave(&did_fork, &is_child);
+        #endif
     }
 
     g_main_context_pop_thread_default(iothread->worker_context);
