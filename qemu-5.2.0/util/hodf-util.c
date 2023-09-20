@@ -62,8 +62,10 @@ void h_save_iothread_loop(GMainLoop *main_loop){
 }
 
 void h_intrpt_iothread_loop(void){
-    DEBUG_PRINT("Interrupting iothread loop\n");
-    g_main_loop_quit(h_iothread_main_loop);
+    // DEBUG_PRINT("Interrupting iothread loop\n");
+    printf("Interrupting iothread loop\n");
+    if(h_iothread_main_loop != NULL)
+        g_main_loop_quit(h_iothread_main_loop);
     return;
 }
 
