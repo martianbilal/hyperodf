@@ -56,7 +56,7 @@ static void *iothread_run(void *opaque)
 
     rcu_register_thread();
 
-    #ifdef USE_HYPERODF
+    #if USE_HYPERODF == 1
     ski_forkall_thread_add_self_tid();
     #endif 
     /*
@@ -67,7 +67,7 @@ static void *iothread_run(void *opaque)
     my_iothread = iothread;
     iothread->thread_id = qemu_get_thread_id();
     qemu_sem_post(&iothread->init_done_sem);
-    #ifdef USE_HYPERODF
+    #if USE_HYPERODF == 1
     h_save_iothread_loop(iothread->main_loop);
     #endif
 
@@ -90,7 +90,7 @@ static void *iothread_run(void *opaque)
         if (iothread->running && qatomic_read(&iothread->run_gcontext)) {
             g_main_loop_run(iothread->main_loop);
         }
-        #ifdef USE_HYPERODF
+        #if USE_HYPERODF == 1
         ski_forkall_slave(&did_fork, &is_child);
         #endif
     }

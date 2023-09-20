@@ -5557,8 +5557,8 @@ void qemu_init(int argc, char **argv, char **envp)
     }
 
     cpu = qemu_get_cpu(0); 
-    printf("Before :: Event RFD : %d\n", cpu->fork_event.rfd);
-    printf("Before :: Event WFD : %d\n", cpu->fork_event.wfd);
+    // printf("Before :: Event RFD : %d\n", cpu->fork_event.rfd);
+    // printf("Before :: Event WFD : %d\n", cpu->fork_event.wfd);
     result = event_notifier_init(&(cpu->fork_event), 0); 
     if(result < 0) {
         printf("Failed to init notifier\n");
@@ -5574,8 +5574,8 @@ void qemu_init(int argc, char **argv, char **envp)
         printf("Failed to init notifier[save_event]\n");
     }
 
-    printf("Event RFD : %d\n", cpu->fork_event.rfd);
-    printf("Event WFD : %d\n", cpu->fork_event.wfd);
+    // printf("Event RFD : %d\n", cpu->fork_event.rfd);
+    // printf("Event WFD : %d\n", cpu->fork_event.wfd);
 
     //qemu_pipe and pipe both fail here 
     // result = qemu_pipe(forkvmfd);
