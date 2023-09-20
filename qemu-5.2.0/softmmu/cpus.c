@@ -416,7 +416,6 @@ void qemu_wait_io_event(CPUState *cpu)
     int is_child = 0;
     int ret = 0;
     int count = 0;
-    bool slept = false;
     #endif 
 
     while (cpu_thread_is_idle(cpu)) {
