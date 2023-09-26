@@ -3555,9 +3555,9 @@ int kvm_cpu_exec(CPUState *cpu)
                 // vm_start();
                 // fork_from_here:
 
-                do {
-                    ret = ioctl(cpu->kvm_fd , KVM_DEBUG, NULL);
-                } while (ret == -EINTR);
+                // do {
+                //     ret = ioctl(cpu->kvm_fd , KVM_DEBUG, NULL);
+                // } while (ret == -EINTR);
                 FORK_COUNTER = FORK_COUNTER + 1;
                 if(FORK_COUNTER > 1){
                     ret = 0; 
