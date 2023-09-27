@@ -32,6 +32,7 @@
 #include "qemu/thread.h"
 #include "qemu/main-loop.h"
 #include "qemu/lockable.h"
+#include "util/forkall-coop.h"
 #if defined(CONFIG_MALLOC_TRIM)
 #include <malloc.h>
 #endif

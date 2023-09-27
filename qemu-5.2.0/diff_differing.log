@@ -3,9 +3,3 @@ Files ./backends/hostmem-file.c and ../../tools/qemu-vmfork/qemu-5.2.0/backends/
 
 
 ## others
-Files ./util/mmap-alloc.c and ../../tools/qemu-vmfork/qemu-5.2.0/util/mmap-alloc.c differ
-Files ./util/oslib-posix.c and ../../tools/qemu-vmfork/qemu-5.2.0/util/oslib-posix.c differ
-Files ./util/qemu-option.c and ../../tools/qemu-vmfork/qemu-5.2.0/util/qemu-option.c differ
-Files ./util/qemu-thread-posix.c and ../../tools/qemu-vmfork/qemu-5.2.0/util/qemu-thread-posix.c differ
-Files ./util/rcu.c and ../../tools/qemu-vmfork/qemu-5.2.0/util/rcu.c differ
-Files ./util/thread-pool.c and ../../tools/qemu-vmfork/qemu-5.2.0/util/thread-pool.c differ
