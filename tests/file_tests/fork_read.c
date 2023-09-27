@@ -42,7 +42,6 @@ int main(void) {
         printf("In the parent process\n");
         // waitpid(pid, NULL, 0);
         printf("Done with child\n");
-        
     }
 
     fclose(file);

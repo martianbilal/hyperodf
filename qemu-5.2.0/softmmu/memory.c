@@ -438,8 +438,25 @@ static MemTxResult  memory_region_read_accessor(MemoryRegion *mr,
                                                 MemTxAttrs attrs)
 {
     uint64_t tmp;
-
+    MemoryRegion *root;
+    char *container_name = "plchlder";
+    
     tmp = mr->ops->read(mr->opaque, addr, size);
+    #if USE_HYPERODF == 1
+    if(mr->container){
+        container_name = mr->container->name; 
+    }
+    // mr->name == "ide" && container_name == "io"
+    if( strcmp(mr->name, "ide") == 0 && strcmp(container_name, "io") == 0 && tmp == 0){
+        // printf("root name: %s, ", mr->name);
+        // printf("root addr: %p,", mr->addr);
+        for (root = mr; root->container;) {
+            root = root->container;
+            // printf("container name: %s, ", root->name);
+        }
+        // printf(" MR: %p, Mr->ioeventfd: %u, *MR :%p, MR->addr : %p, abs_adr: %p, tmp: %p name: %s, size: %p, owner: %p\n", (void *)mr, mr->ioeventfd_nb, *mr, (void *)mr->addr, (void *)addr, (void *)tmp, (char*)mr->name, (void *)mr->size, (void *)mr->owner);
+    }
+    #endif
     if (mr->subpage) {
         trace_memory_region_subpage_read(get_cpu_index(), mr, addr, tmp, size);
     } else if (trace_event_get_state_backends(TRACE_MEMORY_REGION_OPS_READ)) {

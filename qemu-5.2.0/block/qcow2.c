@@ -1860,15 +1860,15 @@ static int coroutine_fn qcow2_do_open(BlockDriverState *bs, QDict *options,
     return ret;
 }
 
-typedef struct QCow2OpenCo {
-    BlockDriverState *bs;
-    QDict *options;
-    int flags;
-    Error **errp;
-    int ret;
-} QCow2OpenCo;
+// typedef struct QCow2OpenCo {
+//     BlockDriverState *bs;
+//     QDict *options;
+//     int flags;
+//     Error **errp;
+//     int ret;
+// } QCow2OpenCo;
 
-static void coroutine_fn qcow2_open_entry(void *opaque)
+void coroutine_fn qcow2_open_entry(void *opaque)
 {
     QCow2OpenCo *qoc = opaque;
     BDRVQcow2State *s = qoc->bs->opaque;

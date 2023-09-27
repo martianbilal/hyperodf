@@ -628,9 +628,7 @@ void monitor_cleanup(void)
      * we need to unregister from chardev below in
      * monitor_data_destroy(), and chardev is not thread-safe yet
      */
-    if (mon_iothread) {
-        iothread_stop(mon_iothread);
-    }
+    
 
     /*
      * The dispatcher needs to stop before destroying the monitor and
@@ -651,6 +649,9 @@ void monitor_cleanup(void)
                    (aio_poll(iohandler_get_aio_context(), false),
                     qatomic_mb_read(&qmp_dispatcher_co_busy)));
 
+    if (mon_iothread) {
+        iothread_stop(mon_iothread);
+    }
     /* Flush output buffers and destroy monitors */
     qemu_mutex_lock(&monitor_lock);
     monitor_destroyed = true;

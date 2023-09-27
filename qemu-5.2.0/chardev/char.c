@@ -987,8 +987,19 @@ static Chardev *chardev_new(const char *id, const char *typename,
         object_property_try_add_child(get_chardevs_root(), id, obj,
                                       &local_err);
         if (local_err) {
+            // prop = object_class_property_find(object_get_class(get_chardevs_root()), "gdb", NULL);
+            // if(prop) {
+
+            // }
+            object_property_del(get_chardevs_root(), id);
+            object_property_try_add_child(get_chardevs_root(), id, obj,
+                                            &local_err);
+            if(!local_err){
+                goto second_chance;
+            }
             goto end;
         }
+        second_chance:
         object_unref(obj);
     }
 

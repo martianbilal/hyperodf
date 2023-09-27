@@ -14,8 +14,12 @@
 #ifndef QEMU_FUTEX_H
 #define QEMU_FUTEX_H
 
+#include <stdlib.h>
 #include <sys/syscall.h>
 #include <linux/futex.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <errno.h>
 
 #define qemu_futex(...)              syscall(__NR_futex, __VA_ARGS__)
 

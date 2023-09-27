@@ -40,7 +40,6 @@
 #include "qapi/qmp/qerror.h"
 #include "hw/mem/memory-device.h"
 #include "hw/acpi/acpi_dev_interface.h"
-
 #include "migration/snapshot.h"
 #include "util/forkall-coop.h"
 #include "util/hodf-util.h"

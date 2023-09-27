@@ -1060,9 +1060,9 @@ out_notify:
     pdu->s->transport->push_and_notify(pdu);
 
     /* Now wakeup anybody waiting in flush for this request */
-    if (!qemu_co_queue_next(&pdu->complete)) {
+    // if (!qemu_co_queue_next(&pdu->complete)) {
         pdu_free(pdu);
-    }
+    // }
 }
 
 static mode_t v9mode_to_mode(uint32_t mode, V9fsString *extension)

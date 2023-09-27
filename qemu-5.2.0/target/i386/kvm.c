@@ -3321,8 +3321,15 @@ static int kvm_get_msrs(X86CPU *cpu)
         error_report("error: failed to get MSR 0x%" PRIx32,
                      (uint32_t)e->index);
     }
-
+    #if USE_HYPERODF == 1
+    if(ret != cpu->kvm_msr_buf->nmsrs){
+        // printf("[DEBUG] ret != nmsrs\n");
+        // printf("ret :%d\nnmsrs:%d\n", ret, cpu->kvm_msr_buf->nmsrs);
+        cpu->kvm_msr_buf->nmsrs = ret;
+    }
+    #else 
     assert(ret == cpu->kvm_msr_buf->nmsrs);
+    #endif
     /*
      * MTRR masks: Each mask consists of 5 parts
      * a  10..0: must be zero

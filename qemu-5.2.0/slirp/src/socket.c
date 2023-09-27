@@ -3,6 +3,7 @@
  * Copyright (c) 1995 Danny Gasparovski.
  */
 
+#include "debug.h"
 #include "slirp.h"
 #include "ip_icmp.h"
 #ifdef __sun__

@@ -104,7 +104,7 @@ static void kvm_pit_get(PITCommonState *pit)
         ret = kvm_vm_ioctl(kvm_state, KVM_GET_PIT2, &kpit);
         if (ret < 0) {
             fprintf(stderr, "KVM_GET_PIT2 failed: %s\n", strerror(ret));
-            abort();
+            // abort();
         }
         pit->channels[0].irq_disabled = kpit.flags & KVM_PIT_FLAGS_HPET_LEGACY;
     } else {

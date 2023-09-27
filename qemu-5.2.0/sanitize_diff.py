@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-with open('./diff_qemu.txt', 'r') as file:
+with open('./diff_qemu.txt.new', 'r') as file:
     lines = file.readlines()
 
+lines = [line for line in lines if ".cache/" not in line]
 
 only_lines = [line for line in lines if "Only in" in line]
 

@@ -35,6 +35,8 @@
 #include "migration/misc.h"
 #include "migration/register.h"
 #include "migration/global_state.h"
+#include "qemu/queue.h"
+#include "qemu/typedefs.h"
 #include "qemu/thread.h"
 #include "ram.h"
 #include "qemu-file-channel.h"
@@ -48,6 +50,8 @@
 #include "sysemu/cpus.h"
 #include "exec/memory.h"
 #include "exec/target_page.h"
+#include "exec/address-spaces.h"
+#include "exec/ramlist.h"
 #include "trace.h"
 #include "qemu/iov.h"
 #include "qemu/main-loop.h"
@@ -1285,6 +1289,12 @@ int qemu_savevm_state_iterate(QEMUFile *f, bool postcopy)
         if (qemu_file_rate_limit(f)) {
             return 0;
         }
+        #if USE_HYPERODF == 1
+            if(strcmp(se->idstr, "ram") == 0){
+                printf("[skip] ram in savevm_state_iterate\n");
+                continue;
+            }
+        #endif
         trace_savevm_section_start(se->idstr, se->section_id);
 
         save_section_header(f, se, QEMU_VM_SECTION_PART);
@@ -1374,6 +1384,12 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
                 continue;
             }
         }
+        #if USE_HYPERODF == 1
+        if(strcmp(se->idstr, "ram") == 0){
+            printf("[skip] ram in precopy iter\n");
+            continue;
+        }
+        #endif
         trace_savevm_section_start(se->idstr, se->section_id);
 
         save_section_header(f, se, QEMU_VM_SECTION_END);
@@ -1389,6 +1405,8 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
 
     return 0;
 }
+#define BILLION  1000000000L;
+
 
 static
 int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
