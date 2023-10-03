@@ -4875,10 +4875,14 @@ static coroutine_fn int qcow2_co_flush_to_os(BlockDriverState *bs)
 {
     BDRVQcow2State *s = bs->opaque;
     int ret;
+    DBG_QCOW2_PRINT("qcow2 flush to os -> get lock\n");
 
     qemu_co_mutex_lock(&s->lock);
+    DBG_QCOW2_PRINT("write caches\n");
     ret = qcow2_write_caches(bs);
+    DBG_QCOW2_PRINT("done write caches\n");
     qemu_co_mutex_unlock(&s->lock);
+    DBG_QCOW2_PRINT("qcow2 flush to os -> release lock\n");
 
     return ret;
 }

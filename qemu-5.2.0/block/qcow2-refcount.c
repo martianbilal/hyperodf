@@ -30,6 +30,7 @@
 #include "qemu/cutils.h"
 #include "trace.h"
 
+
 static int64_t alloc_clusters_noref(BlockDriverState *bs, uint64_t size,
                                     uint64_t max);
 static int QEMU_WARN_UNUSED_RESULT update_refcount(BlockDriverState *bs,
@@ -1206,22 +1207,55 @@ void qcow2_free_any_cluster(BlockDriverState *bs, uint64_t l2_entry,
 int coroutine_fn qcow2_write_caches(BlockDriverState *bs)
 {
     BDRVQcow2State *s = bs->opaque;
+    DBG_QCOW2_PRINT("Entering qcow2_write_caches. bs: %p\n", bs);
+
     int ret;
 
     ret = qcow2_cache_write(bs, s->l2_table_cache);
+    DBG_QCOW2_PRINT("Executed qcow2_cache_write for l2_table_cache. ret: %d\n", ret);
+
     if (ret < 0) {
+        DBG_QCOW2_PRINT("Error in writing l2_table_cache. Exiting with ret: %d\n", ret);
         return ret;
     }
 
     if (qcow2_need_accurate_refcounts(s)) {
+        DBG_QCOW2_PRINT("Accurate refcounts needed. Writing refcount_block_cache.\n");
+        
         ret = qcow2_cache_write(bs, s->refcount_block_cache);
+        DBG_QCOW2_PRINT("Executed qcow2_cache_write for refcount_block_cache. ret: %d\n", ret);
+
         if (ret < 0) {
+            DBG_QCOW2_PRINT("Error in writing refcount_block_cache. Exiting with ret: %d\n", ret);
             return ret;
         }
+    } else {
+        DBG_QCOW2_PRINT("No need for accurate refcounts. Skipping refcount_block_cache write.\n");
     }
 
+    DBG_QCOW2_PRINT("Exiting qcow2_write_caches with success.\n");
     return 0;
 }
+
+// int coroutine_fn qcow2_write_caches(BlockDriverState *bs)
+// {
+//     BDRVQcow2State *s = bs->opaque;
+//     int ret;
+
+//     ret = qcow2_cache_write(bs, s->l2_table_cache);
+//     if (ret < 0) {
+//         return ret;
+//     }
+
+//     if (qcow2_need_accurate_refcounts(s)) {
+//         ret = qcow2_cache_write(bs, s->refcount_block_cache);
+//         if (ret < 0) {
+//             return ret;
+//         }
+//     }
+
+//     return 0;
+// }
 
 int coroutine_fn qcow2_flush_caches(BlockDriverState *bs)
 {

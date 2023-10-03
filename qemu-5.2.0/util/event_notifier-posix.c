@@ -43,6 +43,9 @@ int event_notifier_init(EventNotifier *e, int active)
     ret = -1;
     errno = ENOSYS;
 #endif
+    if(ret == 11){
+        printf("eventfd :: 11\n");
+    }
     if (ret >= 0) {
         e->rfd = e->wfd = ret;
     } else {

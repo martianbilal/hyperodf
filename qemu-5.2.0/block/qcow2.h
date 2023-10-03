@@ -34,6 +34,19 @@
 //#define DEBUG_ALLOC2
 //#define DEBUG_EXT
 
+// #define DEBUG_QCOW2 1
+
+#if DEBUG_QCOW2 == 1
+#define DBG_QCOW2_PRINT(...) \
+    do { \
+        printf("%s:%d: ", __func__, __LINE__); \
+        printf(__VA_ARGS__); \
+    } while (0)
+#else
+#define DBG_QCOW2_PRINT(...)
+#endif
+
+
 #define QCOW_MAGIC (('Q' << 24) | ('F' << 16) | ('I' << 8) | 0xfb)
 
 #define QCOW_CRYPT_NONE 0

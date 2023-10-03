@@ -175,44 +175,53 @@ static int qcow2_cache_flush_dependency(BlockDriverState *bs, Qcow2Cache *c)
 
     return 0;
 }
-
 static int qcow2_cache_entry_flush(BlockDriverState *bs, Qcow2Cache *c, int i)
 {
     BDRVQcow2State *s = bs->opaque;
+    DBG_QCOW2_PRINT("Entering qcow2_cache_entry_flush. bs: %p, cache: %p, entry: %d\n", bs, c, i);
+
     int ret = 0;
 
     if (!c->entries[i].dirty || !c->entries[i].offset) {
+        DBG_QCOW2_PRINT("Entry %d not dirty or offset is zero. Exiting early.\n", i);
         return 0;
     }
 
-    trace_qcow2_cache_entry_flush(qemu_coroutine_self(),
-                                  c == s->l2_table_cache, i);
+    trace_qcow2_cache_entry_flush(qemu_coroutine_self(), c == s->l2_table_cache, i);
 
     if (c->depends) {
+        DBG_QCOW2_PRINT("Cache has dependencies. Flushing them.\n");
         ret = qcow2_cache_flush_dependency(bs, c);
     } else if (c->depends_on_flush) {
+        DBG_QCOW2_PRINT("Cache depends on a flush. Performing bdrv_flush.\n");
         ret = bdrv_flush(bs->file->bs);
         if (ret >= 0) {
             c->depends_on_flush = false;
+            DBG_QCOW2_PRINT("Flush successful. Setting depends_on_flush to false.\n");
         }
     }
 
     if (ret < 0) {
+        DBG_QCOW2_PRINT("Error encountered. Exiting with ret: %d\n", ret);
         return ret;
     }
 
     if (c == s->refcount_block_cache) {
+        DBG_QCOW2_PRINT("Cache is refcount_block_cache. Performing overlap check for QCOW2_OL_REFCOUNT_BLOCK.\n");
         ret = qcow2_pre_write_overlap_check(bs, QCOW2_OL_REFCOUNT_BLOCK,
                 c->entries[i].offset, c->table_size, false);
     } else if (c == s->l2_table_cache) {
+        DBG_QCOW2_PRINT("Cache is l2_table_cache. Performing overlap check for QCOW2_OL_ACTIVE_L2.\n");
         ret = qcow2_pre_write_overlap_check(bs, QCOW2_OL_ACTIVE_L2,
                 c->entries[i].offset, c->table_size, false);
     } else {
+        DBG_QCOW2_PRINT("Cache is other type. Performing general overlap check.\n");
         ret = qcow2_pre_write_overlap_check(bs, 0,
                 c->entries[i].offset, c->table_size, false);
     }
 
     if (ret < 0) {
+        DBG_QCOW2_PRINT("Overlap check failed. Exiting with ret: %d\n", ret);
         return ret;
     }
 
@@ -221,21 +230,87 @@ static int qcow2_cache_entry_flush(BlockDriverState *bs, Qcow2Cache *c, int i)
     } else if (c == s->l2_table_cache) {
         BLKDBG_EVENT(bs->file, BLKDBG_L2_UPDATE);
     }
+    DBG_QCOW2_PRINT("BLKDBG event triggered based on cache type.\n");
 
     ret = bdrv_pwrite(bs->file, c->entries[i].offset,
                       qcow2_cache_get_table_addr(c, i), c->table_size);
+    DBG_QCOW2_PRINT("Performed bdrv_pwrite for entry %d. ret: %d\n", i, ret);
+
     if (ret < 0) {
+        DBG_QCOW2_PRINT("Error in bdrv_pwrite. Exiting with ret: %d\n", ret);
         return ret;
     }
 
     c->entries[i].dirty = false;
+    DBG_QCOW2_PRINT("Set entry %d dirty flag to false.\n", i);
 
+    DBG_QCOW2_PRINT("Exiting qcow2_cache_entry_flush with success.\n");
     return 0;
 }
+
+
+// static int qcow2_cache_entry_flush(BlockDriverState *bs, Qcow2Cache *c, int i)
+// {
+//     BDRVQcow2State *s = bs->opaque;
+//     int ret = 0;
+
+//     if (!c->entries[i].dirty || !c->entries[i].offset) {
+//         return 0;
+//     }
+
+//     trace_qcow2_cache_entry_flush(qemu_coroutine_self(),
+//                                   c == s->l2_table_cache, i);
+
+//     if (c->depends) {
+//         ret = qcow2_cache_flush_dependency(bs, c);
+//     } else if (c->depends_on_flush) {
+//         ret = bdrv_flush(bs->file->bs);
+//         if (ret >= 0) {
+//             c->depends_on_flush = false;
+//         }
+//     }
+
+//     if (ret < 0) {
+//         return ret;
+//     }
+
+//     if (c == s->refcount_block_cache) {
+//         ret = qcow2_pre_write_overlap_check(bs, QCOW2_OL_REFCOUNT_BLOCK,
+//                 c->entries[i].offset, c->table_size, false);
+//     } else if (c == s->l2_table_cache) {
+//         ret = qcow2_pre_write_overlap_check(bs, QCOW2_OL_ACTIVE_L2,
+//                 c->entries[i].offset, c->table_size, false);
+//     } else {
+//         ret = qcow2_pre_write_overlap_check(bs, 0,
+//                 c->entries[i].offset, c->table_size, false);
+//     }
+
+//     if (ret < 0) {
+//         return ret;
+//     }
+
+//     if (c == s->refcount_block_cache) {
+//         BLKDBG_EVENT(bs->file, BLKDBG_REFBLOCK_UPDATE_PART);
+//     } else if (c == s->l2_table_cache) {
+//         BLKDBG_EVENT(bs->file, BLKDBG_L2_UPDATE);
+//     }
+
+//     ret = bdrv_pwrite(bs->file, c->entries[i].offset,
+//                       qcow2_cache_get_table_addr(c, i), c->table_size);
+//     if (ret < 0) {
+//         return ret;
+//     }
+
+//     c->entries[i].dirty = false;
+
+//     return 0;
+// }
 
 int qcow2_cache_write(BlockDriverState *bs, Qcow2Cache *c)
 {
     BDRVQcow2State *s = bs->opaque;
+    DBG_QCOW2_PRINT("Entering qcow2_cache_write. bs: %p, cache: %p\n", bs, c);
+
     int result = 0;
     int ret;
     int i;
@@ -243,14 +318,41 @@ int qcow2_cache_write(BlockDriverState *bs, Qcow2Cache *c)
     trace_qcow2_cache_flush(qemu_coroutine_self(), c == s->l2_table_cache);
 
     for (i = 0; i < c->size; i++) {
+        DBG_QCOW2_PRINT("Flushing cache entry %d of %d\n", i, c->size);
+        if(i == 40) continue;
+        
         ret = qcow2_cache_entry_flush(bs, c, i);
+        DBG_QCOW2_PRINT("Executed qcow2_cache_entry_flush for entry %d. ret: %d\n", i, ret);
+
         if (ret < 0 && result != -ENOSPC) {
+            DBG_QCOW2_PRINT("Error in flushing cache entry %d. Storing result: %d\n", i, ret);
             result = ret;
         }
     }
 
+    DBG_QCOW2_PRINT("Exiting qcow2_cache_write with result: %d\n", result);
     return result;
 }
+
+
+// int qcow2_cache_write(BlockDriverState *bs, Qcow2Cache *c)
+// {
+//     BDRVQcow2State *s = bs->opaque;
+//     int result = 0;
+//     int ret;
+//     int i;
+
+//     trace_qcow2_cache_flush(qemu_coroutine_self(), c == s->l2_table_cache);
+
+//     for (i = 0; i < c->size; i++) {
+//         ret = qcow2_cache_entry_flush(bs, c, i);
+//         if (ret < 0 && result != -ENOSPC) {
+//             result = ret;
+//         }
+//     }
+
+//     return result;
+// }
 
 int qcow2_cache_flush(BlockDriverState *bs, Qcow2Cache *c)
 {

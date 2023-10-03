@@ -2737,67 +2737,96 @@ void bdrv_aio_cancel_async(BlockAIOCB *acb)
     }
 }
 
+// #define DBG_AIO 1
+
+#if DBG_AIO == 1
+#define DBG_AIO_PRINT(...) \
+    do { \
+        printf("%s:%d: ", __func__, __LINE__); \
+        printf(__VA_ARGS__); \
+    } while (0)
+#else
+#define DBG_AIO_PRINT(...)
+#endif
+
 /**************************************************************/
 /* Coroutine block device emulation */
-
 int coroutine_fn bdrv_co_flush(BlockDriverState *bs)
 {
     BdrvChild *primary_child = bdrv_primary_child(bs);
+    DBG_AIO_PRINT("Set primary_child: %p\n", primary_child);
+    
     BdrvChild *child;
+    DBG_AIO_PRINT("Initialized child pointer\n");
+
     int current_gen;
+    DBG_AIO_PRINT("Initialized current_gen\n");
+
     int ret = 0;
+    DBG_AIO_PRINT("Set ret: %d\n", ret);
 
     bdrv_inc_in_flight(bs);
+    DBG_AIO_PRINT("Increased in_flight for bs: %p\n", bs);
 
-    if (!bdrv_is_inserted(bs) || bdrv_is_read_only(bs) ||
-        bdrv_is_sg(bs)) {
+    if (!bdrv_is_inserted(bs) || bdrv_is_read_only(bs) || bdrv_is_sg(bs)) {
         goto early_exit;
     }
+    DBG_AIO_PRINT("Checked bdrv conditions\n");
 
     qemu_co_mutex_lock(&bs->reqs_lock);
-    current_gen = qatomic_read(&bs->write_gen);
+    DBG_AIO_PRINT("Locked reqs_lock\n");
 
-    /* Wait until any previous flushes are completed */
+    current_gen = qatomic_read(&bs->write_gen);
+    DBG_AIO_PRINT("Read write_gen into current_gen: %d\n", current_gen);
+
     while (bs->active_flush_req) {
         qemu_co_queue_wait(&bs->flush_queue, &bs->reqs_lock);
     }
+    DBG_AIO_PRINT("Waited for active_flush_req\n");
 
-    /* Flushes reach this point in nondecreasing current_gen order.  */
     bs->active_flush_req = true;
-    qemu_co_mutex_unlock(&bs->reqs_lock);
+    DBG_AIO_PRINT("Set active_flush_req to true\n");
 
-    /* Write back all layers by calling one driver function */
+    qemu_co_mutex_unlock(&bs->reqs_lock);
+    DBG_AIO_PRINT("Unlocked reqs_lock\n");
+
     if (bs->drv->bdrv_co_flush) {
         ret = bs->drv->bdrv_co_flush(bs);
         goto out;
     }
+    DBG_AIO_PRINT("Checked bdrv_co_flush in driver\n");
 
-    /* Write back cached data to the OS even with cache=unsafe */
     BLKDBG_EVENT(primary_child, BLKDBG_FLUSH_TO_OS);
+    DBG_AIO_PRINT("Triggered BLKDBG_FLUSH_TO_OS event\n");
+
     if (bs->drv->bdrv_co_flush_to_os) {
+        DBG_AIO_PRINT("Calling bdrv_co_flush_to_os\n");
         ret = bs->drv->bdrv_co_flush_to_os(bs);
         if (ret < 0) {
             goto out;
         }
     }
+    DBG_AIO_PRINT("Checked bdrv_co_flush_to_os in driver\n");
 
-    /* But don't actually force it to the disk with cache=unsafe */
     if (bs->open_flags & BDRV_O_NO_FLUSH) {
         goto flush_children;
     }
+    DBG_AIO_PRINT("Checked open_flags for BDRV_O_NO_FLUSH\n");
 
-    /* Check if we really need to flush anything */
     if (bs->flushed_gen == current_gen) {
         goto flush_children;
     }
+    DBG_AIO_PRINT("Compared flushed_gen with current_gen\n");
 
     BLKDBG_EVENT(primary_child, BLKDBG_FLUSH_TO_DISK);
+    DBG_AIO_PRINT("Triggered BLKDBG_FLUSH_TO_DISK event\n");
+
     if (!bs->drv) {
-        /* bs->drv->bdrv_co_flush() might have ejected the BDS
-         * (even in case of apparent success) */
         ret = -ENOMEDIUM;
         goto out;
     }
+    DBG_AIO_PRINT("Checked if driver exists\n");
+
     if (bs->drv->bdrv_co_flush_to_disk) {
         ret = bs->drv->bdrv_co_flush_to_disk(bs);
     } else if (bs->drv->bdrv_aio_flush) {
@@ -2805,36 +2834,29 @@ int coroutine_fn bdrv_co_flush(BlockDriverState *bs)
         CoroutineIOCompletion co = {
             .coroutine = qemu_coroutine_self(),
         };
+        DBG_AIO_PRINT("Set CoroutineIOCompletion struct\n");
 
         acb = bs->drv->bdrv_aio_flush(bs, bdrv_co_io_em_complete, &co);
+        DBG_AIO_PRINT("Called bdrv_aio_flush\n");
+
         if (acb == NULL) {
             ret = -EIO;
         } else {
             qemu_coroutine_yield();
             ret = co.ret;
         }
+        DBG_AIO_PRINT("Handled return of bdrv_aio_flush\n");
+
     } else {
-        /*
-         * Some block drivers always operate in either writethrough or unsafe
-         * mode and don't support bdrv_flush therefore. Usually qemu doesn't
-         * know how the server works (because the behaviour is hardcoded or
-         * depends on server-side configuration), so we can't ensure that
-         * everything is safe on disk. Returning an error doesn't work because
-         * that would break guests even if the server operates in writethrough
-         * mode.
-         *
-         * Let's hope the user knows what he's doing.
-         */
         ret = 0;
     }
+    DBG_AIO_PRINT("Handled driver flush conditions\n");
 
     if (ret < 0) {
         goto out;
     }
+    DBG_AIO_PRINT("Checked ret value\n");
 
-    /* Now flush the underlying protocol.  It will also have BDRV_O_NO_FLUSH
-     * in the case of cache=unsafe, so there are no useless flushes.
-     */
 flush_children:
     ret = 0;
     QLIST_FOREACH(child, &bs->children, next) {
@@ -2845,23 +2867,149 @@ flush_children:
             }
         }
     }
+    DBG_AIO_PRINT("Flushed children\n");
 
 out:
-    /* Notify any pending flushes that we have completed */
     if (ret == 0) {
         bs->flushed_gen = current_gen;
     }
+    DBG_AIO_PRINT("Checked ret value at out label\n");
 
     qemu_co_mutex_lock(&bs->reqs_lock);
     bs->active_flush_req = false;
-    /* Return value is ignored - it's ok if wait queue is empty */
     qemu_co_queue_next(&bs->flush_queue);
     qemu_co_mutex_unlock(&bs->reqs_lock);
+    DBG_AIO_PRINT("Handled active_flush_req and unlocked reqs_lock\n");
 
 early_exit:
     bdrv_dec_in_flight(bs);
+    DBG_AIO_PRINT("Decreased in_flight for bs: %p and exiting\n", bs);
+    
     return ret;
 }
+
+// int coroutine_fn bdrv_co_flush(BlockDriverState *bs)
+// {
+//     BdrvChild *primary_child = bdrv_primary_child(bs);
+//     BdrvChild *child;
+//     int current_gen;
+//     int ret = 0;
+
+//     bdrv_inc_in_flight(bs);
+
+//     if (!bdrv_is_inserted(bs) || bdrv_is_read_only(bs) ||
+//         bdrv_is_sg(bs)) {
+//         goto early_exit;
+//     }
+
+//     qemu_co_mutex_lock(&bs->reqs_lock);
+//     current_gen = qatomic_read(&bs->write_gen);
+
+//     /* Wait until any previous flushes are completed */
+//     while (bs->active_flush_req) {
+//         qemu_co_queue_wait(&bs->flush_queue, &bs->reqs_lock);
+//     }
+
+//     /* Flushes reach this point in nondecreasing current_gen order.  */
+//     bs->active_flush_req = true;
+//     qemu_co_mutex_unlock(&bs->reqs_lock);
+
+//     /* Write back all layers by calling one driver function */
+//     if (bs->drv->bdrv_co_flush) {
+//         ret = bs->drv->bdrv_co_flush(bs);
+//         goto out;
+//     }
+
+//     /* Write back cached data to the OS even with cache=unsafe */
+//     BLKDBG_EVENT(primary_child, BLKDBG_FLUSH_TO_OS);
+//     if (bs->drv->bdrv_co_flush_to_os) {
+//         ret = bs->drv->bdrv_co_flush_to_os(bs);
+//         if (ret < 0) {
+//             goto out;
+//         }
+//     }
+
+//     /* But don't actually force it to the disk with cache=unsafe */
+//     if (bs->open_flags & BDRV_O_NO_FLUSH) {
+//         goto flush_children;
+//     }
+
+//     /* Check if we really need to flush anything */
+//     if (bs->flushed_gen == current_gen) {
+//         goto flush_children;
+//     }
+
+//     BLKDBG_EVENT(primary_child, BLKDBG_FLUSH_TO_DISK);
+//     if (!bs->drv) {
+//         /* bs->drv->bdrv_co_flush() might have ejected the BDS
+//          * (even in case of apparent success) */
+//         ret = -ENOMEDIUM;
+//         goto out;
+//     }
+//     if (bs->drv->bdrv_co_flush_to_disk) {
+//         ret = bs->drv->bdrv_co_flush_to_disk(bs);
+//     } else if (bs->drv->bdrv_aio_flush) {
+//         BlockAIOCB *acb;
+//         CoroutineIOCompletion co = {
+//             .coroutine = qemu_coroutine_self(),
+//         };
+
+//         acb = bs->drv->bdrv_aio_flush(bs, bdrv_co_io_em_complete, &co);
+//         if (acb == NULL) {
+//             ret = -EIO;
+//         } else {
+//             qemu_coroutine_yield();
+//             ret = co.ret;
+//         }
+//     } else {
+//         /*
+//          * Some block drivers always operate in either writethrough or unsafe
+//          * mode and don't support bdrv_flush therefore. Usually qemu doesn't
+//          * know how the server works (because the behaviour is hardcoded or
+//          * depends on server-side configuration), so we can't ensure that
+//          * everything is safe on disk. Returning an error doesn't work because
+//          * that would break guests even if the server operates in writethrough
+//          * mode.
+//          *
+//          * Let's hope the user knows what he's doing.
+//          */
+//         ret = 0;
+//     }
+
+//     if (ret < 0) {
+//         goto out;
+//     }
+
+//     /* Now flush the underlying protocol.  It will also have BDRV_O_NO_FLUSH
+//      * in the case of cache=unsafe, so there are no useless flushes.
+//      */
+// flush_children:
+//     ret = 0;
+//     QLIST_FOREACH(child, &bs->children, next) {
+//         if (child->perm & (BLK_PERM_WRITE | BLK_PERM_WRITE_UNCHANGED)) {
+//             int this_child_ret = bdrv_co_flush(child->bs);
+//             if (!ret) {
+//                 ret = this_child_ret;
+//             }
+//         }
+//     }
+
+// out:
+//     /* Notify any pending flushes that we have completed */
+//     if (ret == 0) {
+//         bs->flushed_gen = current_gen;
+//     }
+
+//     qemu_co_mutex_lock(&bs->reqs_lock);
+//     bs->active_flush_req = false;
+//     /* Return value is ignored - it's ok if wait queue is empty */
+//     qemu_co_queue_next(&bs->flush_queue);
+//     qemu_co_mutex_unlock(&bs->reqs_lock);
+
+// early_exit:
+//     bdrv_dec_in_flight(bs);
+//     return ret;
+// }
 
 int coroutine_fn bdrv_co_pdiscard(BdrvChild *child, int64_t offset,
                                   int64_t bytes)
