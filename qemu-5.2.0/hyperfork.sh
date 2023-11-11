@@ -31,8 +31,8 @@ send "root\r"
 
 
 expect "root@syzkaller:~# "
-# send "gcc -o example ./example.c\r"
-send "gcc -o example ./modex.c\r"
+send "gcc -o example ./example.c\r"
+# send "gcc -o example ./modex.c\r"
 
 # sleep 10
 expect "root@syzkaller:~# "
