@@ -1058,24 +1058,30 @@ static void create_mon_new(void){
 static int do_ski_fork(void){
     // do a simple fork and print the exit in the child 
     // h_cpu_kick();
+    const char *filename = "evals/eval.csv";
+    
     int locked = qemu_mutex_iothread_locked();
 
     kick_all();
 
     // unlocking as it was needed by the the cpu thread at some point
     if(locked) qemu_mutex_unlock_iothread();
-    
+    h_eval_record_time("HMP starting the forkall");
     pid_t pid = ski_forkall_master();
     if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
         printf("I am the child\n");
         create_mon_new();
-                
+        
         // this waits for the setup to complete on other threads => by establish_child
         forkall_child_wait();
+        h_eval_reopen_fd(filename);
+        h_eval_record_time("HMP done recreating threads CHILD");
+
         return pid;
     } else {
         printf("I am the parent\n");
+        h_eval_record_time("HMP done in parent");
         h_wait_for_load_snapshot();
         return pid;
     }  
@@ -1102,6 +1108,7 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     // only load in the child
     if(forkall_check_child()){
         load_vm("newtest", &err);
+        h_eval_record_time("HMP Done loading the VM CHILD");
         hmp_handle_error(mon, err);
     }
     

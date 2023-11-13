@@ -3,6 +3,7 @@
 
 #include "qemu/osdep.h"
 #include <bits/pthreadtypes.h>
+#include <stdio.h>
 #include <termios.h>
 
 #include <glib/gprintf.h>
@@ -27,6 +28,11 @@ extern GMainLoop *h_iothread_main_loop;
 extern int h_qmp_fd;
 //==============================================================
 
+
+// ======================== HODF EVAL ===============================
+static FILE *h_eval_fd;
+// ======================== HODF EVAL ===============================
+
 typedef struct hodf_metadata{
     pthread_t threadid;
     QemuCond halt_cond;
@@ -46,6 +52,13 @@ void h_save_iothread_loop(GMainLoop *main_loop);
 void h_intrpt_iothread_loop(void);
 void h_set_qmp_server_fd(int fd);                          // only call with hmp or qmp monitor
 int h_get_qmp_server_fd(void);
+
+// ======================== HODF EVAL ===============================
+static void h_eval_initialize(const char *filename);
+int h_eval_record_time(const char* name);
+int h_eval_reopen_fd(const char *filename);
+
+// ======================== HODF EVAL ===============================
 
 
 

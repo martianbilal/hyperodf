@@ -31,10 +31,34 @@ int h_qmp_fd = 0;
 //==============================================================
 
 
+
+static void h_eval_initialize(const char *filename){
+    // open a CSV file to write the data
+    h_eval_fd = fopen(filename, "w");
+    if(h_eval_fd == NULL){
+        DEBUG_PRINT("Error opening file\n");
+        return;
+    }
+    // write the header 
+    fprintf(h_eval_fd, "name,time\n");
+    return;
+}
+
+int h_eval_reopen_fd(const char *filename){
+    h_eval_fd = fopen(filename, "a");
+    if(h_eval_fd == NULL){
+        DEBUG_PRINT("Error opening file\n");
+        return -1;
+    }
+
+    return 0;
+}
+
 // sorta hacky way to get the number of times the fd is registered
 static int times_registered_fd = 0;
 
 void h_initialize(void){
+    const char *filename = "evals/eval.csv";
     DEBUG_PRINT("Starting initializing");
     metadata_array = malloc(sizeof(hodf_metadata) * H_MAX_CPUS);
     pipe(parent_child_pipe);
@@ -48,6 +72,8 @@ void h_initialize(void){
     if(ret < 0){
         DEBUG_PRINT("Error initializing event notifier\n");
     }
+
+    h_eval_initialize(filename);
 }
 
 void h_save_metadata(QemuCond *halt_cond, pthread_t threadid, int cpu_index){
@@ -131,4 +157,16 @@ void h_register_monitor_fd(int fd){
 
 int h_get_monitor_fd(void){
     return monitor_client_fd;
+}
+
+int h_eval_record_time(const char *name){
+    // get the current time
+    struct timeval tv;
+    gettimeofday(&tv, NULL); // Get the current time
+
+    double time_in_sec = tv.tv_sec + tv.tv_usec / 1000000.0;
+
+    fprintf(h_eval_fd, "%s,%.6f\n", name, time_in_sec);
+
+    return 0;
 }
