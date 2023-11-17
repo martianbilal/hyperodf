@@ -1067,6 +1067,7 @@ static int do_ski_fork(void){
     // unlocking as it was needed by the the cpu thread at some point
     if(locked) qemu_mutex_unlock_iothread();
     // h_eval_record_time("HMP starting the forkall");
+    hodf_add_event("HMP starting the forkall");
     pid_t pid = ski_forkall_master();
     if(locked) qemu_mutex_lock_iothread();
     if (pid == 0) {
@@ -1077,11 +1078,13 @@ static int do_ski_fork(void){
         forkall_child_wait();
         // h_eval_reopen_fd(filename);
         // h_eval_record_time("HMP done recreating threads CHILD");
+        hodf_add_event("HMP done recreating threads CHILD");
 
         return pid;
     } else {
         printf("I am the parent\n");
         // h_eval_record_time("HMP done in parent");
+        hodf_add_event("HMP done in parent");
         h_wait_for_load_snapshot();
         return pid;
     }  
@@ -1109,6 +1112,7 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     if(forkall_check_child()){
         load_vm("newtest", &err);
         // h_eval_record_time("HMP Done loading the VM CHILD");
+        hodf_add_event("HMP Done loading the VM CHILD");
         hmp_handle_error(mon, err);
     }
     
@@ -1116,6 +1120,7 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     if(pid != 0){
         monitor_printf(mon, "child_pid : %d\n", pid);
     }
+    hodf_print_events();
 }
 
 void hmp_stop(Monitor *mon, const QDict *qdict)

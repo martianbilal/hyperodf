@@ -13,11 +13,15 @@
 #define DEBUG_PRINT(fmt, args...) /* do nothing */
 #endif
 
-
+#define USE_FILE
 
 // random number
 static int H_MAX_CPUS = 20;
 static int monitor_client_fd = 0;
+
+#ifdef USE_FILE
+static const char *hodf_eval_file = "evals/hodf.csv";
+#endif
 
 //======================Global Vars============================
 hodf_metadata *metadata_array;
@@ -59,9 +63,20 @@ void hodf_add_event(const char *eventDesc) {
 }
 // Function to print all events
 void hodf_print_events(void) {
+    #ifdef USE_FILE
+    FILE *hodf_fd = fopen(hodf_eval_file, "w");
+    #endif
     for (int i = 0; i < hodf_events_size; i++) {
+        #ifndef USE_FILE
         printf("Pid: %d, Time: %.2f, Event: %s\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
+        #else
+        fprintf(hodf_fd, "%d,Pid: %d, Time: %.2f, Event: %s\n", hodf_events_size, hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
+        #endif
     }
+
+    #ifdef USE_FILE
+    fclose(hodf_fd);
+    #endif
 }
 
 
