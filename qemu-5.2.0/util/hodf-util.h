@@ -18,11 +18,22 @@
 #include "qemu/event_notifier.h"
 
 // ======================== HODF ===============================
+#define MAX_EVENT_LEN 100
+typedef struct {
+    double time;
+    char event[MAX_EVENT_LEN];
+    int pid;
+} hodf_event;
+
 
 
 // ======================== Global vars ========================
 extern EventNotifier mon_create_event;
 extern int parent_child_pipe[2];
+
+extern hodf_event *hodf_events;
+extern int hodf_events_size;
+
 
 extern GMainLoop *h_iothread_main_loop;
 extern int h_qmp_fd;
@@ -37,6 +48,7 @@ typedef struct hodf_metadata{
     pthread_t threadid;
     QemuCond halt_cond;
 } hodf_metadata;
+
 
 // does the necessary initialization including creating the variables used by 
 // hodf like the halt_cond array 
@@ -60,7 +72,8 @@ int h_eval_reopen_fd(const char *filename);
 
 // ======================== HODF EVAL ===============================
 
-
+void hodf_add_event(const char *eventDesc);
+void hodf_print_events(void);
 
 void h_save_metadata(QemuCond *halt_cond, pthread_t threadid, int cpu_index);
 

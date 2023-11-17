@@ -25,11 +25,44 @@ hodf_metadata *metadata_array;
 EventNotifier mon_create_event;
 int parent_child_pipe[2];
 
+hodf_event *hodf_events = NULL;
+int hodf_events_size =0;
+
 GMainLoop *h_iothread_main_loop;
 int h_qmp_fd = 0;
 
+
 //==============================================================
 
+void hodf_add_event(const char *eventDesc) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL); // Get the current time
+
+    double time = tv.tv_sec + tv.tv_usec / 1000000.0;
+
+    // Resize the hodf_events array
+    hodf_event *newHodfEvents = realloc(hodf_events, (hodf_events_size + 1) * sizeof(hodf_event));
+    if (newHodfEvents == NULL) {
+        perror("Failed to allocate memory for hodf_events");
+        exit(EXIT_FAILURE);
+    }
+    hodf_events = newHodfEvents;
+
+    // Add the new event
+    hodf_events[hodf_events_size].time = time;
+    hodf_events[hodf_events_size].pid = getpid();
+    strncpy(hodf_events[hodf_events_size].event, eventDesc, MAX_EVENT_LEN);
+    hodf_events[hodf_events_size].event[MAX_EVENT_LEN - 1] = '\0'; // Ensure null-termination
+
+    // Increment the size
+    hodf_events_size++;
+}
+// Function to print all events
+void hodf_print_events(void) {
+    for (int i = 0; i < hodf_events_size; i++) {
+        printf("Pid: %d, Time: %.2f, Event: %s\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
+    }
+}
 
 
 static void h_eval_initialize(const char *filename){
@@ -40,12 +73,12 @@ static void h_eval_initialize(const char *filename){
         return;
     }
     // write the header 
-    fprintf(h_eval_fd, "name,time\n");
+    fprintf(h_eval_fd, "pid,name,time\n");
     return;
 }
 
 int h_eval_reopen_fd(const char *filename){
-    h_eval_fd = fopen(filename, "a");
+    h_eval_fd = fopen(filename, "w");
     if(h_eval_fd == NULL){
         DEBUG_PRINT("Error opening file\n");
         return -1;
@@ -73,7 +106,7 @@ void h_initialize(void){
         DEBUG_PRINT("Error initializing event notifier\n");
     }
 
-    h_eval_initialize(filename);
+    // h_eval_initialize(filename);
 }
 
 void h_save_metadata(QemuCond *halt_cond, pthread_t threadid, int cpu_index){
@@ -165,8 +198,10 @@ int h_eval_record_time(const char *name){
     gettimeofday(&tv, NULL); // Get the current time
 
     double time_in_sec = tv.tv_sec + tv.tv_usec / 1000000.0;
+    int pid = getpid();
 
-    fprintf(h_eval_fd, "%s,%.6f\n", name, time_in_sec);
+    fprintf(h_eval_fd, "%d,%s,%.6f\n", pid ? pid: 0, name, time_in_sec);
+    fflush(h_eval_fd);
 
     return 0;
 }
