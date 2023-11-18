@@ -960,12 +960,14 @@ static void save_vm(const char* name, Error **errp){
 }
 
 static void load_vm(const char* name, Error **errp){
+    hodf_add_event("HMP Start loading the snapshot");
     load_snapshot(name, errp);
+    hodf_add_event("HMP end loading the snapshot");
 
     // signal completion of load_snapshot
     h_signal_child_done();
 
-    printf("load_vm[%s]\n", name);
+    // printf("load_vm[%s]\n", name);
 }
 
 static void del_vm(const char* name, Error **errp){
@@ -1069,16 +1071,18 @@ static int do_ski_fork(void){
     // h_eval_record_time("HMP starting the forkall");
     hodf_add_event("HMP starting the forkall");
     pid_t pid = ski_forkall_master();
+    hodf_add_event("Started wait for iothread lock");
     if(locked) qemu_mutex_lock_iothread();
+    hodf_add_event("Acquired iothread lock");
     if (pid == 0) {
         printf("I am the child\n");
         create_mon_new();
         
+        hodf_add_event("Got the socket conn CHILD");
         // this waits for the setup to complete on other threads => by establish_child
         forkall_child_wait();
         // h_eval_reopen_fd(filename);
         // h_eval_record_time("HMP done recreating threads CHILD");
-        hodf_add_event("HMP done recreating threads CHILD");
 
         return pid;
     } else {
@@ -1110,6 +1114,7 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
 
     // only load in the child
     if(forkall_check_child()){
+        hodf_add_event("HMP Start loading the VM CHILD");
         load_vm("newtest", &err);
         // h_eval_record_time("HMP Done loading the VM CHILD");
         hodf_add_event("HMP Done loading the VM CHILD");

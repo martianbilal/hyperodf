@@ -1,5 +1,6 @@
 #!/bin/sh
 
-sleep 13
+# sleep 11
+sleep 3
 
 socat unix-connect:qemu_monitor.sock -

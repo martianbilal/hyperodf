@@ -67,6 +67,7 @@
 #include "migration/colo.h"
 #include "qemu/bitmap.h"
 #include "net/announce.h"
+#include "util/hodf-util.h"
 #include <stdio.h>
 
 const unsigned int postcopy_ram_discard_version;
@@ -3043,22 +3044,26 @@ int load_snapshot(const char *name, Error **errp)
         return -EINVAL;
     }
 
+
+    hodf_add_event("flushing the record/replay queue");
     /*
      * Flush the record/replay queue. Now the VM state is going
      * to change. Therefore we don't need to preserve its consistency
      */
     replay_flush_events();
 
+    hodf_add_event("bdrv_drain_all_begin");
     /* Flush all IO requests so they don't interfere with the new state.  */
     bdrv_drain_all_begin();
 
+    hodf_add_event("bdrv_all_goto_snapshot");
     ret = bdrv_all_goto_snapshot(name, &bs, errp);
     if (ret < 0) {
         error_prepend(errp, "Could not load snapshot '%s' on '%s': ",
                       name, bdrv_get_device_or_node_name(bs));
         goto err_drain;
     }
-
+    hodf_add_event("bdrv_all_goto_snapshot done");
     /* restore the VM state */
     f = qemu_fopen_bdrv(bs_vm_state, 0);
     if (!f) {
@@ -3070,8 +3075,11 @@ int load_snapshot(const char *name, Error **errp)
     qemu_system_reset(SHUTDOWN_CAUSE_NONE);
     mis->from_src_file = f;
 
+    hodf_add_event("Actuall loadvm_state");
     aio_context_acquire(aio_context);
     ret = qemu_loadvm_state(f);
+    hodf_add_event("Done with loadvm_state");
+
     migration_incoming_state_destroy();
     aio_context_release(aio_context);
 

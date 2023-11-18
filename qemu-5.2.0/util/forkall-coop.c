@@ -458,6 +458,7 @@ pid_t ski_forkall_master(){
 	pthread_mutex_unlock(&forkall_mutex);
 	h_intrpt_iothread_loop();
 
+	hodf_add_event("Starting forkall");
 	while(1){
 		int threads_done;
 		int nthreads;
@@ -489,6 +490,7 @@ pid_t ski_forkall_master(){
 	int pid = -1;
 	while(pid != 0)
 	if((pid = fork())){
+		hodf_add_event("Starting parent");
 		// Parent
 		ski_log_forkall("Parent (child pid = %d)\n", pid);
 		return pid;
@@ -496,6 +498,7 @@ pid_t ski_forkall_master(){
 		// Child process
 		// We can now recreate all the threads (also need to release them)
 		ski_log_forkall("Child\n");
+		hodf_add_event("Starting child");
 
 		// Prevent child secondary threads from thinking they have been flaged to do another fork
 		forkall_forking = 0;
@@ -528,6 +531,8 @@ pid_t ski_forkall_master(){
 		//forkall_patch_thread_references();
 
 		ski_log_forkall("[MASTER] restored\n");
+		hodf_add_event("Restored threads");
+		hodf_print_events();
 		return pid;
 	}
 

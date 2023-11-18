@@ -7,7 +7,8 @@ spawn ./recreate_snapshot.sh
 # Launch run.sh script to create and start the QEMU VM
 spawn ./run.sh
 
-sleep 10
+# sleep 10
+sleep 2
 
 # Connect to the UNIX socket
 spawn socat unix-connect:qemu-monitor-socket -

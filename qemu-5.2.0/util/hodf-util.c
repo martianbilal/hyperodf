@@ -2,6 +2,7 @@
 #include "qemu/event_notifier.h"
 #include "qemu/thread.h"
 #include "qemu/typedefs.h"
+#include "util/forkall-coop.h"
 
 // debug flag for hodf
 // #define DBG_HODF
@@ -20,7 +21,7 @@ static int H_MAX_CPUS = 20;
 static int monitor_client_fd = 0;
 
 #ifdef USE_FILE
-static const char *hodf_eval_file = "evals/hodf.csv";
+// static const char *hodf_eval_file = "evals/hodf.csv";
 #endif
 
 //======================Global Vars============================
@@ -63,14 +64,24 @@ void hodf_add_event(const char *eventDesc) {
 }
 // Function to print all events
 void hodf_print_events(void) {
+    const char *hodf_eval_file = forkall_check_child() ? "evals/hodf_child.csv": "evals/hodf_parent.csv";
+    
     #ifdef USE_FILE
     FILE *hodf_fd = fopen(hodf_eval_file, "w");
     #endif
+    
+    // Print the header
+    #ifndef USE_FILE
+    printf("Pid, Time, Event\n");
+    #else
+    fprintf(hodf_fd, "Pid,Time,Event\n");
+    #endif
+
     for (int i = 0; i < hodf_events_size; i++) {
         #ifndef USE_FILE
         printf("Pid: %d, Time: %.2f, Event: %s\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
         #else
-        fprintf(hodf_fd, "%d,Pid: %d, Time: %.2f, Event: %s\n", hodf_events_size, hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
+        fprintf(hodf_fd, "%d,%.6f,%s\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
         #endif
     }
 
@@ -107,6 +118,16 @@ static int times_registered_fd = 0;
 
 void h_initialize(void){
     const char *filename = "evals/eval.csv";
+    
+    #ifdef USE_FILE
+    // FILE *hodf_fd = fopen(hodf_eval_file, "w");
+    // if(hodf_fd == NULL){
+    //     DEBUG_PRINT("Error opening file\n");
+    //     return;
+    // }
+    // fclose(hodf_fd);
+    #endif
+
     DEBUG_PRINT("Starting initializing");
     metadata_array = malloc(sizeof(hodf_metadata) * H_MAX_CPUS);
     pipe(parent_child_pipe);
