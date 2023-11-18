@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
+
 unique_lines = set()
+
+qemu_path = os.getenv('MOD_QEMU')
+eval_path = os.path.join(qemu_path, 'evals')
 
 def read_and_sort_csv(file_path: str) -> list:
     with open(file_path, 'r') as file:
@@ -21,18 +28,38 @@ def process_lines(lines):
 
 
 def main():
-    # Reading the data from the new files
-    child_lines = read_and_sort_csv('./hodf_child.csv')
-    parent_lines = read_and_sort_csv('./hodf_parent.csv')
+    child_eval_path = os.path.join(eval_path, 'hodf_child.csv')
+    parent_eval_path = os.path.join(eval_path, 'hodf_parent.csv')
+
+    child_lines = read_and_sort_csv(child_eval_path)
+    parent_lines = read_and_sort_csv(parent_eval_path)
     
     processed_child_lines = process_lines(child_lines[1:])  # Skip header
     processed_parent_lines = process_lines(parent_lines[1:])  # Skip header
 
     # Combining and sorting the lines from both files
     combined_lines = sorted(processed_child_lines + processed_parent_lines, key=lambda x: float(x.split(',')[1]))
-
-    for line in combined_lines:
-        print(line.strip())    
+    
+    
+    # Printing the combined lines to a file
+    prev_time = 0
+    with open(os.path.join(eval_path, 'combined.csv'), 'w') as file:
+        for line in combined_lines:
+            time = float(line.split(',')[1])
+            print(line.strip(), end=',')
+            file.write(line.strip() + ',')
+            duration = time - prev_time
+            if prev_time == 0:
+                print('0.00')
+                file.write('0.00\n')
+            else:
+                print(f'{duration * 1000:.2f}')
+                file.write(f'{duration * 1000:.2f}\n')
+            prev_time = time
+        
+    
+    # for line in combined_lines:
+    #     print(line.strip())    
 
 if __name__ == '__main__':
     main()

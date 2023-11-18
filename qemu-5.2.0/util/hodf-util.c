@@ -75,14 +75,19 @@ void hodf_print_events(void) {
     printf("Pid, Time, Event\n");
     #else
     fprintf(hodf_fd, "Pid,Time,Event\n");
+    // fprintf(hodf_fd, "Pid,Time,Event,delta(ms)\n");
     #endif
-
+    double prev_time = 0;
     for (int i = 0; i < hodf_events_size; i++) {
+        double delta = hodf_events[i].time - prev_time;
+        if(i == 0) delta = 0;
         #ifndef USE_FILE
-        printf("Pid: %d, Time: %.2f, Event: %s\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
+        printf("Pid: %d, Time: %.2f, Event: %s, Duration: %.2f\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event, delta * 1000);
         #else
+        // fprintf(hodf_fd, "%d,%.6f,%s,%.6f\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event, delta * 1000);
         fprintf(hodf_fd, "%d,%.6f,%s\n", hodf_events[i].pid, hodf_events[i].time, hodf_events[i].event);
         #endif
+        prev_time = hodf_events[i].time;
     }
 
     #ifdef USE_FILE
