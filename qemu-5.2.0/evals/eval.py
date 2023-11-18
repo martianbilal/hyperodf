@@ -26,6 +26,28 @@ def process_lines(lines):
     return processed_lines
 
 
+def print_evaluation(lines: list, file_path: str):
+    prev_time = 0
+    
+    
+    
+    with open(os.path.join(eval_path, file_path), 'w') as file:
+        print('PID,Time,Event,Duration(ms)')
+        file.write('PID,Time,Event,Duration(ms)\n')
+        for line in lines:
+            time = float(line.split(',')[1])
+            print(line.strip(), end=',')
+            file.write(line.strip() + ',')
+            duration = time - prev_time
+            if prev_time == 0:
+                print('0.00')
+                file.write('0.00\n')
+            else:
+                print(f'{duration * 1000:.2f}')
+                file.write(f'{duration * 1000:.2f}\n')
+            prev_time = time
+    
+
 
 def main():
     child_eval_path = os.path.join(eval_path, 'hodf_child.csv')
@@ -40,22 +62,7 @@ def main():
     # Combining and sorting the lines from both files
     combined_lines = sorted(processed_child_lines + processed_parent_lines, key=lambda x: float(x.split(',')[1]))
     
-    
-    # Printing the combined lines to a file
-    prev_time = 0
-    with open(os.path.join(eval_path, 'combined.csv'), 'w') as file:
-        for line in combined_lines:
-            time = float(line.split(',')[1])
-            print(line.strip(), end=',')
-            file.write(line.strip() + ',')
-            duration = time - prev_time
-            if prev_time == 0:
-                print('0.00')
-                file.write('0.00\n')
-            else:
-                print(f'{duration * 1000:.2f}')
-                file.write(f'{duration * 1000:.2f}\n')
-            prev_time = time
+    print_evaluation(combined_lines, 'combined.csv')
         
     
     # for line in combined_lines:
