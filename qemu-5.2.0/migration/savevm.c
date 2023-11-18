@@ -3057,12 +3057,12 @@ int load_snapshot(const char *name, Error **errp)
     bdrv_drain_all_begin();
 
     hodf_add_event("bdrv_all_goto_snapshot");
-    ret = bdrv_all_goto_snapshot(name, &bs, errp);
-    if (ret < 0) {
-        error_prepend(errp, "Could not load snapshot '%s' on '%s': ",
-                      name, bdrv_get_device_or_node_name(bs));
-        goto err_drain;
-    }
+    // ret = bdrv_all_goto_snapshot(name, &bs, errp);
+    // if (ret < 0) {
+    //     error_prepend(errp, "Could not load snapshot '%s' on '%s': ",
+    //                   name, bdrv_get_device_or_node_name(bs));
+    //     goto err_drain;
+    // }
     hodf_add_event("bdrv_all_goto_snapshot done");
     /* restore the VM state */
     f = qemu_fopen_bdrv(bs_vm_state, 0);
