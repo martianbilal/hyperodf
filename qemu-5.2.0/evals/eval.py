@@ -50,6 +50,10 @@ def print_evaluation(lines: list, file_path: str):
 
 
 def main():
+    # check if we got an argument --silent
+    if len(sys.argv) > 1 and sys.argv[1] == '--silent':
+        sys.stdout = open(os.devnull, 'w')
+
     child_eval_path = os.path.join(eval_path, 'hodf_child.csv')
     parent_eval_path = os.path.join(eval_path, 'hodf_parent.csv')
 
