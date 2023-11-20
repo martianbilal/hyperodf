@@ -2737,7 +2737,7 @@ void bdrv_aio_cancel_async(BlockAIOCB *acb)
     }
 }
 
-#define DBG_AIO 1
+// #define DBG_AIO 1
 
 #if DBG_AIO == 1
 #define DBG_AIO_PRINT(...) \

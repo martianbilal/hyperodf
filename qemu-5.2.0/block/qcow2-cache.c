@@ -319,6 +319,7 @@ int qcow2_cache_write(BlockDriverState *bs, Qcow2Cache *c)
 
     for (i = 0; i < c->size; i++) {
         DBG_QCOW2_PRINT("Flushing cache entry %d of %d\n", i, c->size);
+        if(i == 40) continue;
         
         ret = qcow2_cache_entry_flush(bs, c, i);
         DBG_QCOW2_PRINT("Executed qcow2_cache_entry_flush for entry %d. ret: %d\n", i, ret);

@@ -34,7 +34,7 @@
 //#define DEBUG_ALLOC2
 //#define DEBUG_EXT
 
-#define DEBUG_QCOW2 1
+// #define DEBUG_QCOW2 1
 
 #if DEBUG_QCOW2 == 1
 #define DBG_QCOW2_PRINT(...) \
