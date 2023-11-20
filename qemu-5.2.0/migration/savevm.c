@@ -3080,11 +3080,13 @@ int load_snapshot(const char *name, Error **errp)
     ret = qemu_loadvm_state(f);
     hodf_add_event("Done with loadvm_state");
 
-    migration_incoming_state_destroy();
+    // migration_incoming_state_destroy();
     aio_context_release(aio_context);
 
-    bdrv_drain_all_end();
+    hodf_add_event("Release aioctx | Starting bdrv drain all end");
+    // bdrv_drain_all_end();
 
+    hodf_add_event("Done with load_snapshot");
     if (ret < 0) {
         error_setg(errp, "Error %d while loading VM state", ret);
         return ret;

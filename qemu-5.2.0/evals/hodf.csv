@@ -1,0 +1,6 @@
+6,Pid: 13529, Time: 1700278327.796138, Event: HMP starting the forkall
+6,Pid: 13529, Time: 1700278327.796192, Event: Starting forkall
+6,Pid: 13560, Time: 1700278327.894737, Event: Starting child
+6,Pid: 13560, Time: 1700278327.894915, Event: Restored threads
+6,Pid: 13560, Time: 1700278328.235399, Event: HMP done recreating threads CHILD
+6,Pid: 13560, Time: 1700278328.387944, Event: HMP Done loading the VM CHILD

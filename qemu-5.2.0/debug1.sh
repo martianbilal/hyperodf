@@ -2,10 +2,16 @@
 
 set timout 30
 
+if {$argc > 0} {
+    set ram_size [lindex $argv 0]
+} else {
+    set ram_size "1G"
+}
+
 spawn ./recreate_snapshot.sh
 
 # Launch run.sh script to create and start the QEMU VM
-spawn ./run.sh
+spawn ./run.sh $ram_size
 
 # sleep 10
 sleep 2

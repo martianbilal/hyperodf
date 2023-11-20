@@ -1,6 +1,13 @@
 #!/bin/sh
 
-tmux new-session -s mysession -n debug1 -d './debug1.sh; read -p "Press [Enter] to exit..."'
+if [ $# -eq 0 ]
+  then
+    ram_size="1G"
+  else
+    ram_size=$1
+fi
+
+tmux new-session -s mysession -n debug1 -d './debug1.sh $ram_size; read -p "Press [Enter] to exit..."'
 tmux new-window -t mysession:1 -n child_sock './child_sock.sh; read -p "Press [Enter] to exit..."'
 tmux attach -t mysession
 
