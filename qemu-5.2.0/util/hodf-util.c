@@ -272,7 +272,8 @@ int h_enable_ept_sharing(void){
     struct odf_info o_info;
     o_info.parent_vcpu_fd = parent_vcpu_fd;
     o_info.child_vcpu_fd = child_vcpu_fd;
-    o_info.mem_size = parent_mem_size;
+    o_info.mem_size = 0x200000;
+    // o_info.mem_size = parent_mem_size;
     DEBUG_PRINT("Enabling ept sharing\n");
     hodf_add_event("Enabling EPT sharing");
 
