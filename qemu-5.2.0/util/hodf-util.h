@@ -3,6 +3,7 @@
 
 #include "qemu/osdep.h"
 #include <bits/pthreadtypes.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <termios.h>
 
@@ -16,8 +17,11 @@
 #include "qemu/thread.h"
 #include "qemu/thread-posix.h"
 #include "qemu/event_notifier.h"
+#include <sys/ioctl.h>
 
 // ======================== HODF ===============================
+#define KVM_EPT_ODF 0xC00CAEC7
+
 #define MAX_EVENT_LEN 100
 typedef struct {
     double time;
@@ -25,6 +29,17 @@ typedef struct {
     int pid;
 } hodf_event;
 
+struct odf_info{
+	int parent_vcpu_fd;
+	int child_vcpu_fd;
+	int mem_size;
+};
+
+
+static int parent_vcpu_fd;
+static uint64_t parent_mem_size;
+static int child_vcpu_fd;
+static int kvm_fd;
 
 
 // ======================== Global vars ========================
@@ -33,7 +48,6 @@ extern int parent_child_pipe[2];
 
 extern hodf_event *hodf_events;
 extern int hodf_events_size;
-
 
 extern GMainLoop *h_iothread_main_loop;
 extern int h_qmp_fd;
@@ -64,6 +78,11 @@ void h_save_iothread_loop(GMainLoop *main_loop);
 void h_intrpt_iothread_loop(void);
 void h_set_qmp_server_fd(int fd);                          // only call with hmp or qmp monitor
 int h_get_qmp_server_fd(void);
+void h_set_parent_vcpu_fd(int fd);
+void h_set_parent_mem_size(uint64_t mem_size);
+void h_set_child_vcpu_fd(int fd);
+int h_enable_ept_sharing(void);
+void h_set_kvm_fd(int fd);
 
 // ======================== HODF EVAL ===============================
 static void h_eval_initialize(const char *filename);

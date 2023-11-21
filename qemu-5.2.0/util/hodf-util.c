@@ -246,3 +246,50 @@ int h_eval_record_time(const char *name){
 
     return 0;
 }
+
+void h_set_parent_vcpu_fd(int fd){
+    parent_vcpu_fd = fd;
+    return;
+}
+
+void h_set_parent_mem_size(uint64_t mem_size){
+    parent_mem_size = mem_size;
+    return;
+}
+
+void h_set_child_vcpu_fd(int fd){
+    child_vcpu_fd = fd;
+    return;
+}
+
+void h_set_kvm_fd(int fd){
+    kvm_fd = fd;
+    return;
+}
+
+int h_enable_ept_sharing(void){
+    int ret = 0;
+    struct odf_info o_info;
+    o_info.parent_vcpu_fd = parent_vcpu_fd;
+    o_info.child_vcpu_fd = child_vcpu_fd;
+    o_info.mem_size = parent_mem_size;
+    DEBUG_PRINT("Enabling ept sharing\n");
+    hodf_add_event("Enabling EPT sharing");
+
+    ret = ioctl(kvm_fd, KVM_EPT_ODF, &o_info);
+    if(ret < 0){
+        DEBUG_PRINT("Error enabling ept sharing\n");
+        
+        // create a string with the error
+        char error[100];
+        sprintf(error, "EPT shared: ERROR %d", ret);
+
+        hodf_add_event(error);
+        return -1;
+    }
+    
+    hodf_add_event("EPT shared: DONE");
+    DEBUG_PRINT("Enabled EPT sharing\n");
+
+    return 0;
+}

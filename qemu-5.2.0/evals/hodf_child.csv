@@ -1,20 +1,22 @@
 Pid,Time,Event
-32758,1700504211.659762,HMP starting the forkall
-32758,1700504211.660039,Starting forkall
-324,1700504211.762363,Starting child
-324,1700504211.762795,Restored threads
-324,1700504211.763623,Started wait for iothread lock
-324,1700504211.763662,Acquired iothread lock
-324,1700504212.204435,Got the socket conn CHILD
-324,1700504212.204445,HMP Start loading the VM CHILD
-324,1700504212.204446,HMP Start loading the snapshot
-324,1700504212.204532,flushing the record/replay queue
-324,1700504212.204537,bdrv_drain_all_begin
-324,1700504212.204596,bdrv_all_goto_snapshot
-324,1700504212.204598,bdrv_all_goto_snapshot done
-324,1700504212.211671,Actuall loadvm_state
-324,1700504212.211749,Done with loadvm_state
-324,1700504212.211750,Release aioctx | Starting bdrv drain all end
-324,1700504212.211750,Done with load_snapshot
-324,1700504212.211770,HMP end loading the snapshot
-324,1700504212.211777,HMP Done loading the VM CHILD
+9444,1700596921.455764,HMP starting the forkall
+9444,1700596921.455788,Starting forkall
+9501,1700596921.560300,Starting child
+9501,1700596921.561272,Restored threads
+9501,1700596921.563785,Started wait for iothread lock
+9501,1700596921.563926,Acquired iothread lock
+9501,1700596922.019316,Got the socket conn CHILD
+9501,1700596922.019326,HMP Start loading the VM CHILD
+9501,1700596922.019327,Enabling EPT sharing
+9501,1700596922.019366,EPT shared: ERROR -1
+9501,1700596922.019384,HMP Start loading the snapshot
+9501,1700596922.019546,flushing the record/replay queue
+9501,1700596922.019552,bdrv_drain_all_begin
+9501,1700596922.019625,bdrv_all_goto_snapshot
+9501,1700596922.019627,bdrv_all_goto_snapshot done
+9501,1700596922.026516,Actuall loadvm_state
+9501,1700596922.026581,Done with loadvm_state
+9501,1700596922.026582,Release aioctx | Starting bdrv drain all end
+9501,1700596922.026582,Done with load_snapshot
+9501,1700596922.026583,HMP end loading the snapshot
+9501,1700596922.026591,HMP Done loading the VM CHILD

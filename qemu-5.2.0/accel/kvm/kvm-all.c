@@ -3188,13 +3188,6 @@ static void debug_maps_dump(){
     #endif
 }
 
-struct odf_info{
-	int parent_vcpu_fd;
-	int child_vcpu_fd;
-	int mem_size;
-};
-
-
 /*
     @brief: function to be called by the child process after fork
            to set up the child VM. This function would be doing
@@ -3216,11 +3209,17 @@ int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, str
     struct kvm_run *run = *runp; // TODO : Update this with the global one
 
     printf("=======================establishing child=========================\n");
+    
+    // TODO: call hodf function to set parent vcpu fd and parent mem size
+    // hodf_set_parent_vcpu_fd(cpu, parent_vcpu_fd);    
+    // hodf_set_parent_mem_size(cpu, parent_mem_size);
+
 
     qemu_cond_init(&cpu->vcpu_recreated_cond);
     cpu->is_child = true;
     s->fd = open("/dev/kvm", 2);
     s->vmfd = kvm_ioctl(s, KVM_CREATE_VM, 0);
+
 
     kvm_irqchip_create(s);
 
@@ -3230,6 +3229,9 @@ int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, str
 
     run = cpu->kvm_run;
     s = cpu->kvm_state;
+
+    // TODO: call hodf function to set child vcpu fd
+    // hodf_set_child_vcpu_fd(cpu, child_vcpu_fd);
 
     cpu->should_wait = false;
     vm_stop(RUN_STATE_RESTORE_VM);

@@ -1115,7 +1115,10 @@ void hmp_vmfork(Monitor *mon, const QDict *qdict)
     // only load in the child
     if(forkall_check_child()){
         hodf_add_event("HMP Start loading the VM CHILD");
+        h_enable_ept_sharing();
         load_vm("newtest", &err);
+        // TODO: Add the IOCTL for EPT sharing here
+        
         // h_eval_record_time("HMP Done loading the VM CHILD");
         hodf_add_event("HMP Done loading the VM CHILD");
         hmp_handle_error(mon, err);

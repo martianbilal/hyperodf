@@ -3461,11 +3461,6 @@ void handle_save_snapshot(void *opaque){
 //     return;
 // }
 
-struct odf_info{
-	int parent_vcpu_fd;
-	int child_vcpu_fd;
-	int mem_size;
-};
 
 void handle_load_snapshot(void *opaque){
     CPUState *cpu = (CPUState*)opaque; 
