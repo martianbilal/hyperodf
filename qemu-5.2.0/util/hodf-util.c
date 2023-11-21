@@ -269,6 +269,8 @@ void h_set_kvm_fd(int fd){
 
 int h_enable_ept_sharing(void){
     int ret = 0;
+    
+    #ifdef USE_EPT
     struct odf_info o_info;
     o_info.parent_vcpu_fd = parent_vcpu_fd;
     o_info.child_vcpu_fd = child_vcpu_fd;
@@ -286,11 +288,12 @@ int h_enable_ept_sharing(void){
         sprintf(error, "EPT shared: ERROR %d", ret);
 
         hodf_add_event(error);
-        return -1;
+        return ret;
     }
     
     hodf_add_event("EPT shared: DONE");
     DEBUG_PRINT("Enabled EPT sharing\n");
+    #endif
 
-    return 0;
+    return ret;
 }
