@@ -1,0 +1,23 @@
+PID,Time,Event,Duration(ms)
+8228,1700601798.322681,Starting forkall,0.00
+8228,1700601798.424414,Starting parent,101.73
+8228,1700601798.424629,Started wait for iothread lock,0.22
+8228,1700601798.424633,Acquired iothread lock,0.00
+8228,1700601798.424677,HMP done in parent,0.04
+8244,1700601798.424765,Starting child,0.09
+8244,1700601798.424938,Restored threads,0.17
+8244,1700601798.425454,Started wait for iothread lock,0.52
+8244,1700601798.425457,Acquired iothread lock,0.00
+8244,1700601798.847389,Got the socket conn CHILD,421.93
+8244,1700601798.847397,HMP Start loading the VM CHILD,0.01
+8244,1700601798.847398,HMP Start loading the snapshot,0.00
+8244,1700601798.847480,flushing the record/replay queue,0.08
+8244,1700601798.847485,bdrv_drain_all_begin,0.01
+8244,1700601798.847542,bdrv_all_goto_snapshot,0.06
+8244,1700601798.847544,bdrv_all_goto_snapshot done,0.00
+8244,1700601798.853899,Actuall loadvm_state,6.36
+8244,1700601798.853970,Done with loadvm_state,0.07
+8244,1700601798.853971,Release aioctx | Starting bdrv drain all end,0.00
+8244,1700601798.853971,Done with load_snapshot,0.00
+8244,1700601798.853975,HMP end loading the snapshot,0.00
+8244,1700601798.853979,HMP Done loading the VM CHILD,0.00
