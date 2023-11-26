@@ -6,6 +6,7 @@
 
 // debug flag for hodf
 // #define DBG_HODF
+#define USE_EPT
 
 #ifdef DBG_HODF
 #define DEBUG_PRINT(fmt, args...) printf( "[%d|%s():%d] " fmt, \

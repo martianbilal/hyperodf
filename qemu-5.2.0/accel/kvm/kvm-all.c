@@ -3212,7 +3212,8 @@ int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, str
     
     // TODO: call hodf function to set parent vcpu fd and parent mem size
     // hodf_set_parent_vcpu_fd(cpu, parent_vcpu_fd);    
-    // hodf_set_parent_mem_size(cpu, parent_mem_size);
+    h_set_parent_mem_size(0x20000);
+    h_set_parent_vcpu_fd(cpu->kvm_fd);
 
 
     qemu_cond_init(&cpu->vcpu_recreated_cond);
@@ -3227,8 +3228,12 @@ int kvm_establish_child(CPUState *cpu, KVMState **sp, struct kvm_run **runp, str
     kvm_init_vcpu(cpu, NULL);
     kvm_set_vcpu_attrs(cpu, prefork_state, cpu->kvm_fd);
 
+
     run = cpu->kvm_run;
     s = cpu->kvm_state;
+
+    h_set_kvm_fd(s->fd);
+    h_set_child_vcpu_fd(cpu->kvm_fd);
 
     // TODO: call hodf function to set child vcpu fd
     // hodf_set_child_vcpu_fd(cpu, child_vcpu_fd);
