@@ -8,7 +8,7 @@ function test_ram_size {
     do
         echo "Testing the VM with $ram_size of RAM for ($i)th time"
         ./start_demo1.sh "$ram_size" &
-        sleep 4
+        sleep 6
         ./clean_demo.sh
         ./evals/eval.py
 
