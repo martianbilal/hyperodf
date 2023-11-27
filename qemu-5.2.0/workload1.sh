@@ -51,15 +51,23 @@ fi
 
 if [ $1 -eq 0 ]; then
     echo "Running all tests"
+
+    # 1st test: Vanilla
+    run_dir="run_vanilla"
+    run_and_save $run_dir
+    
+    # 2nd test: ODF enabled
     run_dir="run_odf"
     # enable odf
     echo 1 > /proc/self/use_odf
     run_and_save $run_dir
 
+    # 3rd test: ODF enabled + EPT sharing enabled
     sed -i 's/^\/\/#define USE_EPT/#define USE_EPT/' $hodf_util_file
     run_dir="run_odf_ept"
     run_and_save $run_dir
 
+    # 4th test: ODF disable + EPT sharing enabled
     echo 0 > /proc/self/use_odf
     run_dir="run_ept"
     run_and_save $run_dir
