@@ -1,0 +1,9 @@
+PID,Time,Event,Duration(ms)
+935,1700976795.415275,Starting forkall,0.00
+935,1700976795.514472,Starting parent,99.20
+935,1700976795.515293,Started wait for iothread lock,0.82
+935,1700976795.515393,Acquired iothread lock,0.10
+935,1700976795.515474,HMP done in parent,0.08
+1107,1700976803.597999,Starting forkall,8082.53
+1120,1700976803.697622,Starting child,99.62
+1120,1700976803.706454,Restored threads,8.83
