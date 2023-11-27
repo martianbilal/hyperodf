@@ -21,3 +21,4 @@ test_ram_size "1G"
 test_ram_size "2G"
 test_ram_size "3G"
 test_ram_size "4G"
+tmux wait -S workloadDone
