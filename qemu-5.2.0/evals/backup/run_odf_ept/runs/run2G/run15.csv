@@ -1,23 +1,25 @@
 PID,Time,Event,Duration(ms)
-18786,1701130024.364447,Starting forkall,0.00
-18786,1701130024.466393,Starting parent,101.95
-18786,1701130024.466960,Started wait for iothread lock,0.57
-18786,1701130024.466978,Acquired iothread lock,0.02
-18812,1701130024.467250,Starting child,0.27
-18786,1701130024.467484,HMP done in parent,0.23
-18812,1701130024.467760,Restored threads,0.28
-18812,1701130024.468465,Started wait for iothread lock,0.71
-18812,1701130024.468481,Acquired iothread lock,0.02
-18812,1701130024.864511,Got the socket conn CHILD,396.03
-18812,1701130024.864519,HMP Start loading the VM CHILD,0.01
-18812,1701130024.864520,HMP Start loading the snapshot,0.00
-18812,1701130024.864598,flushing the record/replay queue,0.08
-18812,1701130024.864617,bdrv_drain_all_begin,0.02
-18812,1701130024.864675,bdrv_all_goto_snapshot,0.06
-18812,1701130024.864677,bdrv_all_goto_snapshot done,0.00
-18812,1701130024.876633,Actuall loadvm_state,11.96
-18812,1701130024.876897,Done with loadvm_state,0.26
-18812,1701130024.876901,Release aioctx | Starting bdrv drain all end,0.00
-18812,1701130024.876902,Done with load_snapshot,0.00
-18812,1701130024.876921,HMP end loading the snapshot,0.02
-18812,1701130024.876958,HMP Done loading the VM CHILD,0.04
+23559,1701136056.124385,Starting forkall,0.00
+23559,1701136056.231542,Starting parent,107.16
+23572,1701136056.232160,Starting child,0.62
+23559,1701136056.232636,Started wait for iothread lock,0.48
+23572,1701136056.233157,Restored threads,0.52
+23572,1701136056.234255,Started wait for iothread lock,1.10
+23559,1701136056.235244,Acquired iothread lock,0.99
+23559,1701136056.235299,HMP done in parent,0.06
+23572,1701136056.254126,Acquired iothread lock,18.83
+23572,1701136056.597604,Got the socket conn CHILD,343.48
+23572,1701136056.597607,HMP Start loading the VM CHILD,0.00
+23572,1701136056.597607,Enabling EPT sharing,0.00
+23572,1701136056.598704,EPT shared: DONE,1.10
+23572,1701136056.598718,HMP Start loading the snapshot,0.01
+23572,1701136056.598737,flushing the record/replay queue,0.02
+23572,1701136056.598741,bdrv_drain_all_begin,0.00
+23572,1701136056.598758,bdrv_all_goto_snapshot,0.02
+23572,1701136056.598761,bdrv_all_goto_snapshot done,0.00
+23572,1701136056.601339,Actuall loadvm_state,2.58
+23572,1701136056.601424,Done with loadvm_state,0.08
+23572,1701136056.601425,Release aioctx | Starting bdrv drain all end,0.00
+23572,1701136056.601425,Done with load_snapshot,0.00
+23572,1701136056.601430,HMP end loading the snapshot,0.01
+23572,1701136056.601436,HMP Done loading the VM CHILD,0.01

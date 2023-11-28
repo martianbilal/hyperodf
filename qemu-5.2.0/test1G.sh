@@ -4,7 +4,7 @@
 
 function test_ram_size {
     ram_size=$1
-    for i in {1..10}
+    for i in {1..30}
     do
         echo "Testing the VM with $ram_size of RAM for ($i)th time"
         ./start_demo1.sh "$ram_size" &
