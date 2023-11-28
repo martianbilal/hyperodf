@@ -49,48 +49,62 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-if [ $1 -eq 0 ]; then
-    echo "Running all tests"
-
-    # 1st test: Vanilla
-    run_dir="run_vanilla"
-    run_and_save $run_dir
-    
-    # 2nd test: ODF enabled
-    run_dir="run_odf"
-    # enable odf
-    echo 1 > /proc/self/use_odf
-    run_and_save $run_dir
-
-    # 3rd test: ODF enabled + EPT sharing enabled
-    sed -i 's/^\/\/#define USE_EPT/#define USE_EPT/' $hodf_util_file
-    run_dir="run_odf_ept"
-    run_and_save $run_dir
-
-    # 4th test: ODF disable + EPT sharing enabled
-    echo 0 > /proc/self/use_odf
-    run_dir="run_ept"
-    run_and_save $run_dir
-elif [ $1 -eq 1 ]; then
+test_vanilla() {
     echo "Running vanilla"
+    
+    sed -i 's/^#define USE_EPT/\/\/#define USE_EPT/' $hodf_util_file
+    echo 0 > /proc/self/use_odf
+
     run_dir="run_vanilla"
     run_and_save $run_dir
-elif [ $1 -eq 2 ]; then
+}
+
+test_odf() {
     echo "Running ODF enabled"
-    run_dir="run_odf"
-    # enable odf
+    sed -i 's/^#define USE_EPT/\/\/#define USE_EPT/' $hodf_util_file
     echo 1 > /proc/self/use_odf
+
+    run_dir="run_odf"
     run_and_save $run_dir
-elif [ $1 -eq 3 ]; then
+}
+
+test_odf_ept() {
     echo "Running ODF enabled + EPT sharing enabled"
     sed -i 's/^\/\/#define USE_EPT/#define USE_EPT/' $hodf_util_file
+    echo 1 > /proc/self/use_odf
+
     run_dir="run_odf_ept"
     run_and_save $run_dir
-elif [ $1 -eq 4 ]; then
+}
+
+test_ept() {
     echo "Running ODF disable + EPT sharing enabled"
+    sed -i 's/^\/\/#define USE_EPT/#define USE_EPT/' $hodf_util_file
     echo 0 > /proc/self/use_odf
+
     run_dir="run_ept"
     run_and_save $run_dir
+}
+
+if [ $1 -eq 0 ]; then
+    echo "Running all tests"
+    test_vanilla
+    test_odf
+    test_odf_ept
+    test_ept
+
+elif [ $1 -eq 1 ]; then
+    test_vanilla
+
+elif [ $1 -eq 2 ]; then
+    test_odf
+
+elif [ $1 -eq 3 ]; then
+    test_odf_ept
+
+elif [ $1 -eq 4 ]; then
+    test_ept
+    
 else
     print_help
     exit 1

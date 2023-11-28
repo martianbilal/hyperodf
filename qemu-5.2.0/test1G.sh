@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-
+make -j $(nproc)
 function test_ram_size {
     ram_size=$1
     for i in {1..30}
