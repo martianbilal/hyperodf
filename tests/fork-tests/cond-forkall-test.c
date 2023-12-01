@@ -3,6 +3,36 @@
 #include <unistd.h>
 #include <pthread.h>
 
+// TODO: Add a cond var, and make one of the child thread wait for it while the other thread broadcasts it
+// The cond var is supposed to be initialized and set up in the parent process, and then inherited by the child process.
+
+
+int counter = 0;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+static void broadcaster(void) {
+    for (int i = 0; i < 5; ++i) {
+        pthread_mutex_lock(&mutex);
+        counter++;
+        printf("[%d]Producer: Counter = %d\n", getpid(), counter);
+        pthread_cond_broadcast(&cond);  // Signal the consumer
+        pthread_mutex_unlock(&mutex);
+        sleep(1);  // Simulate work (e.g., producing data)
+    }
+}
+
+
+static void consumer(void) {
+    pthread_mutex_lock(&mutex);
+    while (counter < 5) {
+        pthread_cond_wait(&cond, &mutex);  // Wait for signal
+        printf("Consumer: Counter = %d\n", counter);
+    }
+    pthread_mutex_unlock(&mutex);
+    return;
+}
+
 // Slave thread function
 void *slave_function(void *arg) {
     int *id_ptr = (int *)arg;
@@ -17,6 +47,11 @@ void *slave_function(void *arg) {
         if (did_fork) {
             if (is_child) {
                 printf("Child: Slave Thread %d is duplicated in child process\n", id);
+                if(id == 1){
+                    broadcaster();
+                } else {
+                    consumer();
+                }
             } else {
                 printf("Parent: Slave Thread %d continues in parent process\n", id);
             }
@@ -62,7 +97,7 @@ int main() {
     
     printf("Parent: Master Thread is sleeping\n");
     // Simulate continuing work in both parent and child processes
-    sleep(3);
+    sleep(10);
     printf("Parent: Master Thread is continuing in parent process\n");
 
     return 0;
