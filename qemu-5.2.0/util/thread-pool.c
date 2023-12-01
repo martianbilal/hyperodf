@@ -139,7 +139,7 @@ static void *worker_thread(void *opaque)
                     // }
                     if(did_fork){
                         ski_log_forkall("Did fork");
-                        count = &pool->sem.count;
+                        // count = &pool->sem.count;
 
                         // qemu_sem_init(&pool->sem, count);
                         // pool->idle_threads --;

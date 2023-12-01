@@ -89,5 +89,10 @@
         "titleBar.inactiveBackground": "#3308da99",
         "titleBar.inactiveForeground": "#e7e7e799"
     },
-    "peacock.remoteColor": "#3308da"
+    "peacock.remoteColor": "#3308da",
+    "clangd.arguments": [
+        "-background-index",
+        "-compile-commands-dir=build"
+    ]
+
 }

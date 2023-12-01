@@ -59,6 +59,7 @@ int main() {
         printf("Child: Master Thread is running in child process\n");
     }
 
+    
     // Simulate continuing work in both parent and child processes
     sleep(5);
 
