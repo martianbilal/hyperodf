@@ -67,7 +67,7 @@ void *slave_function(void *arg) {
 }
 
 int main() {
-    pthread_t thread1, thread2;
+    pthread_t thread1, thread2,thread3;
     int id1 = 1, id2 = 2;
 
     // Initialize the ski_forkall system
@@ -76,6 +76,7 @@ int main() {
     // Create and register slave threads
     ski_forkall_pthread_create(&thread1, NULL, slave_function, &id1);
     ski_forkall_pthread_create(&thread2, NULL, slave_function, &id2);
+    ski_forkall_pthread_create(&thread3, NULL, slave_function, &id2);
 
     // Simulate some work in the main thread
     sleep(2);
