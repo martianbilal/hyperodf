@@ -5,7 +5,7 @@ all: normal
 
 .PHONY: normal
 normal: forkall-test.c
-	gcc -lpthread -o forkall-test ./forkall-test.c ./forkall-coop.c
+	gcc -o forkall-test ./forkall-test.c ./forkall-coop.c -lpthread
 	./forkall-test
 
 .PHONY: forkall-test
