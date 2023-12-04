@@ -28,6 +28,7 @@ typedef struct {
 
 channel_t ch_1;
 channel_t ch_2;
+channel_hdr_t *shm_hdr;
 
 
 void printUsage() {
@@ -35,14 +36,18 @@ void printUsage() {
 }
 
 void cleanup() {
-    munmap( ch_1.hdr, sizeof(channel_hdr_t) );
-    close( ch_1.fd );
+    // munmap( ch_1.hdr, sizeof(channel_hdr_t) );
+    // close( ch_1.fd );
 
-    munmap( ch_2.hdr, sizeof(channel_hdr_t) );
-    close( ch_2.fd );
+    // munmap( ch_2.hdr, sizeof(channel_hdr_t) );
+    // close( ch_2.fd );
     // Cleanup the shared memory
-    shm_unlink("channel1");
-    shm_unlink("channel2");
+    // shm_unlink("channel1");
+    // shm_unlink("channel2");
+    pthread_condattr_t cond_attr;
+    pthread_condattr_init(&cond_attr);
+    pthread_condattr_setpshared (&cond_attr, PTHREAD_PROCESS_SHARED);
+    pthread_cond_init (&shm_hdr->cond, &cond_attr);
     
 }
 
@@ -154,7 +159,7 @@ int init_channel(char *shm_name, channel_t *out) {
         return 4;
     }
 
-    channel_hdr_t *shm_hdr = ptr_shm_hdr;
+    shm_hdr = ptr_shm_hdr;
 
     if (initialize) {
         // set mutex shared between processes
