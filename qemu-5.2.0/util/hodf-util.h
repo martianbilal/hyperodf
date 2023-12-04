@@ -39,7 +39,7 @@ typedef struct QemuCondList {
     GList *list;
 } QemuCondList;
 
-static QemuCondList *qemu_cond_list;
+extern QemuCondList *qemu_cond_list;
 
 static int parent_vcpu_fd;
 static uint64_t parent_mem_size;

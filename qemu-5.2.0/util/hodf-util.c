@@ -5,7 +5,7 @@
 #include "util/forkall-coop.h"
 
 // debug flag for hodf
-// #define DBG_HODF
+#define DBG_HODF
 //#define USE_EPT
 
 #ifdef DBG_HODF
@@ -36,6 +36,8 @@ int hodf_events_size =0;
 
 GMainLoop *h_iothread_main_loop;
 int h_qmp_fd = 0;
+
+QemuCondList *qemu_cond_list = NULL;
 
 
 //==============================================================
