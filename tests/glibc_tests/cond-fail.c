@@ -47,7 +47,8 @@ void cleanup() {
     pthread_condattr_t cond_attr;
     pthread_condattr_init(&cond_attr);
     pthread_condattr_setpshared (&cond_attr, PTHREAD_PROCESS_SHARED);
-    pthread_cond_init (&shm_hdr->cond, &cond_attr);
+    pthread_cond_init (&ch_1.hdr->cond, &cond_attr);
+    pthread_cond_init (&ch_2.hdr->cond, &cond_attr);
     
 }
 
