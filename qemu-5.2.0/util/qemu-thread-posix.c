@@ -17,6 +17,7 @@
 #include "qemu-thread-common.h"
 #include "qemu/tsan.h"
 #include "forkall-coop.h"
+#include "util/hodf-util.h"
 
 static bool name_threads;
 
@@ -128,7 +129,8 @@ void qemu_rec_mutex_init(QemuRecMutex *mutex)
 void qemu_cond_init(QemuCond *cond)
 {
     int err;
-
+    
+    h_qemu_cond_list_add(qemu_cond_list, &cond);
     err = pthread_cond_init(&cond->cond, NULL);
     if (err)
         error_exit(err, __func__);

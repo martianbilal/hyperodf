@@ -39,6 +39,7 @@ typedef struct QemuCondList {
     GList *list;
 } QemuCondList;
 
+static QemuCondList *qemu_cond_list;
 
 static int parent_vcpu_fd;
 static uint64_t parent_mem_size;
@@ -87,18 +88,20 @@ void h_set_parent_mem_size(uint64_t mem_size);
 void h_set_child_vcpu_fd(int fd);
 int h_enable_ept_sharing(void);
 void h_set_kvm_fd(int fd);
-QemuCondList* h_qemu_cond_list_new(void);
-void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond *cond);
-void h_qemu_cond_list_iterate(QemuCondList *qcl, void (*func)(QemuCond *));
-void h_qemu_cond_cleanup(QemuCond *cond);
-void h_qemu_cond_list_cleanup(QemuCondList *qcl);
 
+
+// ======================== HODF Cond Recording ===============================
+static QemuCondList* h_qemu_cond_list_new(void);
+void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond **cond);
+void h_qemu_cond_list_iterate(QemuCondList *qcl, void (*func)(QemuCond **));
+// void h_qemu_cond_cleanup(QemuCond *cond);
+// void h_qemu_cond_list_cleanup(QemuCondList *qcl);
+// ======================== HODF Cond Recording ===============================
 
 // ======================== HODF EVAL ===============================
 static void h_eval_initialize(const char *filename);
 int h_eval_record_time(const char* name);
 int h_eval_reopen_fd(const char *filename);
-
 // ======================== HODF EVAL ===============================
 
 void hodf_add_event(const char *eventDesc);

@@ -96,6 +96,22 @@ void hodf_print_events(void) {
     #endif
 }
 
+QemuCondList* h_qemu_cond_list_new(void) {
+    QemuCondList *qcl = g_malloc(sizeof(QemuCondList));
+    qcl->list = NULL;
+    return qcl;
+}
+
+void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond **cond) {
+    qcl->list = g_list_append(qcl->list, cond);
+}
+
+void h_qemu_cond_list_iterate(QemuCondList *qcl, void (*func)(QemuCond **)) {
+    GList *l;
+    for (l = qcl->list; l != NULL; l = l->next) {
+        func(l->data);
+    }
+}
 
 static void h_eval_initialize(const char *filename){
     // open a CSV file to write the data
@@ -133,6 +149,8 @@ void h_initialize(void){
     // }
     // fclose(hodf_fd);
     #endif
+
+    qemu_cond_list = h_qemu_cond_list_new();
 
     DEBUG_PRINT("Starting initializing");
     metadata_array = malloc(sizeof(hodf_metadata) * H_MAX_CPUS);
