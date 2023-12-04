@@ -111,6 +111,7 @@ void kvm_start_vcpu_thread(CPUState *cpu)
 
     cpu->thread = g_malloc0(sizeof(QemuThread));
     cpu->halt_cond = g_malloc0(sizeof(QemuCond));
+    printf("[debug] cpu->halt_cond : %p\n", cpu->halt_cond);
     qemu_cond_init(cpu->halt_cond);
     snprintf(thread_name, VCPU_THREAD_NAME_SIZE, "CPU %d/KVM",
              cpu->cpu_index);

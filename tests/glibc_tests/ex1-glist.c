@@ -10,23 +10,33 @@ struct testing {
 };
 
 
-static char *get_string(struct testing *test) {
-    return test->name->str;
+static char *get_string(struct testing **test) {
+    struct testing *testref = *test;
+
+    return testref->name->str;
+}
+
+static void add_to_list(GList *list, struct testing *test) {
+    list = g_list_append(list, test);
 }
 
 
 int main(int argc, char** argv) {
     GList* list = NULL;
-    struct testing test;
-    test.a = 1;
-    test.b = 2;
-    test.name = g_string_new("Hello world!");
+    struct testing *test = g_malloc(sizeof(struct testing));
+    test->a = 1;
+    test->b = 2;
+    test->name = g_string_new("Hello world!");
     
 
     
-    list = g_list_append(list, &test);
-    printf("The first item is '%s'\n", get_string(list->data));
+    // add_to_list(list, test);
+    // list = g_list_append(list, &test);
+    // printf("The first item is '%s'\n", get_string(list->data));
 
+    list = g_list_append(list, "Hello world!");
+    printf("The first item is '%s'\n", list->data);
+    
     list = g_list_insert(list, "Baltimore ", 1);
     printf("The second item is '%s'\n", g_list_next(list)->data);
     

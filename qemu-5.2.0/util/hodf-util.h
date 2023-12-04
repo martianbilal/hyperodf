@@ -92,8 +92,10 @@ void h_set_kvm_fd(int fd);
 
 // ======================== HODF Cond Recording ===============================
 static QemuCondList* h_qemu_cond_list_new(void);
-void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond **cond);
-void h_qemu_cond_list_iterate(QemuCondList *qcl, void (*func)(QemuCond **));
+void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond *cond);
+void h_qemu_cond_list_iterate(QemuCondList *qcl, void (*func)(QemuCond *));
+void h_qemu_cond_list_patch(QemuCondList *qcl);
+void h_print_pthread_cond(pthread_cond_t cond);
 // void h_qemu_cond_cleanup(QemuCond *cond);
 // void h_qemu_cond_list_cleanup(QemuCondList *qcl);
 // ======================== HODF Cond Recording ===============================

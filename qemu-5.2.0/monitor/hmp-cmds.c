@@ -60,6 +60,7 @@
 #include "migration/misc.h"
 #include "util/forkall-coop.h"
 #include "util/hodf-util.h"
+#include <unistd.h>
 
 #ifdef CONFIG_SPICE
 #include <spice/enums.h>
@@ -1086,7 +1087,7 @@ static int do_ski_fork(void){
 
         return pid;
     } else {
-        printf("I am the parent\n");
+        printf("I am the parent [%d]\n", getpid());
         // h_eval_record_time("HMP done in parent");
         hodf_add_event("HMP done in parent");
         h_wait_for_load_snapshot();

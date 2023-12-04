@@ -3,9 +3,11 @@
 #include "qemu/thread.h"
 #include "qemu/typedefs.h"
 #include "util/forkall-coop.h"
+#include <bits/pthreadtypes.h>
+#include <pthread.h>
 
 // debug flag for hodf
-#define DBG_HODF
+// #define DBG_HODF
 //#define USE_EPT
 
 #ifdef DBG_HODF
@@ -104,15 +106,66 @@ QemuCondList* h_qemu_cond_list_new(void) {
     return qcl;
 }
 
-void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond **cond) {
+void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond *cond) {
+    printf("cond: %p\n", cond);
+    h_print_pthread_cond(cond->cond);
     qcl->list = g_list_append(qcl->list, cond);
 }
 
-void h_qemu_cond_list_iterate(QemuCondList *qcl, void (*func)(QemuCond **)) {
+void h_qemu_cond_list_iterate(QemuCondList *qcl, void (*func)(QemuCond *)) {
     GList *l;
     for (l = qcl->list; l != NULL; l = l->next) {
         func(l->data);
     }
+}
+
+void h_print_pthread_cond(pthread_cond_t cond) {
+    // if (cond == NULL) {
+    //     printf("Condition variable is NULL.\n");
+    //     return;
+    // }
+
+    // Print the raw bytes of the pthread_cond_t structure
+    unsigned char *cond_bytes = (unsigned char *)&cond;
+    size_t size = sizeof(pthread_cond_t);
+    printf("pthread_cond_t at address %p, size %zu bytes:\n", (void *)&cond, size);
+    
+    for (size_t i = 0; i < size; ++i) {
+        printf("%02x ", cond_bytes[i]);
+        if ((i + 1) % 16 == 0) {
+            printf("\n");
+        }
+    }
+    printf("\n");
+
+}
+
+static void h_qemu_cond_patch(QemuCond *condptr){
+    // QemuCond **condptr2 = *condptr;
+    QemuCond *cond = condptr;
+    int err = 0;
+    
+    hodf_add_event("Patching cond");
+    printf("Patching cond [%d]\n", getpid());
+    // clear the cond variable
+    // memset(cond, 0, sizeof(QemuCond));
+    err = pthread_cond_init(&cond->cond, NULL);
+
+    // printf("Cond: %p\n", (void *)(*cond));
+    h_print_pthread_cond(cond->cond);
+    
+
+    if(err != 0){
+        printf("Error initializing cond: %d\n", err);
+        return;
+    }
+    printf("Done patched cond\n");
+    return;
+}
+
+void h_qemu_cond_list_patch(QemuCondList *qcl) {
+    hodf_add_event("patching cond list");
+    h_qemu_cond_list_iterate(qcl, h_qemu_cond_patch);
 }
 
 static void h_eval_initialize(const char *filename){

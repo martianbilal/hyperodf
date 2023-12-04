@@ -130,11 +130,14 @@ void qemu_cond_init(QemuCond *cond)
 {
     int err;
     
-    h_qemu_cond_list_add(qemu_cond_list, &cond);
     err = pthread_cond_init(&cond->cond, NULL);
     if (err)
         error_exit(err, __func__);
     cond->initialized = true;
+    h_print_pthread_cond(cond->cond);
+    printf("Cond: %p\n", cond);
+    printf("cond ptr: %p\n", &cond);
+    h_qemu_cond_list_add(qemu_cond_list, cond);
 }
 
 void qemu_cond_destroy(QemuCond *cond)

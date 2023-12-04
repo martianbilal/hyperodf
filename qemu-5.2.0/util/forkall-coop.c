@@ -499,6 +499,9 @@ pid_t ski_forkall_master(){
 		// We can now recreate all the threads (also need to release them)
 		ski_log_forkall("Child\n");
 		hodf_add_event("Starting child");
+		h_qemu_cond_list_patch(qemu_cond_list);
+		hodf_add_event("Patched QEMU cond list");
+
 
 		// Prevent child secondary threads from thinking they have been flaged to do another fork
 		forkall_forking = 0;
