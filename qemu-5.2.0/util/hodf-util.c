@@ -107,7 +107,7 @@ QemuCondList* h_qemu_cond_list_new(void) {
 }
 
 void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond *cond) {
-    printf("cond: %p\n", cond);
+    DEBUG_PRINT("cond: %p\n", cond);
     h_print_pthread_cond(cond->cond);
     qcl->list = g_list_append(qcl->list, cond);
 }
@@ -128,15 +128,15 @@ void h_print_pthread_cond(pthread_cond_t cond) {
     // Print the raw bytes of the pthread_cond_t structure
     unsigned char *cond_bytes = (unsigned char *)&cond;
     size_t size = sizeof(pthread_cond_t);
-    printf("pthread_cond_t at address %p, size %zu bytes:\n", (void *)&cond, size);
+    DEBUG_PRINT("pthread_cond_t at address %p, size %zu bytes:\n", (void *)&cond, size);
     
     for (size_t i = 0; i < size; ++i) {
-        printf("%02x ", cond_bytes[i]);
+        DEBUG_PRINT("%02x ", cond_bytes[i]);
         if ((i + 1) % 16 == 0) {
             printf("\n");
         }
     }
-    printf("\n");
+    DEBUG_PRINT("\n");
 
 }
 
@@ -145,8 +145,8 @@ static void h_qemu_cond_patch(QemuCond *condptr){
     QemuCond *cond = condptr;
     int err = 0;
     
-    hodf_add_event("Patching cond");
-    printf("Patching cond [%d]\n", getpid());
+    // hodf_add_event("Patching cond");
+    DEBUG_PRINT("Patching cond [%d]\n", getpid());
     // clear the cond variable
     // memset(cond, 0, sizeof(QemuCond));
     err = pthread_cond_init(&cond->cond, NULL);
@@ -156,15 +156,14 @@ static void h_qemu_cond_patch(QemuCond *condptr){
     
 
     if(err != 0){
-        printf("Error initializing cond: %d\n", err);
+        DEBUG_PRINT("Error initializing cond: %d\n", err);
         return;
     }
-    printf("Done patched cond\n");
+    DEBUG_PRINT("Done patched cond\n");
     return;
 }
 
 void h_qemu_cond_list_patch(QemuCondList *qcl) {
-    hodf_add_event("patching cond list");
     h_qemu_cond_list_iterate(qcl, h_qemu_cond_patch);
 }
 
