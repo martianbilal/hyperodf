@@ -1,5 +1,3 @@
-// https://stackoverflow.com/questions/51730660/is-this-a-bug-in-glibc-pthread
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -10,8 +8,12 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <signal.h>
+
 #define TRUE 1
 #define FALSE 0
+
+
 
 typedef struct {
     pthread_cond_t cond;
@@ -24,8 +26,42 @@ typedef struct {
     channel_hdr_t *hdr;
 } channel_t;
 
+channel_t ch_1;
+channel_t ch_2;
+
+
 void printUsage() {
     printf("usage: shm_comm_test2 channel_name1 channel_name2\n");
+}
+
+void cleanup() {
+    munmap( ch_1.hdr, sizeof(channel_hdr_t) );
+    close( ch_1.fd );
+
+    munmap( ch_2.hdr, sizeof(channel_hdr_t) );
+    close( ch_2.fd );
+    // Cleanup the shared memory
+    shm_unlink("channel1");
+    shm_unlink("channel2");
+    
+}
+
+static void sigint_handler(int sig) {
+    // Print a message when Ctrl+C is pressed
+    printf("Caught SIGINT (Ctrl+C)! Exiting...\n");
+    cleanup();
+    exit(0); // Exit the program
+}
+
+
+static int init_mutex(pthread_mutex_t *mutex) {
+  pthread_mutexattr_t mutex_attr;
+  pthread_mutexattr_init(&mutex_attr);
+  pthread_mutexattr_setpshared (&mutex_attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutexattr_setrobust (&mutex_attr, PTHREAD_MUTEX_ROBUST);
+  pthread_mutexattr_setprotocol(&mutex_attr, PTHREAD_PRIO_INHERIT);
+
+  return pthread_mutex_init (mutex, &mutex_attr);
 }
 
 int robust_mutex_lock(pthread_mutex_t *mutex) {
@@ -53,9 +89,11 @@ int robust_mutex_lock(pthread_mutex_t *mutex) {
   case EOWNERDEAD:
     // the reader that acquired the mutex is dead
     printf("**** EOWNERDEAD ****\n");
+    
 
     // recover the mutex
     if (pthread_mutex_consistent(mutex) == EINVAL) {
+        // init_mutex(mutex);
     printf("**** EOWNERDEAD, EINVAL ****\n");
       err = -15;
       break;
@@ -79,6 +117,8 @@ int init_channel(char *shm_name, channel_t *out) {
     if (shm_fd < 0) {
         if (errno == EEXIST) {
             // open again, do not initialize
+            // initialize = TRUE;
+            printf("opened shm object %s\n", shm_name);
             shm_fd = shm_open (shm_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
             if (shm_fd < 0) {
                 printf( "ERROR: could not create %s, errno: %d\n", shm_name, errno );
@@ -146,15 +186,19 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    // Register the SIGINT handler
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        perror("Unable to catch SIGINT");
+        return 1;
+    }
+
     char *shm_1_name = argv[1];
     char *shm_2_name = argv[2];
 
-    channel_t ch_1;
     if (init_channel(shm_1_name, &ch_1) != 0) {
         return 1;
     }
 
-    channel_t ch_2;
     if (init_channel(shm_2_name, &ch_2) != 0) {
         munmap( ch_1.hdr, sizeof(channel_hdr_t) );
         close( ch_1.fd );
