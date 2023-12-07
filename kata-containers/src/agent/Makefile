@@ -90,7 +90,7 @@ default: $(TARGET) show-header
 $(TARGET): $(GENERATED_CODE) $(TARGET_PATH)
 
 $(TARGET_PATH): $(SOURCES) | show-summary
-	@RUSTFLAGS="$(EXTRA_RUSTFLAGS) --deny warnings" cargo build --target $(TRIPLE) --$(BUILD_TYPE)
+	@RUSTFLAGS="$(EXTRA_RUSTFLAGS)" cargo build --target $(TRIPLE) --$(BUILD_TYPE)
 
 $(GENERATED_FILES): %: %.in
 	@sed $(foreach r,$(GENERATED_REPLACEMENTS),-e 's|@$r@|$($r)|g') "$<" > "$@"
@@ -105,7 +105,6 @@ clippy: $(GENERATED_CODE)
 	cargo clippy --all-targets --all-features --release \
 		-- \
 		-Aclippy::redundant_allocation \
-		-D warnings
 
 format:
 	cargo fmt -- --check

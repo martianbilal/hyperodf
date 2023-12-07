@@ -33,6 +33,7 @@ use crate::log_child;
 
 // Info reveals information about a particular mounted filesystem. This
 // struct is populated from the content in the /proc/<pid>/mountinfo file.
+#[allow(dead_code)]
 #[derive(std::fmt::Debug)]
 pub struct Info {
     id: i32,

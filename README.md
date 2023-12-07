@@ -22,7 +22,7 @@ go version
 Then install rust:
 ```bash
 sudo snap install rustup --classic
-rustup install 1.46.0
+rustup install 1.47.0
 ```
 
 Build and install kata containers
@@ -36,6 +36,49 @@ ls /usr/local/bin/ | grep kata
 ls /usr/share/defaults/kata-containers/
 ls /etc/kata-containers/configuration.toml
 ```
+
+Configuring the kata-containers to use initrd image
+```bash
+sudo sed -i 's/^\(image =.*\)/# \1/g' /etc/kata-containers/configuration.toml
+sudo sed -i 's/^# \(initrd =.*\)/\1/g' /etc/kata-containers/configuration.toml
+```
+Make sure this worked using the following command:
+```bash
+sudo vi /etc/kata-containers/configuration.toml
+```
+
+In order to build the custom kata-agent, use the following commands:
+```bash
+export ARCH="$(uname -m)"
+if [ "$ARCH" = "ppc64le" -o "$ARCH" = "s390x" ]; then export LIBC=gnu; else export LIBC=musl; fi
+[ "${ARCH}" == "ppc64le" ] && export ARCH=powerpc64le
+rustup target add "${ARCH}-unknown-linux-${LIBC}"
+make -C kata-containers/src/agent SECCOMP=no
+```
+These commands build kata-agent without seccomp support.
+
+Create a local rootfs for initrd image:
+```bash
+export distro="ubuntu" # example
+export ROOTFS_DIR="$(realpath kata-containers/tools/osbuilder/rootfs-builder/rootfs)"
+sudo rm -rf "${ROOTFS_DIR}"
+pushd kata-containers/tools/osbuilder/rootfs-builder/
+script -fec 'sudo -E AGENT_INIT=yes USE_DOCKER=true ./rootfs.sh "${distro}"'
+popd
+```
+Build the agent without seccomp support:
+```bash
+script -fec 'sudo -E AGENT_INIT=yes USE_DOCKER=true SECCOMP=no ./rootfs.sh "${distro}"'
+```
+Add your custom agent binary to the rootfs with the following commands:
+```bash
+export ARCH="$(uname -m)"
+[ "${ARCH}" == "ppc64le" ] || [ "${ARCH}" == "s390x" ] && export LIBC=gnu || export LIBC=musl
+[ "${ARCH}" == "ppc64le" ] && export ARCH=powerpc64le
+sudo install -o root -g root -m 0550 -T "${ROOTFS_DIR}/../../../../src/agent/target/${ARCH}-unknown-linux-${LIBC}/release/kata-agent" "${ROOTFS_DIR}/sbin/init"
+
+```
+
 
 
 ## Usage

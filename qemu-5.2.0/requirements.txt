@@ -5,6 +5,7 @@ libglib2.0-dev
 libpixman-1-dev
 socat
 expect
+docker
 
 tools :
     gdb
