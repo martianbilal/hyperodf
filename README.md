@@ -134,6 +134,7 @@ In /etc/kata-containers/configuration.toml, change path = "/path/to/qemu/build/q
 
 > ℹ️ If you are using cgroupv2, make sure you set the sandbox_cgroup_only=true in the configuration.toml file.
 
+
 ### Usage
 
 ### Global Variables to be set
