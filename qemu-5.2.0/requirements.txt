@@ -6,6 +6,11 @@ libpixman-1-dev
 socat
 expect
 docker
+libseccomp-dev
+libcap-ng-dev
+librbd-dev
+libpmem-dev
+libpmemobj-dev
 
 tools :
     gdb

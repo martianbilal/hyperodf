@@ -79,6 +79,58 @@ sudo install -o root -g root -m 0550 -T "${ROOTFS_DIR}/../../../../src/agent/tar
 
 ```
 
+Build an initrd image:
+```bash
+pushd kata-containers/tools/osbuilder/initrd-builder
+script -fec 'sudo -E AGENT_INIT=yes USE_DOCKER=true ./initrd_builder.sh "${ROOTFS_DIR}"'
+popd
+```
+
+Install the initrd image:
+```bash
+pushd kata-containers/tools/osbuilder/initrd-builder
+commit="$(git log --format=%h -1 HEAD)"
+date="$(date +%Y-%m-%d-%T.%N%z)"
+image="kata-containers-initrd-${date}-${commit}"
+sudo install -o root -g root -m 0640 -D kata-containers-initrd.img "/usr/share/kata-containers/${image}"
+(cd /usr/share/kata-containers && sudo ln -sf "$image" kata-containers-initrd.img)
+popd
+```
+
+Build and install setup the kernel for kata-containers: 
+```bash
+./build-kernel.sh -v 5.10.25 -f -d setup
+./build-kernel.sh -v 5.10.25 -d build
+sudo ./build-kernel.sh -v 5.10.25 -d install
+```
+
+Build a custom QEMU:
+```bash
+qemu_version="v5.2.0"
+pushd ~/tools/
+git clone -b "${qemu_version}" https://github.com/qemu/qemu.git
+your_qemu_directory="$(realpath qemu)"
+popd
+```
+```bash
+packaging_dir="$(realpath kata-containers/tools/packaging)"
+"$packaging_dir/scripts/apply_patches.sh" "$packaging_dir/qemu/patches/5.2.x/"
+```
+
+You may need to add "--disable-werror" to the kata.cfg file.
+
+```bash
+pushd "$your_qemu_directory"
+"$packaging_dir/scripts/configure-hypervisor.sh" kata-qemu > kata.cfg
+eval ./configure "$(cat kata.cfg)"
+make -j $(nproc --ignore=1)
+Optional
+sudo -E make install
+popd
+```
+
+In /etc/kata-containers/configuration.toml, change path = "/path/to/qemu/build/qemu-system-x86_64" to point to the correct QEMU binary.
+
 
 
 ## Usage

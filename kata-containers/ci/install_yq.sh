@@ -23,11 +23,14 @@ function install_yq() {
 		GOPATH=${GOPATH:-${HOME}/go}
 		mkdir -p "${GOPATH}/bin"
 		local yq_path="${GOPATH}/bin/yq"
+		echo "Made the yq_path ${yq_path}"
 	else
 		yq_path="/usr/local/bin/yq"
 	fi
+	echo "checking yq_path"
 	[ -x  "${yq_path}" ] && [ "`${yq_path} --version`"X == "yq version ${yq_version}"X ] && return
-
+	
+	echo "reading uname"
 	read -r -a sysInfo <<< "$(uname -sm)"
 
 	case "${sysInfo[0]}" in
@@ -56,22 +59,24 @@ function install_yq() {
 		die "Arch ${sysInfo[1]} not supported"
 		;;
 	esac
-
+	echo "checking curl"
 
 	# Check curl
 	if ! command -v "curl" >/dev/null; then
 		die "Please install curl"
 	fi
-
+	echo "Got curl"
 	## NOTE: ${var,,} => gives lowercase value of var
 	local yq_url="https://${yq_pkg}/releases/download/${yq_version}/yq_${goos,,}_${goarch}"
 	curl -o "${yq_path}" -LSsf "${yq_url}"
 	[ $? -ne 0 ] && die "Download ${yq_url} failed"
 	chmod +x "${yq_path}"
+	echo "Got the yq_path ${yq_path}"
 
 	if ! command -v "${yq_path}" >/dev/null; then
 		die "Cannot not get ${yq_path} executable"
 	fi
 }
 
+echo "Installing yq"
 install_yq
