@@ -8,10 +8,13 @@ if {$argc > 0} {
     set ram_size "1G"
 }
 
+puts "Recreating snapshot"
 spawn ./recreate_snapshot.sh
-# printing something in expect script
+# printing an environment variable in expect
+puts "KERNEL = $env(KERNEL)"
 # Launch run.sh script to create and start the QEMU VM
-puts "Done with recreate ::: starting run.sh"
+
+puts "Launching run.sh"
 spawn ./run.sh $ram_size
 
 

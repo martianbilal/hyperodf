@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ $# -eq 0 ]
   then
@@ -7,7 +7,8 @@ if [ $# -eq 0 ]
     ram_size=$1
 fi
 
-tmux new-session -s mysession -n debug1 -d './debug1.sh $ram_size; read -p "Press [Enter] to exit..."'
+# tmux new-session -s mysession -n debug1 -d './debug1.sh $ram_size; read -p "Press [Enter] to exit..."'
+tmux new-session -s mysession -n debug1 -d 'bash -i -c "./debug1.sh $ram_size; read -p \"Press [Enter] to exit...\""'
 tmux new-window -t mysession:1 -n child_sock './child_sock.sh; read -p "Press [Enter] to exit..."'
 tmux attach -t mysession
 
