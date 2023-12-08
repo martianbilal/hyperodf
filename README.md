@@ -132,8 +132,9 @@ popd
 In /etc/kata-containers/configuration.toml, change path = "/path/to/qemu/build/qemu-system-x86_64" to point to the correct QEMU binary.
 
 
+> ℹ️ If you are using cgroupv2, make sure you set the sandbox_cgroup_only=true in the configuration.toml file.
 
-## Usage
+### Usage
 
 ### Global Variables to be set
 
