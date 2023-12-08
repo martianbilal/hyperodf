@@ -145,11 +145,20 @@ sudo tar Cxzvf /usr/local ./containerd-1.5.2-linux-amd64.tar.gz
 popd
 ```
 
+Install runc:
+```bash
+pushd ~/tools
+wget https://github.com/opencontainers/runc/releases/download/v1.0.1/runc.amd64
+install -m 755 runc.amd64 /usr/local/sbin/runc
+popd
+```
+
 Install cni plugins:
 ```bash
 cd ~/tools
 git clone https://github.com/containernetworking/plugins.git
 pushd plugins
+git checkout 485be65581341430f9106a194a98f0f2412245fb
 ./build_linux.sh
 sudo mkdir /opt/cni
 sudo cp -r bin /opt/cni/
