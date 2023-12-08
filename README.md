@@ -135,6 +135,27 @@ In /etc/kata-containers/configuration.toml, change path = "/path/to/qemu/build/q
 > ℹ️ If you are using cgroupv2, make sure you set the sandbox_cgroup_only=true in the configuration.toml file.
 
 
+#### Using Kata containers with containrd
+
+Install the containerd: 
+```bash
+pushd ~/tools
+wget https://github.com/containerd/containerd/releases/download/v1.5.2/containerd-1.5.2-linux-amd64.tar.gz
+sudo tar Cxzvf /usr/local ./containerd-1.5.2-linux-amd64.tar.gz
+popd
+```
+
+Install cni plugins:
+```bash
+cd ~/tools
+git clone https://github.com/containernetworking/plugins.git
+pushd plugins
+./build_linux.sh
+sudo mkdir /opt/cni
+sudo cp -r bin /opt/cni/
+popd
+```
+
 ### Usage
 
 ### Global Variables to be set
