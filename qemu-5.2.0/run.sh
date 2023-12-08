@@ -1,11 +1,12 @@
 #!/bin/sh
 set +o noclobber
+echo "Starting run.sh"
 # kill -9 $(pgrep qemu)
 cd build ;
 make -j 128 ;
 cd .. ;
 pkill -9 qemu
-
+echo "KERNEL = $KERNEL"
   
 ./build/qemu-system-x86_64 \
   -m 1G \

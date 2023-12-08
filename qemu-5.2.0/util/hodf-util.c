@@ -108,6 +108,10 @@ QemuCondList* h_qemu_cond_list_new(void) {
 
 void h_qemu_cond_list_add(QemuCondList *qcl, QemuCond *cond) {
     DEBUG_PRINT("cond: %p\n", cond);
+    if(qcl == NULL){
+        DEBUG_PRINT("QemuCondList is NULL\n");
+        return;
+    }
     h_print_pthread_cond(cond->cond);
     qcl->list = g_list_append(qcl->list, cond);
 }
